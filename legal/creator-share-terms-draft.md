@@ -72,3 +72,11 @@ Live on the site since slice 3b of the series revamp (a paragraph after **Ad sha
 | Unclaimed credit | held 12 months with reminders, then lapses to the pool |
 | Tip cut | 5%, fan covers card fee, $1 minimum, $500 maximum |
 | Supporter name visibility | anonymous unless the member opts in |
+
+## 7. Terms of Service · section 14 · Secured pay · refund holds (2026-11-16)
+
+Live on the site since 2026-11-16 (`pages/terms.js`, the `#secured-pay` paragraph; Jose: "Yes, hold the money for any disputes"):
+
+> If the poster says the job didn't happen, the poster gets everything back; if the poster cancels the booking or takes the person off the job, the poster gets everything back except the card fee. Either way the money waits three days before it goes back, and in those three days the crew member can tell us the job happened: then it stays held until we decide, and we may ask both of them for details. While the money waits, a poster who said the job didn't happen or was cancelled can change that to "worked it", and the rate is then sent as for any confirmed job.
+
+**Question for counsel.** Studio Tapa now holds a poster's money for three days after they ask for it back, and for as long as it takes to decide when the crew member says the job happened — deciding between the two of them on what each says. Does that holding and deciding change how the platform should describe itself in section 14 (today: "not a party to the job … only holding or releasing the money"), and does it need anything under money-transmission or escrow rules, or a limit on how long a contested amount may be held before it must go back?

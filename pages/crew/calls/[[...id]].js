@@ -19,7 +19,7 @@ import { ownerProductions } from '../../../lib/productions';
 import { CREW_ROLES, CAST_ROLES, UNION_STATUS, WITHIN_CHOICES } from '../../../lib/crewOptions';
 import { SelfTapeField, TapePlayer, playingAge } from '../../../components/crew/CastingBits';
 import { PAY_TYPES, PAY_HINT, MAX_SPOTS, MAX_ENDORSEMENT_CHARS, URGENT_WITHIN_HOURS, AVAILABLE_NOW_CHOICES } from '../../../lib/crewCallRules';
-import { payDollars, crewPayQuote, MIN_CREW_PAY_CENTS, MAX_CREW_PAY_CENTS } from '../../../lib/crewPayRules';
+import { payDollars, crewPayQuote, MIN_CREW_PAY_CENTS, MAX_CREW_PAY_CENTS, workerRefundBox, posterRefundChip, posterRefundLine, canChangeToWorked, CONTEST_PLACEHOLDER, CONTEST_BUTTON, WORKED_AFTER_ALL_BUTTON, CONTEST_NOTE_MIN, CONTEST_NOTE_MAX } from '../../../lib/crewPayRules';
 import { getCrewPayCutPercent } from '../../../lib/crewPay';
 import { SITE } from '../../../lib/siteConfig';
 import { segmentsRefused } from '../../../lib/pageSegments';
@@ -304,7 +304,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
 
 function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
   const router = useRouter();
-  const { call, viewerResponse, canRespond, booked, benched = 0, pastEnd, responses, firstResponseMinutes = null, funded = 0, payWarning = null } = data;
+  const { call, viewerResponse, canRespond, booked, benched = 0, pastEnd, responses, firstResponseMinutes = null, funded = 0, payWarning = null, payNote = null } = data;
   const [reply, setReply] = useState('');
   // Back from Stripe Checkout (pay secured, migration 110): the webhook
   // marks it held a moment later, so re-read the call once.
@@ -333,7 +333,12 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
   const [note, setNote] = useState(null);
   const [endorsing, setEndorsing] = useState(null); // responseId
   const [line, setLine] = useState('');
+  // A refund the poster asked for on the viewer's secured pay (migration 125).
+  const [contestNote, setContestNote] = useState('');
   const isPoster = viewerId && call.poster.userId === viewerId;
+  const myPay = viewerResponse && viewerResponse.pay ? viewerResponse.pay : null;
+  const myRefund = myPay && myPay.refundState && myPay.refundState !== 'none' ? myPay.refundState : null;
+  const firstOf = (name) => String(name || '').split(' ')[0];
 
   async function api(url, body, method = 'POST') {
     setBusy(true);
@@ -372,6 +377,11 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
   async function fund(responseId) {
     const r = await api(`/api/crew/calls/${call.id}/fund`, { responseId });
     if (r && r.url) window.location.assign(r.url);
+  }
+  async function contest(e) {
+    e.preventDefault();
+    const r = await api(`/api/crew/calls/${call.id}/contest-pay`, { responseId: viewerResponse.id, note: contestNote });
+    if (r) { onChange(r); setContestNote(''); }
   }
   async function outcome(responseId, value) {
     const r = await api(`/api/crew/calls/${call.id}/outcome`, { responseId, outcome: value });
@@ -416,7 +426,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
         <span>When</span><span>{fmtRange(call.startsOn, call.endsOn)}</span>
         <span>Where</span><span>{call.remote ? 'Remote — anyone with the role, anywhere' : call.place}{call.miles != null ? ` · ${call.miles} mi from you` : ''}</span>
         <span>Pay</span><span><span className={`cc-pay ${payClass(call.payType)}`}>{call.payLabel}</span> {call.paySecured && <span className="cc-secured">🔒 {payDollars(call.payRateCents)} per person · secured</span>} {call.payNote}</span>
-        {call.paySecured && <><span /><span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the ${SITE.name} fee + card processing); it's held until you confirm they worked, then sent to their payout account. "Didn't happen" refunds you in full.` : `The poster funds your ${payDollars(call.payRateCents)} through ${SITE.name} once you're booked; it's held until they confirm you worked, then sent to your payout account.`}</span></>}
+        {call.paySecured && <><span /><span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the ${SITE.name} fee + card processing); it's held until you confirm they worked, then sent to their payout account. "Didn't happen" refunds you in full three days later, unless they tell us the job happened.` : `The poster funds your ${payDollars(call.payRateCents)} through ${SITE.name} once you're booked; it's held until they confirm you worked, then sent to your payout account.`}</span></>}
         {call.projectTitle && <><span>Project</span><span><Link href={call.projectType === 'pitch' ? `/pitches/${call.projectId}` : `/series/${call.projectId}`} className="crew-chip pitch">{call.projectTitle}</Link></span></>}
         {call.productionTitle && <><span>Production</span><span><Link href={`/productions/${call.productionId}`} className="crew-chip olive">{call.productionTitle}</Link> <span className="crew-mono">booked people join its crew list</span></span></>}
         <span>Posted by</span><span><PersonLine p={call.poster} />{!isPoster && data.workedWithPoster ? <span className="crew-chip ok" style={{ marginLeft: '0.4rem' }}>✓ you’ve worked together {data.workedWithPoster}×</span> : null}</span>
@@ -467,11 +477,23 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
             {viewerResponse.callbackAt && <span className="crew-chip olive">Callback {new Date(viewerResponse.callbackAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
             {(viewerResponse.selfTapeUrl || viewerResponse.selfTapeUid) && <span className="crew-chip ok">✓ Self-tape attached</span>}
             {viewerResponse.outcome === 'worked' && <span className="crew-chip ok">✓ Confirmed job — on your track record</span>}
-            {viewerResponse.pay && viewerResponse.pay.status === 'held' && <span className="crew-chip olive">🔒 {payDollars(viewerResponse.pay.amountCents)} secured for you{viewerResponse.pay.holdLabel ? ` — ${viewerResponse.pay.holdLabel}` : viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms you worked'}</span>}
+            {viewerResponse.pay && viewerResponse.pay.status === 'held' && <span className="crew-chip olive">🔒 {payDollars(viewerResponse.pay.amountCents)} secured for you{myRefund ? ` · ${posterRefundChip(viewerResponse.pay)}` : viewerResponse.pay.holdLabel ? ` — ${viewerResponse.pay.holdLabel}` : viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms you worked'}</span>}
             {viewerResponse.pay && viewerResponse.pay.status === 'released' && <span className="crew-chip ok">💸 {payDollars(viewerResponse.pay.amountCents)} sent to your payout account</span>}
             {viewerResponse.pay && viewerResponse.pay.status === 'refunded' && <span className="crew-chip mute">The secured pay went back to the poster</span>}
             {call.paySecured && viewerResponse.status === 'booked' && !viewerResponse.pay && <span className="crew-chip mute">🔒 {payDollars(call.payRateCents)} secured pay — not funded yet</span>}
           </div>
+          {myRefund && (
+            <div className="crew-status" role="status">
+              {workerRefundBox({ posterFirstName: firstOf(call.poster.displayName), kind: myPay.refundKind, amountCents: myPay.amountCents, dueAt: myPay.refundDueAt, contestedAt: myPay.contestedAt })}
+              {myPay.contestNote && <span className="crew-mono" style={{ display: 'block', marginTop: '0.35rem', textTransform: 'none', letterSpacing: 0 }}>You wrote: “{myPay.contestNote}”</span>}
+            </div>
+          )}
+          {myRefund === 'waiting' && (
+            <form className="cc-form" onSubmit={contest}>
+              <textarea className="crew-input" rows={3} value={contestNote} onChange={(e) => setContestNote(e.target.value)} placeholder={CONTEST_PLACEHOLDER} aria-label={CONTEST_PLACEHOLDER} maxLength={CONTEST_NOTE_MAX} />
+              <div className="crew-actions"><button type="submit" className="crew-btn sm primary" disabled={busy || contestNote.trim().length < CONTEST_NOTE_MIN}>{CONTEST_BUTTON}</button></div>
+            </form>
+          )}
           {viewerResponse.pay && ['held', 'released'].includes(viewerResponse.pay.status) && viewerResponse.payoutReady === false && (
             <div className="crew-status" role="status">Your pay needs somewhere to go: <Link href="/crew/card">set up payouts on your working card</Link> (a few minutes with Stripe). {SITE.name} sends it the moment your account is ready.</div>
           )}
@@ -502,6 +524,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
           {fundedQ && fundedQ !== 'cancelled' && <div className="crew-status ok" role="status">Payment received — it’s held until you confirm the job{refreshed ? '' : '…'}</div>}
           {fundedQ === 'cancelled' && <div className="crew-status" role="status">No charge was made. Fund them whenever you’re ready.</div>}
           {payWarning && <div className="crew-status error" role="alert">{payWarning}</div>}
+          {payNote && <div className="crew-status" role="status">{payNote}</div>}
           <div className="crew-rhead"><h4 className="cc-h4">Responses{responses && responses.length ? ` · ${responses.length}` : ''}{call.kind === 'cast' && data.shortlisted ? ` · ${data.shortlisted} shortlisted` : ''}</h4>{call.kind === 'cast' && responses && responses.length > 0 && <button type="button" className={`crew-btn sm${shortOnly ? ' on' : ''}`} aria-pressed={shortOnly} onClick={() => setShortOnly((v) => !v)}>★ Shortlisted only</button>}</div>
           {(!responses || responses.length === 0) && <div className="crew-muted">No responses yet. Matching people were told when you posted.</div>}
           {responses && responses.filter((r) => !shortOnly || r.shortlisted).map((r) => (
@@ -538,11 +561,18 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
                   {r.outcome === 'worked' && <span className="crew-chip ok">✓ Worked it</span>}
                   {r.outcome === 'no_show' && <span className="crew-chip warn">Didn't happen</span>}
                   {r.outcome === 'cancelled' && <span className="crew-chip mute">Cancelled</span>}
-                  {r.pay && r.pay.status === 'held' && <span className="crew-chip olive" title={`You paid ${payDollars(r.pay.totalCents)} (${payDollars(r.pay.cutCents)} ${SITE.name} fee + ${payDollars(r.pay.feeCents)} card processing)`}>🔒 {payDollars(r.pay.amountCents)} held{r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}</span>}
+                  {r.pay && r.pay.status === 'held' && r.pay.refundState && r.pay.refundState !== 'none' && <span className={`crew-chip ${r.pay.refundState === 'contested' ? 'warn' : 'mute'}`}>{posterRefundChip(r.pay)}</span>}
+                  {r.pay && r.pay.status === 'held' && (!r.pay.refundState || r.pay.refundState === 'none') && <span className="crew-chip olive" title={`You paid ${payDollars(r.pay.totalCents)} (${payDollars(r.pay.cutCents)} ${SITE.name} fee + ${payDollars(r.pay.feeCents)} card processing)`}>🔒 {payDollars(r.pay.amountCents)} held{r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}</span>}
                   {r.pay && r.pay.status === 'released' && <span className="crew-chip ok">💸 {payDollars(r.pay.amountCents)} paid out</span>}
                   {r.pay && r.pay.status === 'refunded' && <span className="crew-chip mute">↩ {payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you</span>}
                   {r.pay && r.pay.status === 'pending_payment' && <span className="crew-chip warn">Payment not finished</span>}
                 </div>
+                {r.pay && r.pay.status === 'held' && r.pay.refundState && r.pay.refundState !== 'none' && (
+                  <div className="cc-outcome">
+                    <span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>{posterRefundLine({ workerFirstName: firstOf(r.person.displayName), amountCents: r.pay.refundAskedCents, dueAt: r.pay.refundDueAt, contested: r.pay.refundState === 'contested' })}</span>
+                    {canChangeToWorked(r.pay) && (r.outcome === 'no_show' || r.outcome === 'cancelled') && <button type="button" className="crew-btn sm" disabled={busy} onClick={() => outcome(r.id, 'worked')}>{WORKED_AFTER_ALL_BUTTON}</button>}
+                  </div>
+                )}
                 {r.status === 'booked' && !r.outcome && pastEnd && (
                   <div className="cc-outcome">
                     <span className="crew-mono">Did they work the job?</span>

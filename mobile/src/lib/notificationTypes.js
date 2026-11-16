@@ -146,6 +146,9 @@ export const NOTIFICATION_TYPES = Object.freeze({
   crew_pay_disputed: kind('Pay disputed', 'card', 'call'),
   crew_pay_dispute_won: kind('Pay dispute won', 'card', 'call'),
   crew_pay_dispute_lost: kind('Pay dispute lost', 'card', 'call'),
+  crew_pay_refund_asked: kind('Refund asked', 'card', 'call'),
+  crew_pay_contested: kind('Refund contested', 'card', 'call'),
+  crew_pay_refund_decided: kind('Refund decided', 'card', 'call'),
 
   // Locations: places, booking requests, Shot here (lib/locations.js,
   // lib/locationRequests.js, lib/locationCredits.js, lib/paymentDisputes.js).

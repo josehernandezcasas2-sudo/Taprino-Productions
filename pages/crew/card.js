@@ -10,7 +10,7 @@ import { Avatar, GearRows, CreditRows } from '../../components/crew/CrewBits';
 import { PerformerEditor } from '../../components/crew/CastingBits';
 import PayoutsCard from '../../components/creator/PayoutsCard';
 import { listMyCrewPay } from '../../lib/crewPay';
-import { payDollars } from '../../lib/crewPayRules';
+import { payDollars, cardRefundWords } from '../../lib/crewPayRules';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnCard } from '../../lib/crewCards';
@@ -346,12 +346,16 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
               {myPay.length > 0 && (
                 <div className="crew-panel crew-paylist">
                   <h3>Your secured pay</h3>
-                  {myPay.map((p) => (
-                    <div key={p.id} className="crew-rhead">
-                      <span><b>{payDollars(p.amountCents)}</b> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link></span>
-                      <span className={`crew-chip ${p.status === 'released' ? 'ok' : 'olive'}`}>{p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : p.holdLabel ? `🔒 yours — ${p.holdLabel}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}</span>
-                    </div>
-                  ))}
+                  {myPay.map((p) => {
+                    // A refund the poster asked for (migration 125): "· refund asked, goes back Nov 19".
+                    const refund = cardRefundWords(p);
+                    return (
+                      <div key={p.id} className="crew-rhead">
+                        <span><b>{payDollars(p.amountCents)}</b> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link>{refund ? <> · <Link href={`/crew/calls/${p.call.id}`}>{refund}</Link></> : null}</span>
+                        <span className={`crew-chip ${p.status === 'released' ? 'ok' : refund ? 'mute' : 'olive'}`}>{p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : refund ? '🔒 held' : p.holdLabel ? `🔒 yours — ${p.holdLabel}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </section>

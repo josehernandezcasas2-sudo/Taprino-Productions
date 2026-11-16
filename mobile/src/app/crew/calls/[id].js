@@ -11,13 +11,16 @@ import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
 import { crew, Chip, Avatar, TierChip, payStyle, fmtRange } from '../../../components/CrewBits';
 import { playingAge } from '../../../components/CastingBits';
+import { payDollars, workerRefundBox, posterRefundChip, posterRefundLine, canChangeToWorked, CONTEST_PLACEHOLDER, CONTEST_BUTTON, WORKED_AFTER_ALL_BUTTON, CONTEST_NOTE_MIN, CONTEST_NOTE_MAX } from '../../../lib/crewPayRules';
 
 // One call (pages/crew/calls/<id> on the web). Respond = a message to the
 // poster with the call attached. The poster books people here and, after
 // the last day, says who worked it — the confirmed job on their record.
 // Pay secured (migration 110): the poster funds a booked person through
 // Stripe Checkout in the in-app browser; the call is re-read when it closes.
-const payDollars = (cents) => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: (cents || 0) % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+// A refund the poster asks for waits three days (migration 125): the crew
+// member can say the job happened, the poster can change their answer to
+// "worked it" — the website's words, from lib/crewPayRules.js.
 
 export default function CallScreen() {
   const router = useRouter();
@@ -36,6 +39,7 @@ export default function CallScreen() {
   const [note, setNote] = useState(null);
   const [endorsing, setEndorsing] = useState(null);
   const [line, setLine] = useState('');
+  const [contestNote, setContestNote] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -103,6 +107,12 @@ export default function CallScreen() {
     }
     return null;
   });
+  // "It happened — tell the studio" (the crew member, while the refund waits).
+  const contest = () => act(async () => {
+    const d = await apiPost(`/api/crew/calls/${id}/contest-pay`, { responseId: data.viewerResponse.id, note: contestNote }, await freshToken(getToken));
+    setContestNote('');
+    return d;
+  });
   const endorse = () => act(async () => {
     await apiPost('/api/crew/endorse', { responseId: endorsing, line, wouldAgain: true }, await freshToken(getToken));
     setEndorsing(null);
@@ -111,6 +121,8 @@ export default function CallScreen() {
   }, 'Thanks — it shows on their profile.');
 
   const first = (name) => String(name || '').split(' ')[0];
+  const myPay = data && data.viewerResponse && data.viewerResponse.pay ? data.viewerResponse.pay : null;
+  const myRefund = myPay && myPay.refundState && myPay.refundState !== 'none' ? myPay.refundState : null;
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
@@ -155,7 +167,7 @@ export default function CallScreen() {
                 <TierChip person={call.poster} />
               </Pressable>
               {call.details ? <Text style={[crew.rowText, { color: colors.inkDim, lineHeight: 20 }]}>{call.details}</Text> : null}
-              {call.paySecured ? <Text style={crew.mono}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the Studio Tapa fee + card processing); held until you confirm they worked, then sent to their payout account. “Didn’t happen” refunds you in full.` : `The poster funds your ${payDollars(call.payRateCents)} through Studio Tapa once you’re booked; held until they confirm you worked, then sent to your payout account.`}</Text> : null}
+              {call.paySecured ? <Text style={crew.mono}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the Studio Tapa fee + card processing); held until you confirm they worked, then sent to their payout account. “Didn’t happen” refunds you in full three days later, unless they tell us the job happened.` : `The poster funds your ${payDollars(call.payRateCents)} through Studio Tapa once you’re booked; held until they confirm you worked, then sent to your payout account.`}</Text> : null}
               {!isPoster && data.workedWithPoster ? <Chip label={`✓ you’ve worked together ${data.workedWithPoster}×`} tone="ok" style={{ alignSelf: 'flex-start' }} /> : null}
               <Text style={crew.mono}>{first(call.poster.displayName)} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked{isPoster && data.firstResponseMinutes ? ` · first response after ${data.firstResponseMinutes < 60 ? `${data.firstResponseMinutes} min` : `${Math.round(data.firstResponseMinutes / 60)} h`}` : ''}</Text>
             </View>
@@ -204,11 +216,23 @@ export default function CallScreen() {
                   {data.viewerResponse.callbackAt ? <Chip label={`Callback ${new Date(data.viewerResponse.callbackAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`} tone="gear" /> : null}
                   {data.viewerResponse.selfTapeUrl || data.viewerResponse.selfTapeUid ? <Chip label="✓ Self-tape attached" tone="ok" /> : null}
                   {data.viewerResponse.outcome === 'worked' ? <Chip label="✓ Confirmed job — on your track record" tone="ok" /> : null}
-                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(data.viewerResponse.pay.amountCents)} secured for you${data.viewerResponse.pay.holdLabel ? ` — ${data.viewerResponse.pay.holdLabel}` : data.viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms'}`} tone="gear" /> : null}
+                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(data.viewerResponse.pay.amountCents)} secured for you${myRefund ? ` · ${posterRefundChip(data.viewerResponse.pay)}` : data.viewerResponse.pay.holdLabel ? ` — ${data.viewerResponse.pay.holdLabel}` : data.viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms'}`} tone="gear" /> : null}
                   {data.viewerResponse.pay && data.viewerResponse.pay.status === 'released' ? <Chip label={`💸 ${payDollars(data.viewerResponse.pay.amountCents)} sent to your payout account`} tone="ok" /> : null}
                   {data.viewerResponse.pay && data.viewerResponse.pay.status === 'refunded' ? <Chip label="The secured pay went back to the poster" tone="mute" /> : null}
                   {call.paySecured && data.viewerResponse.status === 'booked' && !data.viewerResponse.pay ? <Chip label={`🔒 ${payDollars(call.payRateCents)} secured pay — not funded yet`} tone="mute" /> : null}
                 </View>
+                {myRefund ? (
+                  <View style={styles.outcome}>
+                    <Text style={crew.rowText}>{workerRefundBox({ posterFirstName: first(call.poster.displayName), kind: myPay.refundKind, amountCents: myPay.amountCents, dueAt: myPay.refundDueAt, contestedAt: myPay.contestedAt })}</Text>
+                    {myPay.contestNote ? <Text style={crew.mono}>You wrote: “{myPay.contestNote}”</Text> : null}
+                    {myRefund === 'waiting' ? (
+                      <>
+                        <TextInput style={[crew.input, { minHeight: 80, textAlignVertical: 'top' }]} value={contestNote} onChangeText={setContestNote} placeholder={CONTEST_PLACEHOLDER} placeholderTextColor={colors.inkFaint} accessibilityLabel={CONTEST_PLACEHOLDER} multiline maxLength={CONTEST_NOTE_MAX} />
+                        <Pressable style={[crew.btnSm, crew.btnPrimary, { alignSelf: 'flex-start' }, (busy || contestNote.trim().length < CONTEST_NOTE_MIN) && { opacity: 0.5 }]} disabled={busy || contestNote.trim().length < CONTEST_NOTE_MIN} onPress={contest}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{CONTEST_BUTTON}</Text></Pressable>
+                      </>
+                    ) : null}
+                  </View>
+                ) : null}
                 {data.viewerResponse.pay && ['held', 'released'].includes(data.viewerResponse.pay.status) && data.viewerResponse.payoutReady === false ? (
                   <Pressable style={[crew.btnSm, { alignSelf: 'flex-start' }]} onPress={() => router.push('/crew/card')}><Text style={crew.btnSmText}>Set up payouts on your working card →</Text></Pressable>
                 ) : null}
@@ -237,6 +261,7 @@ export default function CallScreen() {
                   <Text style={crew.mono}>{data.booked} of {call.spots} booked{data.benched ? ` · ${data.benched} on the bench` : ''}{call.paySecured ? ` · ${data.funded || 0} funded` : ''}</Text>
                 </View>
                 {data.payWarning ? <Text style={crew.error}>{data.payWarning}</Text> : null}
+                {data.payNote ? <Text style={crew.muted}>{data.payNote}</Text> : null}
                 <View style={[crew.row, { justifyContent: 'space-between' }]}>
                   <Text style={crew.h4}>Responses{data.responses && data.responses.length ? ` · ${data.responses.length}` : ''}{call.kind === 'cast' && data.shortlisted ? ` · ${data.shortlisted} shortlisted` : ''}</Text>
                   {call.kind === 'cast' && data.responses && data.responses.length ? <Chip label="★ Shortlisted only" on={shortOnly} onPress={() => setShortOnly((v) => !v)} /> : null}
@@ -278,11 +303,19 @@ export default function CallScreen() {
                       {r.status === 'declined' ? <Chip label="Declined" tone="mute" /> : null}
                       {r.outcome === 'worked' ? <Chip label="✓ Worked it" tone="ok" /> : null}
                       {r.outcome === 'no_show' ? <Chip label="Didn't happen" tone="mute" /> : null}
-                      {r.pay && r.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(r.pay.amountCents)} held${r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}`} tone="gear" /> : null}
+                      {r.outcome === 'cancelled' ? <Chip label="Cancelled" tone="mute" /> : null}
+                      {r.pay && r.pay.status === 'held' && r.pay.refundState && r.pay.refundState !== 'none' ? <Chip label={posterRefundChip(r.pay)} tone="mute" /> : null}
+                      {r.pay && r.pay.status === 'held' && (!r.pay.refundState || r.pay.refundState === 'none') ? <Chip label={`🔒 ${payDollars(r.pay.amountCents)} held${r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}`} tone="gear" /> : null}
                       {r.pay && r.pay.status === 'released' ? <Chip label={`💸 ${payDollars(r.pay.amountCents)} paid out`} tone="ok" /> : null}
                       {r.pay && r.pay.status === 'refunded' ? <Chip label={`↩ ${payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you`} tone="mute" /> : null}
                       {r.pay && r.pay.status === 'pending_payment' ? <Chip label="Payment not finished" tone="mute" /> : null}
                     </View>
+                    {r.pay && r.pay.status === 'held' && r.pay.refundState && r.pay.refundState !== 'none' ? (
+                      <View style={styles.outcome}>
+                        <Text style={crew.rowText}>{posterRefundLine({ workerFirstName: first(r.person.displayName), amountCents: r.pay.refundAskedCents, dueAt: r.pay.refundDueAt, contested: r.pay.refundState === 'contested' })}</Text>
+                        {canChangeToWorked(r.pay) && (r.outcome === 'no_show' || r.outcome === 'cancelled') ? <Pressable style={[crew.btnSm, { alignSelf: 'flex-start' }]} disabled={busy} onPress={() => outcome(r.id, 'worked')}><Text style={crew.btnSmText}>{WORKED_AFTER_ALL_BUTTON}</Text></Pressable> : null}
+                      </View>
+                    ) : null}
                     {r.status === 'booked' && !r.outcome && data.pastEnd ? (
                       <View style={styles.outcome}>
                         <Text style={crew.mono}>Did they work the job?</Text>

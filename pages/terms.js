@@ -70,7 +70,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-15';
+const TEXT_UPDATED = '2026-11-16';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -439,8 +439,12 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         payout account. Between accounts new to {SITE.name}, or for a person&rsquo;s first payout through
         it, the rate is sent seven days after the confirmation rather than at once, the same for everyone;
         the poster&rsquo;s bank may ask them to confirm the payment when they fund it. If the poster says the
-        person didn&rsquo;t show, the poster gets everything back, and
-        if the booking is cancelled the poster gets everything back except the card fee. Once anyone on a call
+        job didn&rsquo;t happen, the poster gets everything back; if the poster cancels the booking or takes
+        the person off the job, the poster gets everything back except the card fee. Either way the money
+        waits three days before it goes back, and in those three days the crew member can tell us the job
+        happened: then it stays held until we decide, and we may ask both of them for details. While the
+        money waits, a poster who said the job didn&rsquo;t happen or was cancelled can change that to
+        &ldquo;worked it&rdquo;, and the rate is then sent as for any confirmed job. Once anyone on a call
         is funded, the rate and fee are fixed for that call. A poster who disputes a secured payment with
         their bank puts the pay on hold until the bank rules; money already sent to a crew member after the
         poster confirmed the work is not taken back by us. Securing pay doesn&rsquo;t make us a party to the

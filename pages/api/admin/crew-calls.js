@@ -1,7 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
-import { listCalls, listPendingOutcomes, updateCall, setOutcome } from '../../../lib/crewCalls';
+import { listCalls, listPendingOutcomes, updateCall, setOutcome, decideCrewPayRefund } from '../../../lib/crewCalls';
 import { getSupabase } from '../../../lib/supabase';
 import { listReportedProductions, updateProduction } from '../../../lib/productions';
 import { listCrewPaymentsForAdmin, adminRefundCrewPay, adminReleaseCrewPay } from '../../../lib/crewPay';
@@ -17,6 +17,11 @@ import { sendError } from '../../../lib/apiErrors';
 //        { op: 'remove_production', productionId }        take a production down
 //        { op: 'refund_pay', paymentId, reason }          give held crew pay back to the poster
 //        { op: 'release_pay', paymentId }                 push a confirmed job's pay out again
+//        { op: 'decide_refund', paymentId, decision: 'refund' | 'release', note }
+//            a refund the poster asked for (migration 125), usually one the
+//            crew member contested: back to the poster now, or settle the
+//            job as worked and pay the crew member. Full admins only; a row
+//            that isn't waiting any more answers 409, before 125 503.
 export default async function handler(req, res) {
   const account = await getRoleContext(req);
   if (!(account.isAdmin || hasCapability(account, 'handle_flags'))) return res.status(403).json({ error: 'Admin access required.' });
@@ -27,8 +32,10 @@ export default async function handler(req, res) {
         listCalls({ includeClosed: false }, { viewerId: account.userId, includeHeld: true }),
         getSupabase().from('content_reports').select('target_id, reason').eq('target_type', 'call').eq('status', 'open'),
         listReportedProductions().catch(() => []),
-        listCrewPaymentsForAdmin().catch((err) => ({ payments: [], ready: false, error: err.message }))
+        listCrewPaymentsForAdmin().catch((err) => { console.error('admin/crew-calls pay list:', err.message); return { payments: [], ready: false, error: 'couldn’t read the payments' }; })
       ]);
+      // The crew member's note on a contested refund is for full admins only.
+      if (!account.isAdmin && pay && Array.isArray(pay.payments)) pay.payments = pay.payments.map(({ contestNote, ...p }) => p);
       const counts = {};
       for (const r of reports.data || []) counts[r.target_id] = (counts[r.target_id] || 0) + 1;
       return res.status(200).json({
@@ -48,6 +55,15 @@ export default async function handler(req, res) {
           : await adminReleaseCrewPay(String(paymentId || ''), { adminId: account.userId });
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: op === 'refund_pay' ? 'crew_pay_refunded' : 'crew_pay_released', targetType: 'crew_payment', targetId: paymentId, details: op === 'refund_pay' ? `refund: ${reason || 'no reason given'}` : (result.released ? 'released' : result.waiting ? 'waiting on payout account' : result.error || 'no change') });
         return res.status(200).json({ ok: true, result });
+      }
+      if (op === 'decide_refund') {
+        if (!account.isAdmin) return res.status(403).json({ error: 'Only a full admin can move money.' });
+        const decision = String(req.body.decision || '');
+        const note = String(req.body.note || '').trim().slice(0, 500);
+        const out = await decideCrewPayRefund(account.userId, String(paymentId || ''), decision);
+        const r = out.result || {};
+        await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'crew_pay_refund_decided', targetType: 'crew_payment', targetId: paymentId, details: `${decision === 'refund' ? 'refund the poster' : 'pay the crew member'}${r.refundedCents != null ? ` · ${r.refundedCents} cents back` : r.released ? ' · released' : r.waiting ? ' · waiting (hold or payout account)' : r.error ? ` · ${r.error}` : ''}${note ? ` · ${note}` : ''}` });
+        return res.status(200).json({ ok: true, ...out });
       }
       if (op === 'remove_production') {
         const result = await updateProduction(account.userId, String(productionId || ''), { status: 'removed' }, { isAdmin: true });
@@ -88,8 +104,9 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    console.error('admin/crew-calls:', err.message);
+    // A refusal with a code (migration-125) keeps it; anything internal is
+    // answered plainly by sendError.
+    if (err && err.code && err.status && !err.internal) return res.status(err.status).json({ error: err.message, code: err.code });
     return sendError(res, err, 'admin/crew-calls');
   }
 }

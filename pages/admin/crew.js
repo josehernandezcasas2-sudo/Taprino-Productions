@@ -7,7 +7,9 @@ import { payDollars } from '../../lib/crewPayRules';
 // The Crew Call board, admin side (migration 082). Jobs waiting on a
 // poster who's gone quiet (settle them here — a "worked" is a confirmed
 // job on the person's track record), secured crew pay (migration 110:
-// what's held, released, refunded; refund or re-release), calls people
+// what's held, released, refunded; refund or re-release; since migration
+// 125 the refunds posters asked for, waiting three days, and the ones the
+// crew member contested, which a full admin decides), calls people
 // reported, reported productions, and every open call.
 export async function getServerSideProps(ctx) {
   return adminPageProps(ctx, { caps: ['handle_flags'] });
@@ -68,15 +70,26 @@ export default function CrewAdmin({ account, mainGenres }) {
                 <p className="crew-muted" style={{ margin: '0 0 0.6rem', maxWidth: '70ch' }}>
                   Money posters put up for booked people (migration 110). <b>{payDollars(data.pay.heldCents)}</b> held right now{data.pay.waiting ? `, ${data.pay.waiting} confirmed ${data.pay.waiting === 1 ? 'job' : 'jobs'} waiting on the worker’s payout account` : ''} · {payDollars(data.pay.cutCents)} in service fees on held and paid-out jobs. A held payment is released when the job is settled as “worked” (here or by the poster); refund one only when both sides agree the job is off. Released money is reversed from the Stripe dashboard, not here.
                 </p>
+                <p className="crew-muted" style={{ margin: '0 0 0.6rem', maxWidth: '70ch' }}>
+                  When a poster says the job didn’t happen, cancels it or takes someone off it, the money waits three days and then goes back by itself, unless the crew member says the job happened. A contested refund waits here for a full admin: <b>Refund the poster</b> or <b>Pay the crew member</b> (which settles the job as worked). Ask both for details first if you need them.{data.pay.refundsAsked ? ` ${data.pay.refundsAsked} ${data.pay.refundsAsked === 1 ? 'refund' : 'refunds'} asked right now${data.pay.contested ? `, ${data.pay.contested} contested` : ''}.` : ''}
+                </p>
                 {data.pay.payments.length === 0 && <div className="crew-panel crew-empty">Nobody has secured pay yet.</div>}
                 <div className="crew-results">
                   {data.pay.payments.map((p) => (
                     <div key={p.id} className="crew-panel crew-rhead">
                       <span>
                         <b>{payDollars(p.amountCents)}</b> <span className={`crew-chip ${p.status === 'held' ? 'olive' : p.status === 'released' ? 'ok' : 'mute'}`}>{p.statusLabel}{p.status === 'held' && p.holdLabel ? ` · ${p.holdLabel}` : p.status === 'held' && p.releaseRequestedAt ? ' · waiting on payout account' : ''}{p.reversedCents ? ` · ${payDollars(p.reversedCents)} reversed` : ''}</span> <Link href={p.poster.profilePath}>{p.poster.displayName}</Link> → <Link href={p.worker.profilePath}>{p.worker.displayName}</Link> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link>
-                        <span className="crew-mono"> · charged {payDollars(p.totalCents)} (fee {payDollars(p.cutCents)} + card {payDollars(p.feeCents)}) · job {p.outcome || 'not settled'}{p.call.endsOn ? ` · ended ${fmt(p.call.endsOn)}` : ''}{p.refundedCents != null ? ` · refunded ${payDollars(p.refundedCents)}${p.refundReason ? ` (${p.refundReason})` : ''}` : ''}{p.failedReason ? ` · ${p.failedReason}` : ''}</span>
+                        <span className="crew-mono"> · charged {payDollars(p.totalCents)} (fee {payDollars(p.cutCents)} + card {payDollars(p.feeCents)}) · job {p.outcome || 'not settled'}{p.call.endsOn ? ` · ended ${fmt(p.call.endsOn)}` : ''}{p.refundedCents != null ? ` · refunded ${payDollars(p.refundedCents)}${p.refundReason ? ` (${p.refundReason})` : ''}` : ''}{p.failedReason ? ` · ${p.failedReason}` : ''}{p.contestDecision ? ` · decided: ${p.contestDecision === 'release' ? 'paid the crew member' : 'refunded the poster'}` : ''}</span>
+                        {p.refundLine && <span style={{ display: 'block', marginTop: '0.3rem' }}><span className={`crew-chip ${p.refundState === 'contested' ? 'warn' : 'mute'}`}>{p.refundLine}</span> <span className="crew-mono">· {payDollars(p.refundAskedCents)} would go back to {p.poster.displayName}</span></span>}
+                        {p.refundState === 'contested' && p.contestNote && <span className="crew-muted" style={{ display: 'block', marginTop: '0.3rem', maxWidth: '70ch' }}>{p.worker.displayName}: “{p.contestNote}”</span>}
                       </span>
-                      {p.status === 'held' && account.isAdmin && (
+                      {p.status === 'held' && account.isAdmin && p.refundLine && (
+                        <span className="crew-actions">
+                          <button type="button" className="crew-btn sm" disabled={busy === p.id} onClick={() => { if (window.confirm(`Refund ${payDollars(p.refundAskedCents)} to ${p.poster.displayName} now? Both sides are told.`)) act(p.id, { op: 'decide_refund', paymentId: p.id, decision: 'refund' }); }}>Refund the poster</button>
+                          <button type="button" className="crew-btn sm primary" disabled={busy === p.id} onClick={() => { if (window.confirm(`Settle the job as worked and pay ${p.worker.displayName} ${payDollars(p.amountCents)}? Both sides are told.`)) act(p.id, { op: 'decide_refund', paymentId: p.id, decision: 'release' }); }}>Pay the crew member</button>
+                        </span>
+                      )}
+                      {p.status === 'held' && account.isAdmin && !p.refundLine && (
                         <span className="crew-actions">
                           {p.outcome === 'worked' && <button type="button" className="crew-btn sm primary" disabled={busy === p.id} onClick={() => act(p.id, { op: 'release_pay', paymentId: p.id })}>Release again</button>}
                           <button type="button" className="crew-btn sm" disabled={busy === p.id} onClick={() => { const reason = window.prompt(`Refund ${payDollars(p.totalCents)} to ${p.poster.displayName}? Say why (both sides are told):`); if (reason != null) act(p.id, { op: 'refund_pay', paymentId: p.id, reason }); }}>Refund</button>

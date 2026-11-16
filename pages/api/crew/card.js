@@ -2,12 +2,14 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getOwnCard, saveCard, deleteCard } from '../../../lib/crewCards';
 import { crewOptions } from '../../../lib/crewOptions';
 import { getCreditedWork } from '../../../lib/userProfiles';
+import { listMyCrewPay } from '../../../lib/crewPay';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
 
 // The signed-in person's own Crew Call working card.
-//   GET    → { card | null, creditedWork, options }
+//   GET    → { card | null, creditedWork, options, myPay } (myPay: the
+//            secured pay with their name on it, the app's Get paid list)
 //   POST   → save the whole card (lib/crewCards.js cleanCardInput) → { card }
 //   DELETE → remove it → { ok }
 // Same CORS shape as the other account routes so the app can call it
@@ -24,8 +26,8 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const [card, creditedWork] = await Promise.all([getOwnCard(userId), getCreditedWork(userId)]);
-      return res.status(200).json({ card, creditedWork, options: crewOptions() });
+      const [card, creditedWork, myPay] = await Promise.all([getOwnCard(userId), getCreditedWork(userId), listMyCrewPay(userId).catch(() => [])]);
+      return res.status(200).json({ card, creditedWork, options: crewOptions(), myPay });
     }
     if (req.method === 'POST') {
       if (!(await checkRateLimit(`crew-card:${userId}`, 30, 600))) {

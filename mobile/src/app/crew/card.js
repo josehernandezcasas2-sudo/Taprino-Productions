@@ -9,6 +9,7 @@ import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, GearRows, CreditRows, GEAR_FLAGS } from '../../components/CrewBits';
 import { PerformerEditor } from '../../components/CastingBits';
 import PayoutsCard from '../../components/PayoutsCard';
+import { payDollars, cardRefundWords } from '../../lib/crewPayRules';
 
 // Your Crew Call working card (pages/crew/card.js on the web): roles,
 // where you're based and how far you'll go, availability, gear, outside
@@ -51,7 +52,7 @@ export default function CrewCardScreen() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const tokenRef = useRef(null);
 
-  const [state, setState] = useState({ loading: true, error: null, card: null, creditedWork: [], options: FALLBACK_OPTIONS });
+  const [state, setState] = useState({ loading: true, error: null, card: null, creditedWork: [], options: FALLBACK_OPTIONS, myPay: [] });
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState(null);
@@ -74,7 +75,7 @@ export default function CrewCardScreen() {
     tokenRef.current = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
     try {
       const data = await apiGet('/api/crew/card', tokenRef.current);
-      setState({ loading: false, error: null, card: data.card, creditedWork: data.creditedWork || [], options: { ...FALLBACK_OPTIONS, ...data.options } });
+      setState({ loading: false, error: null, card: data.card, creditedWork: data.creditedWork || [], options: { ...FALLBACK_OPTIONS, ...data.options }, myPay: Array.isArray(data.myPay) ? data.myPay : [] });
       const next = fromCard(data.card);
       const untouched = baseRef.current === null || JSON.stringify(formRef.current) === baseRef.current;
       baseRef.current = JSON.stringify(next);
@@ -288,6 +289,25 @@ export default function CrewCardScreen() {
           <Text style={crew.h4}>Secured pay from calls</Text>
           <Text style={crew.muted}>On a call marked 🔒 pay secured, the poster funds your rate through Studio Tapa once you’re booked. It’s held until they confirm you worked, then sent to the payout account below — set it up once and every secured job lands there.</Text>
           <PayoutsCard showEarningsLink={false} />
+          {state.myPay.length ? (
+            <View style={[crew.panel, { gap: 6 }]}>
+              <Text style={crew.h4}>Your secured pay</Text>
+              {state.myPay.map((p) => {
+                // A refund the poster asked for (migration 125): "· refund asked, goes back Nov 19".
+                const refund = cardRefundWords(p);
+                return (
+                  <Pressable key={p.id} onPress={() => router.push(`/crew/calls/${p.call.id}`)} style={{ gap: 4 }}>
+                    <Text style={crew.rowText}>{payDollars(p.amountCents)} · {p.call.role} on {p.call.title}{refund ? ` · ${refund}` : ''}</Text>
+                    <Chip
+                      label={p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : refund ? '🔒 held' : p.holdLabel ? `🔒 yours — ${p.holdLabel}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}
+                      tone={p.status === 'released' ? 'ok' : refund ? 'mute' : 'gear'}
+                      style={{ alignSelf: 'flex-start' }}
+                    />
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
       </>
     );
