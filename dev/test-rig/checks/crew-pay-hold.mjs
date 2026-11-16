@@ -223,9 +223,12 @@ async function after125({ poster, worker, stranger, sub }) {
   ok('…and it can’t be contested while disputed (409)', r.status === 409 && r.json && r.json.code === 'not-held', `${r.status} ${r.text.slice(0, 200)}`);
   await stripeHook('/__dispute', { method: 'POST', body: { charge: h.charge, phase: 'won' } });
   row = payRow(h.payId);
-  ok('won: held again with the refund still waiting', row.status === 'held' && row.refund_kind === 'no_show' && row.refund_due_at, row && { status: row.status, kind: row.refund_kind });
+  ok('won: held again with the refund waiting, and the crew member’s three days start again', row.status === 'held' && row.refund_kind === 'no_show' && near(row.refund_due_at, 3 * 86400000), row && { status: row.status, kind: row.refund_kind, due: row.refund_due_at });
   await cron();
-  ok('…so the next run makes it', payRow(h.payId).status === 'refunded' && (await refundedOnStripe(h)) === h.total);
+  ok('…the next run leaves it while the three days run', payRow(h.payId).status === 'held' && (await refundedOnStripe(h)) === 0);
+  due(h);
+  await cron();
+  ok('…and once they are up, the refund goes', payRow(h.payId).status === 'refunded' && (await refundedOnStripe(h)) === h.total);
 
   section('The working card lists a waiting refund');
   const k = await fundedCall(poster, worker, { tag: 'card' });
