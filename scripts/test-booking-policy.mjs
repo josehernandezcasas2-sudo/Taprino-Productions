@@ -223,10 +223,10 @@ test('a host’s change tells people (lib/locations.js updateListing → lib/boo
   assert.match(types, /location_policy_changed: kind\('Cancellation policy changed', 'account', 'location_request'\)/);
 });
 
-test('a place\'s policy changes at most three times a day; a closed Checkout is forgotten, never a completed one (2026-11-16)', () => {
+test('a place\'s policy changes at most five times a day; a closed Checkout is forgotten, never a completed one (2026-11-16)', () => {
   const loc = read('lib/locations.js');
   const update = between(loc, 'export async function updateListing', 'export function listingToInput');
-  assert.match(loc, /const POLICY_CHANGES_PER_DAY = 3;/);
+  assert.match(loc, /const POLICY_CHANGES_PER_DAY = 5;/);
   // Counted before the save, per place, a full admin's change aside; refused with a 429.
   assert.match(update, /if \(before !== clean\.cancellation && !isAdmin && !\(await checkRateLimit\(`location-policy:\$\{row\.id\}`, POLICY_CHANGES_PER_DAY, 86400\)\)\) \{\s*fail\(POLICY_CHANGES_LINE, 429\);/);
   assert.ok(update.indexOf('location-policy:') < update.indexOf("updateCompat(getSupabase(), 'locations'"), 'refused before anything is written');
