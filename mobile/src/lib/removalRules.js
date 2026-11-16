@@ -156,6 +156,24 @@ export function cancelRemovalRefusal(row, { isAdmin = false } = {}) {
   return { status: 403, code: 'team-removal', error: REMOVAL_WORDS.teamCancel };
 }
 
+// An owner's own removal reason can't read as one the team wrote
+// (2026-11-16): a reason that opens with the team's words ("Removed by an
+// admin: …", a take-down's "Taken down after review: …") made the owner's
+// request look like a removal the team started — only a full admin could
+// then confirm it, deny it or bring it back, a show's removal stamped those
+// words onto its contributors' episodes, and the queue and the audit lines
+// named the team. Refused wherever an owner's reason is stored, in any
+// letter case or spacing and with invisible characters taken out.
+// → { status, code, error } or null.
+export const OWN_REASON_LINE = 'Write the reason in your own words: that opening is the team’s.';
+const INVISIBLE = /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]/g;
+const TEAM_OPENINGS = [ADMIN_REMOVAL_PREFIX, TAKEN_DOWN_PREFIX].map((p) => p.trim().toLowerCase());
+export function ownerReasonRefusal(reason) {
+  const plain = (typeof reason === 'string' ? reason : '').replace(INVISIBLE, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!TEAM_OPENINGS.some((m) => plain.startsWith(m))) return null;
+  return { status: 400, code: 'team-words', error: OWN_REASON_LINE };
+}
+
 // Where a removed (withdrawn) title stands, or null for one that isn't:
 // { key, label, tone, line, purgeDay }.
 //   asked   the owner asked to bring it back; it waits for the team

@@ -288,4 +288,36 @@ t('the clean-up: pages past titles left to their show; checks a row again before
   assert.doesNotMatch(tr, /\.or\(`purge_after/);
 });
 
+t('an owner\'s reason can\'t open with the team\'s words (2026-11-16), and the server refuses it before storing it', () => {
+  for (const forged of [
+    'Removed by an admin: please',
+    'removed by an admin: please',
+    '  Removed  by   an admin:please',
+    '\u200BRemoved by an admin: hidden opening',
+    'Re\u00ADmoved by an admin: soft hyphen',
+    '\uFEFFRemoved\u2060 by an admin: joiner',
+    'Taken down after review: mine',
+    'TAKEN DOWN AFTER REVIEW:'
+  ]) {
+    const r = R.ownerReasonRefusal(forged);
+    assert.ok(r, JSON.stringify(forged));
+    assert.equal(r.status, 400);
+    assert.equal(r.code, 'team-words');
+    assert.equal(r.error, R.OWN_REASON_LINE);
+  }
+  for (const fine of ['Recut', 'I was removed by an admin: no', 'Removed by me', 'Removed by an administrator', '', null, undefined, 42]) {
+    assert.equal(R.ownerReasonRefusal(fine), null, String(fine));
+  }
+  // What a team-started removal reads as stays the stored opening.
+  assert.equal(R.teamStartedRemoval({ deletion_reason: `${R.ADMIN_REMOVAL_PREFIX}abuse` }), true);
+  // Both owner requests check it before writing (lib/showPage.js), and the
+  // two denials need a full admin for a removal the team started.
+  const sp = readFileSync(new URL('../lib/showPage.js', import.meta.url), 'utf8');
+  assert.equal((sp.match(/const teamWords = action === 'request' \? ownerReasonRefusal\(why\) : null;/g) || []).length, 2);
+  const sa = readFileSync(new URL('../lib/showAdmin.js', import.meta.url), 'utf8');
+  assert.match(sa, /const adminStarted = teamStartedRemoval\(show\);\n  if \(adminStarted\) needFullAdmin\(rc\);/);
+  const rd = readFileSync(new URL('../pages/api/admin/resolve-deletion.js', import.meta.url), 'utf8');
+  assert.match(rd, /if \(teamStarted && roleContext\.isAdmin !== true\)/);
+});
+
 console.log(`\n${n} removal checks passed`);
