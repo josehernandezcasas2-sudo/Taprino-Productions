@@ -5,7 +5,7 @@ import { sendEmail } from '../../lib/notify';
 import { isHttpUrl } from '../../lib/safeUrl';
 import {
   RIGHTS_QUESTIONS, ONBOARDING, APPLICATION_TYPES, APPLICATION_RATINGS, APPLICATION_STATUSES, APPLICATION_GENRES, ATTESTATION,
-  APPLICATION_STATUS_LABEL, normalizeRightsAnswers, rightsVerdict, getOwnApplication, toApplicantView, applicationEmails
+  APPLICATION_STATUS_LABEL, normalizeRightsAnswers, rightsVerdict, getOwnApplication, applicantView, applicationEmails
 } from '../../lib/creatorApplications';
 import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../lib/videoOwnership';
 import { insertCompat } from '../../lib/dbCompat';
@@ -157,5 +157,5 @@ export default async function handler(req, res) {
     await sendEmail({ to: role.email, ...mail });
   }
 
-  return res.status(200).json({ ok: true, application: toApplicantView(data) });
+  return res.status(200).json({ ok: true, application: await applicantView(data) });
 }
