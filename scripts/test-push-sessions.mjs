@@ -115,13 +115,16 @@ t('the server stores the sign-in on registration and filters every send (lib/pus
   assert.match(push, /clerk_session_id: cleanSessionId\(sessionId\)\n  \}, \['clerk_session_id'\], \{ onConflict: 'token' \}\);/);
   assert.match(push, /upsertCompat\(getSupabase\(\), 'push_tokens'/);
   assert.match(push, /'token, user_id',\s*\['clerk_session_id'\]/);
-  assert.match(push, /const ended = await endedPushSessions\(rows\.map\(\(r\) => r\.clerk_session_id\)\);\s*const \{ send: tokens, stop \} = splitBySession\(rows, ended\);\s*if \(stop\.length\) \{\s*await disableTokens\(stop\.map\(\(r\) => r\.token\), SESSION_ENDED_REASON\);/);
+  assert.match(push, /const ended = await endedPushSessions\(rows\.map\(\(r\) => r\.clerk_session_id\)\);\s*const \{ send: tokens, stop \} = splitBySession\(rows, ended\);\s*if \(stop\.length\) \{\s*await disableEndedTokens\(stop\);/);
+  // Disabled only while still registered under the sign-in that was checked.
+  assert.match(push, /\.update\(\{ disabled_at: new Date\(\)\.toISOString\(\), disabled_reason: SESSION_ENDED_REASON \}\)\.in\('token', tokens\)\.eq\('clerk_session_id', sid\)/);
   // By the token alone: that one row, only a token's shape, only while live.
   assert.match(push, /export async function unregisterPushTokenByToken\(\{ token \}\) \{\s*if \(!looksLikeExpoToken\(token\)\) return \{ ok: true \};[\s\S]*?\.eq\('token', token\)\.is\('disabled_at', null\);/);
   const web = read('../lib/webPush.js');
   assert.match(web, /clerk_session_id: cleanSessionId\(sessionId\)\n  \}, \['clerk_session_id'\], \{ onConflict: 'endpoint' \}\);/);
   assert.match(web, /'endpoint, user_id, p256dh, auth',\s*\['clerk_session_id'\]/);
-  assert.match(web, /const \{ send: rows, stop \} = splitBySession\(live, ended\);\s*if \(stop\.length\) \{\s*await disableRows\(stop\.map\(\(r\) => r\.endpoint\), SESSION_ENDED_REASON\);/);
+  assert.match(web, /const \{ send: rows, stop \} = splitBySession\(live, ended\);\s*if \(stop\.length\) \{\s*await disableEndedRows\(stop\);/);
+  assert.match(web, /\.update\(\{ disabled_at: new Date\(\)\.toISOString\(\), disabled_reason: SESSION_ENDED_REASON \}\)\.in\('endpoint', endpoints\)\.eq\('clerk_session_id', sid\)/);
   assert.match(read('../pages/api/push/register.js'), /const \{ userId, sessionId \} = getAuth\(req\);[\s\S]*registerPushToken\(\{ userId, token, platform, deviceName, appVersion, sessionId \}\)/);
   assert.match(read('../pages/api/push/web-subscribe.js'), /const \{ userId, sessionId \} = getAuth\(req\);[\s\S]*sessionId \}\)\);/);
   const un = read('../pages/api/push/unregister.js');
