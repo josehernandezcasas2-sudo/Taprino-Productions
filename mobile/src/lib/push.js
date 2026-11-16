@@ -108,22 +108,65 @@ export async function disablePush(getToken) {
   return { ok: true };
 }
 
+// Tells the server this phone's token is no longer the account's: with
+// the session when there is one, else by the token alone (the server takes
+// that too: pages/api/push/unregister.js). → whether the server said yes.
+async function tellServerToForget(token, session) {
+  try {
+    await apiPost('/api/push/unregister', { token }, session || null);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The phone stops being a push address at Expo too, so even a row the
+// server still holds is answered DeviceNotRegistered on its next send and
+// disabled there (lib/push.js). Signing in and turning push on again
+// registers afresh.
+async function unregisterDevice() {
+  try { await Notifications.unregisterForNotificationsAsync(); } catch { /* not on this device */ }
+}
+
 // On sign-out (lib/signOut.js): the token stops belonging to this account
 // — the server row goes while the session still exists — and the
 // preference returns to "never asked", so the next person on this phone
 // gets the card rather than the last account's choice. Until 2026-10-28
 // nothing did this, and a signed-out phone kept receiving the old
-// account's pushes.
+// account's pushes. Since 2026-11-16 the token is kept when the server
+// couldn't be told, so the next start tries again (forgetPushWhenSignedOut,
+// by the token alone), and the phone unregisters from pushes itself.
 export async function forgetPushOnSignOut(getToken) {
   const token = await read(TOKEN_KEY);
   if (token) {
-    try {
-      const session = await freshToken(getToken);
-      if (session) await apiPost('/api/push/unregister', { token }, session);
-    } catch { /* the server disables dead tokens on its own */ }
+    let session = null;
+    try { session = await freshToken(getToken); } catch { /* by the token alone */ }
+    const told = await tellServerToForget(token, session);
+    await unregisterDevice();
+    if (told) await write(TOKEN_KEY, '');
   }
-  await write(TOKEN_KEY, '');
   await write(PREF_KEY, '');
+}
+
+// Clerk says this phone is signed out and a token is still kept: it was
+// signed out from somewhere else (Account → Security's devices, a password
+// reset), or its own sign-out couldn't reach the server (2026-11-16). The
+// server is told by the token alone; the token is kept until it says yes,
+// so the next start tries again. The phone also unregisters from pushes,
+// and the preference goes back to "never asked" for whoever signs in next.
+let forgetting = null;
+export function forgetPushWhenSignedOut() {
+  if (!forgetting) {
+    forgetting = (async () => {
+      const token = await read(TOKEN_KEY);
+      if (!token) return;
+      const told = await tellServerToForget(token, null);
+      await unregisterDevice();
+      await write(PREF_KEY, '');
+      if (told) await write(TOKEN_KEY, '');
+    })().catch(() => {}).finally(() => { forgetting = null; });
+  }
+  return forgetting;
 }
 
 // On a signed-in start: keep the token fresh (tokens rotate; the row's

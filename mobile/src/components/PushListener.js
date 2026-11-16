@@ -3,7 +3,7 @@ import { Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../lib/stableAuth';
-import { refreshPushRegistration } from '../lib/push';
+import { forgetPushWhenSignedOut, refreshPushRegistration } from '../lib/push';
 import { API_BASE_URL } from '../lib/api';
 
 // Renders nothing. Keeps the push token fresh while signed in and turns
@@ -183,6 +183,10 @@ export default function PushListener() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn) refreshPushRegistration(getToken);
+    // Signed out — from elsewhere, or a sign-out that couldn't reach the
+    // server — with a token still kept: the server forgets it by the token
+    // alone, and the phone stops being a push address (lib/push.js).
+    else if (isLoaded && isSignedIn === false) forgetPushWhenSignedOut();
   }, [isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;

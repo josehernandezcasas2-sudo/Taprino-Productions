@@ -47,6 +47,10 @@ const pushes = [];
 // private keys a check registered, so the sink can read the message.
 const webPushes = [];
 const webPushKeys = new Map();
+// Sign-ins (2026-11-16): GET /v1/sessions/<id> answers 'active' unless a
+// check set another state (POST /__sessions?sid=&status=) — the push sends
+// skip a phone or browser whose sign-in has ended (lib/pushSessions.js).
+const sessionStates = new Map();
 // Accounts whose reads answer 500 (POST /__fail), for the money paths that
 // must fail closed when Clerk can't say who is on the team.
 const failing = new Set();
@@ -121,6 +125,7 @@ function loadSeed() {
   pushes.length = 0;
   webPushes.length = 0;
   webPushKeys.clear();
+  sessionStates.clear();
 }
 loadSeed();
 
@@ -291,6 +296,14 @@ const server = http.createServer(async (req, res) => {
       }
       return sendJson(res, 200, { ok: true, failing: [...failing] });
     }
+    if (p === '/__sessions' && req.method === 'POST') {
+      const sid = String(q.get('sid') || '');
+      const status = String(q.get('status') || 'active');
+      if (!/^sess_[A-Za-z0-9_]+$/.test(sid)) return sendJson(res, 400, { error: 'send ?sid=sess_…&status=' });
+      if (status === 'active') sessionStates.delete(sid);
+      else sessionStates.set(sid, status);
+      return sendJson(res, 200, { ok: true, sid, status });
+    }
     if (p === '/__webpush-keys' && req.method === 'POST') {
       if (!body.token || !body.privateKey || !body.auth) return sendJson(res, 400, { error: 'send { token, privateKey, auth }' });
       webPushKeys.set(String(body.token), { privateKey: String(body.privateKey), auth: String(body.auth) });
@@ -375,6 +388,14 @@ const server = http.createServer(async (req, res) => {
         u.updated_at = Date.now();
         return sendJson(res, 200, u);
       }
+    }
+
+    if (seg[1] === 'sessions' && seg.length === 3 && req.method === 'GET') {
+      const sid = seg[2];
+      if (!/^sess_[A-Za-z0-9_]+$/.test(sid)) return clerkError(res, 404, 'resource_not_found', 'not found', `Session ${sid} not found`);
+      const now = Date.now();
+      const userId = sid.startsWith('sess_rig_') ? sid.slice('sess_rig_'.length) : null;
+      return sendJson(res, 200, { object: 'session', id: sid, client_id: 'client_rig', user_id: userId, status: sessionStates.get(sid) || 'active', last_active_at: now, expire_at: now + 7 * DAY, abandon_at: now + 30 * DAY, created_at: now - DAY, updated_at: now });
     }
 
     if (seg[1] === 'invitations') {
