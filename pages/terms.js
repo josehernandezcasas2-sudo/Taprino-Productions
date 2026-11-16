@@ -449,8 +449,8 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         their bank puts the pay on hold until the bank rules; money already sent to a crew member after the
         poster confirmed the work is not taken back by us. Securing pay doesn&rsquo;t make us a party to the
         job: who is hired, how the work goes and whether it was done are between the poster and the crew
-        member, and a disagreement about the work is settled between them, with us only holding or releasing
-        the money as described here. The fee is set on our Settings page and shown before the poster pays;
+        member. Our part is the money: we hold it, release it or return it as described here, and when they
+        disagree about whether the job happened, we decide where the held money goes. The fee is set on our Settings page and shown before the poster pays;
         a change applies to calls funded after it.
       </p>
       <p id="locations">

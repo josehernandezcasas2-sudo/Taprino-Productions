@@ -208,7 +208,7 @@ export default function CallScreen() {
             {!isPoster && data.viewerResponse ? (
               <View style={crew.panel}>
                 <View style={crew.chips}>
-                  {data.viewerResponse.status === 'booked' ? <Chip label="You're booked" tone="ok" /> : null}
+                  {data.viewerResponse.status === 'booked' && !data.viewerResponse.outcome ? <Chip label="You're booked" tone="ok" /> : null}
                   {data.viewerResponse.status === 'backup' ? <Chip label="On the bench — first in line if someone drops" tone="gear" /> : null}
                   {data.viewerResponse.status === 'declined' ? <Chip label="Not this time" tone="mute" /> : null}
                   {data.viewerResponse.status === 'sent' ? <Chip label="You responded" /> : null}

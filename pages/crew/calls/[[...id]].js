@@ -469,7 +469,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
       {!isPoster && viewerResponse && (
         <div className="cc-form">
           <div className="crew-chips">
-            {viewerResponse.status === 'booked' && <span className="crew-chip ok">You're booked</span>}
+            {viewerResponse.status === 'booked' && !viewerResponse.outcome && <span className="crew-chip ok">You're booked</span>}
             {viewerResponse.status === 'backup' && <span className="crew-chip olive">You're on the bench — first in line if someone drops</span>}
             {viewerResponse.status === 'declined' && <span className="crew-chip mute">Not this time</span>}
             {viewerResponse.status === 'sent' && <span className="crew-chip">You responded</span>}
