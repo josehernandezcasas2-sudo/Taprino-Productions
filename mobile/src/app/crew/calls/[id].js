@@ -304,7 +304,7 @@ export default function CallScreen() {
                       {r.outcome === 'worked' ? <Chip label="✓ Worked it" tone="ok" /> : null}
                       {r.outcome === 'no_show' ? <Chip label="Didn't happen" tone="mute" /> : null}
                       {r.outcome === 'cancelled' ? <Chip label="Cancelled" tone="mute" /> : null}
-                      {r.pay && r.pay.status === 'held' && r.pay.refundState && r.pay.refundState !== 'none' ? <Chip label={posterRefundChip(r.pay)} tone="mute" /> : null}
+                      {r.pay && r.pay.status === 'held' && r.pay.refundState && r.pay.refundState !== 'none' ? <Chip label={posterRefundChip(r.pay)} tone={r.pay.refundState === 'contested' ? 'warn' : 'mute'} /> : null}
                       {r.pay && r.pay.status === 'held' && (!r.pay.refundState || r.pay.refundState === 'none') ? <Chip label={`🔒 ${payDollars(r.pay.amountCents)} held${r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}`} tone="gear" /> : null}
                       {r.pay && r.pay.status === 'released' ? <Chip label={`💸 ${payDollars(r.pay.amountCents)} paid out`} tone="ok" /> : null}
                       {r.pay && r.pay.status === 'refunded' ? <Chip label={`↩ ${payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you`} tone="mute" /> : null}

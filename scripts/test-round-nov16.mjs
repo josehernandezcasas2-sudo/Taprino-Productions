@@ -16,7 +16,7 @@
 // dev/test-rig/checks/round-nov16.mjs.
 import assert from 'node:assert/strict';
 import {
-  DOWNLOAD_REFUNDING_LINE, REFUND_BLOCKS, REFUND_CLAIM_STALE_MS, countsAsDownloaded, refundBlocksDownload, refundClaimLive, refundEligibility
+  DOWNLOAD_REFUNDING_LINE, REFUND_BLOCKS, REFUND_CLAIM_STALE_MS, STARTING_DOWNLOAD_MINUTES, countsAsDownloaded, refundBlocksDownload, refundClaimLive, refundEligibility
 } from '../lib/purchaseRules.js';
 import { EXPIRY_EVERY_MS, RESPONDING_STATUSES, expiryDue, outOfTime, shownStatus } from '../lib/requestExpiryRules.js';
 import { safePrivatePath } from '../lib/uploadRefRules.js';
@@ -67,6 +67,17 @@ test('countsAsDownloaded: dated rows always, undated ones only while active', ()
   assert.equal(countsAsDownloaded({ licensed_until: null, status: 'revoked' }), false);
   assert.equal(countsAsDownloaded({ licensed_until: null, status: 'removed' }), false);
   assert.equal(countsAsDownloaded(null), false);
+});
+
+test('countsAsDownloaded: an undated row counts only while it was asked for lately', () => {
+  const fresh = { licensed_until: null, status: 'active', renewed_at: ago(5 * 60 * 1000) };
+  const stale = { licensed_until: null, status: 'active', renewed_at: ago((STARTING_DOWNLOAD_MINUTES + 1) * 60 * 1000) };
+  assert.equal(countsAsDownloaded(fresh, NOW), true);
+  assert.equal(countsAsDownloaded(stale, NOW), false, 'a download the phone abandoned doesn’t block a refund for good');
+  // Falls back to created_at when renewed_at isn't set.
+  assert.equal(countsAsDownloaded({ licensed_until: null, status: 'active', created_at: ago(60 * 1000) }, NOW), true);
+  // A dated row counts however old.
+  assert.equal(countsAsDownloaded({ licensed_until: ago(0), status: 'active', renewed_at: ago(90 * 86400000) }, NOW), true);
 });
 
 test('refundBlocksDownload: no completed purchase left, or any refund on its way', () => {

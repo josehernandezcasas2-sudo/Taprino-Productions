@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Location from 'expo-location';
 import { apiGet } from '../lib/api';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, warnTint } from '../lib/theme';
 import PositionedImage from './PositionedImage';
 
 // Pieces shared by the Crew Call screens (crew/index, crew/card) and the
@@ -54,7 +54,7 @@ export function availLabel(card) {
 }
 
 export function Chip({ label, on = false, tone, onPress, style }) {
-  const toneStyle = tone === 'role' ? crew.chipRole : tone === 'gear' ? crew.chipGear : tone === 'ok' ? crew.chipOk : tone === 'mute' ? crew.chipMute : null;
+  const toneStyle = tone === 'role' ? crew.chipRole : tone === 'gear' ? crew.chipGear : tone === 'ok' ? crew.chipOk : tone === 'warn' ? crew.chipWarn : tone === 'mute' ? crew.chipMute : null;
   const body = <Text style={[crew.chipText, toneStyle, on && crew.chipOnText]}>{label}</Text>;
   if (!onPress) return <View style={[crew.chip, toneStyle && { backgroundColor: toneStyle.backgroundColor }, style]}>{body}</View>;
   return (
@@ -324,6 +324,7 @@ export const crew = StyleSheet.create({
   chipGear: { backgroundColor: 'rgba(242,193,78,0.16)', color: colors.olive },
   chipOk: { backgroundColor: 'rgba(132,205,152,0.16)', color: colors.ok },
   chipMute: { backgroundColor: colors.surface3, color: colors.inkFaint },
+  chipWarn: { backgroundColor: warnTint(0.16), color: colors.warn },
   chipUrgent: { backgroundColor: 'rgba(239,91,91,0.16)', color: colors.danger },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   name: { fontFamily: fonts.displaySemi, fontSize: 15.5, color: colors.ink },
