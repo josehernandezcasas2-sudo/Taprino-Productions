@@ -10,7 +10,7 @@ import { readViewingTerms } from './viewingTerms';
 import * as rules from './downloadRules';
 import {
   APP_WORDS, LINK_MARGIN_MS, PAGE_SYNC_EVERY_MS, PAUSE_GRACE_MS, PREPARE_MAX_MS, START_RETRY_MS, SYNC_EVERY_MS,
-  createDownloadLogic, emptyIndex, isTitleSlug, normalizeIndex, onPhoneClock, pickIndex, pickMeta, preparePollDelay
+  copiesHidden, createDownloadLogic, emptyIndex, isTitleSlug, normalizeIndex, onPhoneClock, pickIndex, pickMeta, preparePollDelay, signedOutMark
 } from './downloadLogic';
 
 // Downloads in the app: the store and the manager (Jose, 2026-11-14;
@@ -294,11 +294,20 @@ function drop(id) {
 }
 
 // Copies are hidden when Clerk positively says the phone is signed out, or
-// signed in as someone else (those are deleted too, in setSession).
+// signed in as someone else (those are deleted too, in setSession), and,
+// while Clerk hasn't said (an offline start), when the phone was last seen
+// signed out (index.signedOutAt; downloadLogic.js copiesHidden).
 function hidden() {
-  if (!session.known) return false;
-  if (!session.userId) return true;
-  return Boolean(index.userId && index.userId !== session.userId);
+  return copiesHidden(index, session);
+}
+
+// Keeps the signed-out mark in step with what Clerk says (setSession): set
+// and written at once when it says signed out, cleared by a sign-in.
+function noteSignedOut() {
+  const next = signedOutMark(index, session, Date.now());
+  if (next === undefined) return;
+  index = { ...index, signedOutAt: next };
+  saveNow();
 }
 
 function refreshMissing() {
@@ -1265,6 +1274,7 @@ export function setSession({ known = false, userId = null, getToken = null } = {
   loadAgainIfLocked();
   if (session.userId) {
     claimIndex();
+    noteSignedOut();
     emit();
     if (before.userId !== session.userId) {
       lastSyncTry = 0;
@@ -1274,6 +1284,9 @@ export function setSession({ known = false, userId = null, getToken = null } = {
     return;
   }
   // Signed out (or not known yet): nothing moves; what was coming down waits.
+  // Signed out is written down, so an app opened later with no connection
+  // (Clerk then says nothing) still keeps the copies hidden.
+  noteSignedOut();
   if (session.known && active) stopIfActive(active.id, 'hidden');
   emit();
 }
@@ -1456,7 +1469,8 @@ export function getDownloadsState() {
 // Downloads. Reads the index file only. → true | false | null (not known)
 export async function shouldOpenOnDownloads() {
   load();
-  if (!SUPPORTED || Object.keys(index.items).length === 0) return false;
+  // Last seen signed out: the copies stay hidden, nothing to open on.
+  if (!SUPPORTED || Object.keys(index.items).length === 0 || index.signedOutAt) return false;
   try {
     const state = await Network.getNetworkStateAsync();
     onNet(state);

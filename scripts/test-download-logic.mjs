@@ -69,6 +69,47 @@ t('the index as read: anything malformed is dropped, a transfer left in flight g
   assert.equal(out.notices.length, 1);
   // Wi-Fi only is on unless it was switched off.
   assert.equal(lib.normalizeIndex({}).wifiOnly, true);
+  // The signed-out mark is a date or nothing.
+  assert.equal(lib.emptyIndex().signedOutAt, null);
+  assert.equal(lib.normalizeIndex({ signedOutAt: NOW }).signedOutAt, NOW);
+  assert.equal(lib.normalizeIndex({ signedOutAt: 'not a date' }).signedOutAt, null);
+});
+
+t('a phone seen signed out keeps its copies hidden on an offline restart; a sign-in clears the mark (2026-11-16)', () => {
+  const held = indexOf([{ episodeId: 'a', state: 'ready' }]);
+  const unknown = { known: false, userId: null };
+  const out = { known: true, userId: null };
+  const same = { known: true, userId: 'user_a' };
+  const other = { known: true, userId: 'user_b' };
+  // As before: Clerk says signed out, or someone else — hidden; the owner, or nothing said yet — shown.
+  assert.equal(lib.copiesHidden(held, out), true);
+  assert.equal(lib.copiesHidden(held, other), true);
+  assert.equal(lib.copiesHidden(held, same), false);
+  assert.equal(lib.copiesHidden(held, unknown), false, 'an offline start with no mark: the copies play (the honest limit)');
+  assert.equal(lib.copiesHidden(held, null), false);
+  // Clerk says signed out: the mark is set, once.
+  const mark = lib.signedOutMark(held, out, NOW);
+  assert.equal(mark, NOW);
+  const marked = { ...held, signedOutAt: mark };
+  assert.equal(lib.signedOutMark(marked, out, NOW + 60000), undefined, 'set once');
+  // Restarted in airplane mode: Clerk says nothing, and the copies stay hidden.
+  assert.equal(lib.copiesHidden(marked, unknown), true);
+  assert.equal(lib.signedOutMark(marked, unknown, NOW), undefined, 'nothing said: unchanged');
+  // The same account signs in again: the mark goes, the copies show.
+  assert.equal(lib.signedOutMark(marked, same, NOW), null);
+  assert.equal(lib.copiesHidden({ ...marked, signedOutAt: null }, same), false);
+  assert.equal(lib.signedOutMark(held, same, NOW), undefined, 'no mark, nothing to clear');
+  // Nothing kept for an account: nothing to mark.
+  assert.equal(lib.signedOutMark(lib.emptyIndex(), out, NOW), undefined);
+  assert.equal(lib.signedOutMark({ ...lib.emptyIndex(), userId: 'user_a' }, out, NOW), NOW, 'the account the index belongs to, even with no copies yet');
+  // Survives being written and read back.
+  assert.equal(lib.copiesHidden(lib.normalizeIndex(JSON.parse(JSON.stringify(marked))), unknown), true);
+  // The manager uses them (mobile/src/lib/downloads.js): hidden() is the rule, the mark is written at once, and an app opened offline doesn't land on Downloads it can't show.
+  const manager = readFileSync(new URL('../mobile/src/lib/downloads.js', import.meta.url), 'utf8');
+  assert.match(manager, /function hidden\(\) \{\s*return copiesHidden\(index, session\);\s*\}/);
+  assert.match(manager, /const next = signedOutMark\(index, session, Date\.now\(\)\);\s*if \(next === undefined\) return;\s*index = \{ \.\.\.index, signedOutAt: next \};\s*saveNow\(\);/);
+  assert.equal((manager.match(/noteSignedOut\(\);/g) || []).length, 2, 'signed in and signed out');
+  assert.match(manager, /Object\.keys\(index\.items\)\.length === 0 \|\| index\.signedOutAt\) return false;/);
 });
 
 t('what is kept of a title, and its labels', () => {
