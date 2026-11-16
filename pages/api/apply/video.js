@@ -1,7 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { checkRateLimit } from '../../../lib/rateLimit';
-import { getApplication, toApplicantView, deleteApplicationVideo, isOpenStatus } from '../../../lib/creatorApplications';
+import { getApplication, applicantView, deleteApplicationVideo, isOpenStatus } from '../../../lib/creatorApplications';
 import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { updateCompat } from '../../../lib/dbCompat';
 import { applyCors } from '../../../lib/cors';
@@ -54,5 +54,5 @@ export default async function handler(req, res) {
 
   const { data, error } = await updateCompat(getSupabase(), 'creator_applications', patch, VIDEO_COLUMNS, (q) => q.eq('id', id).select().single());
   if (error) return sendError(res, error, 'apply/video', 'Could not attach the new file.');
-  return res.status(200).json({ ok: true, application: toApplicantView(data) });
+  return res.status(200).json({ ok: true, application: await applicantView(data) });
 }

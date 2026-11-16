@@ -2,7 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import {
-  rightsVerdict, acceptApplication, holdApplication, declineApplication, refreshVideoState, signedMediaFor, isOpenStatus
+  rightsVerdict, acceptApplication, holdApplication, declineApplication, refreshVideoState, signedMediaFor, isOpenStatus, withArtworkRoutes
 } from '../../../lib/creatorApplications';
 import { sendError } from '../../../lib/apiErrors';
 
@@ -20,6 +20,12 @@ const STATUSES = ['new', 'reviewing', 'held', 'accepted', 'declined'];
 //   held     → the note is what to fix, emailed;
 //   declined → the master is deleted, the note emailed;
 //   reviewing / no status → bookkeeping only.
+//
+// An applicant's poster and still are private until Accept (2026-11-16):
+// every application this route answers with carries them as
+// /api/admin/application-artwork addresses, which sign a fresh link each
+// time they are opened (the page may be open for hours); a public address
+// stays as it is.
 export default async function handler(req, res) {
   const roleContext = await requireCapability(req, res, 'manage_applications');
   if (!roleContext) return;
@@ -43,7 +49,7 @@ export default async function handler(req, res) {
       // videoRefreshRules.js), so reloading the page costs no more calls.
       const a = isOpenStatus(raw.status) ? await refreshVideoState(raw, { listing: true }) : raw;
       const media = isOpenStatus(a.status) ? await signedMediaFor(a) : null;
-      applications.push({ ...a, rights_holds: rightsVerdict(a.rights_answers).holds, media });
+      applications.push(withArtworkRoutes({ ...a, rights_holds: rightsVerdict(a.rights_answers).holds, media }));
     }
     return res.status(200).json({ applications });
   }
@@ -62,15 +68,16 @@ export default async function handler(req, res) {
         if (error) return sendError(res, error, 'admin/applications');
       }
 
+      const withLinks = async (out) => ({ ...out, application: withArtworkRoutes(out.application) });
       if (status === 'accepted') {
         const result = await acceptApplication(roleContext, { id, tier, note: decisionNote });
-        return res.status(200).json(result);
+        return res.status(200).json(await withLinks(result));
       }
       if (status === 'held') {
-        return res.status(200).json(await holdApplication(roleContext, { id, note: decisionNote }));
+        return res.status(200).json(await withLinks(await holdApplication(roleContext, { id, note: decisionNote })));
       }
       if (status === 'declined') {
-        return res.status(200).json(await declineApplication(roleContext, { id, note: decisionNote }));
+        return res.status(200).json(await withLinks(await declineApplication(roleContext, { id, note: decisionNote })));
       }
 
       const { data: before } = await supabase.from('creator_applications').select('id, title, status').eq('id', id).maybeSingle();
@@ -81,7 +88,7 @@ export default async function handler(req, res) {
       const { data, error } = await supabase.from('creator_applications').update(update).eq('id', id).select().single();
       if (error) return sendError(res, error, 'admin/applications');
       await recordAudit({ adminId: userId, adminEmail: email, action: `application_${status || 'note'}`, targetType: 'creator_application', targetId: id, details: data.title });
-      return res.status(200).json({ application: { ...data, rights_holds: rightsVerdict(data.rights_answers).holds }, roleGranted: false, needsManualGrant: false });
+      return res.status(200).json({ application: withArtworkRoutes({ ...data, rights_holds: rightsVerdict(data.rights_answers).holds }), roleGranted: false, needsManualGrant: false });
     } catch (err) {
       return sendError(res, err, 'admin/applications');
     }

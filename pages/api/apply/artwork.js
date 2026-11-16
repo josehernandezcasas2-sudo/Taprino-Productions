@@ -1,8 +1,8 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { checkRateLimit } from '../../../lib/rateLimit';
-import { getApplication, toApplicantView, isOpenStatus } from '../../../lib/creatorApplications';
-import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { getApplication, applicantView, isOpenStatus, removePrivateArtwork } from '../../../lib/creatorApplications';
+import { uploadPrivateImage } from '../../../lib/artworkUpload';
 import { updateCompat } from '../../../lib/dbCompat';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
@@ -10,6 +10,12 @@ import { sendError } from '../../../lib/apiErrors';
 // A poster and a still for an open application, optional (the status
 // card's "Add a poster and a still"). Without them Accept cuts both from
 // the film. Base64 data URLs, like the creator forms.
+//
+// Kept private until Accept (2026-11-16): they go to the private bucket
+// (`private:apply-<id>-poster-…`), the applicant's card and the team see
+// them through one-hour links, Accept copies what the title uses to the
+// public artwork bucket, Decline removes them (lib/creatorApplications.js).
+// A picture replaced here is removed at once.
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
 };
@@ -38,11 +44,18 @@ export default async function handler(req, res) {
 
   try {
     const patch = {};
-    if (posterBase64) patch.poster = await uploadArtworkImage({ base64: posterBase64, fileName: posterFileName, pathPrefix: `apply-${id}-poster` });
-    if (thumbnailBase64) patch.thumbnail = await uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `apply-${id}-thumbnail` });
+    if (posterBase64) patch.poster = await uploadPrivateImage({ base64: posterBase64, fileName: posterFileName, pathPrefix: `apply-${id}-poster` });
+    if (thumbnailBase64) patch.thumbnail = await uploadPrivateImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `apply-${id}-thumbnail` });
     const { data, error } = await updateCompat(getSupabase(), 'creator_applications', patch, ['poster', 'thumbnail'], (q) => q.eq('id', id).select().single());
-    if (error) throw error;
-    return res.status(200).json({ ok: true, application: toApplicantView(data) });
+    if (error) {
+      // Nothing points at the new ones: they go again.
+      await removePrivateArtwork(patch.poster, patch.thumbnail);
+      throw error;
+    }
+    // The pictures they replace (private ones; a public one from before
+    // 2026-11-16 is left where it is).
+    await removePrivateArtwork(patch.poster && row.poster !== patch.poster ? row.poster : null, patch.thumbnail && row.thumbnail !== patch.thumbnail ? row.thumbnail : null);
+    return res.status(200).json({ ok: true, application: await applicantView(data) });
   } catch (err) {
     return sendError(res, err, 'apply/artwork', 'Could not save the artwork.', { plainStatus: 400 });
   }

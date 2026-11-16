@@ -4,6 +4,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import { runSaverStep } from '../../../lib/seriesDrop';
 import { purgeHeldTitles } from '../../../lib/titleRemoval';
+import { expireStaleRequests } from '../../../lib/locationRequests';
 
 // Runs daily via vercel.json's cron config, which Vercel authenticates
 // automatically: set CRON_SECRET as an env var and Vercel sends
@@ -26,6 +27,10 @@ import { purgeHeldTitles } from '../../../lib/titleRemoval';
 // (lib/titleRemoval.js purgeHeldTitles: ad share credited first, extras
 // re-filed, files to Orphaned media, the row deleted, the owner told),
 // at most 50 a day. Before 124 that step finds no column and does nothing.
+//
+// And location requests nobody answered in time (2026-11-16): the readers
+// run that sweep at most once a minute now, so the day's run catches the
+// rest (lib/locationRequests.js expireStaleRequests).
 function sameSecret(a, b) {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -114,10 +119,20 @@ export default async function handler(req, res) {
     savers = { shows: 0, checked: 0, sent: 0, finished: false, failed: true };
   }
 
+  // Location requests past their time, whatever the readers have done.
+  let requests = null;
+  try {
+    requests = await expireStaleRequests();
+  } catch (err) {
+    console.error('expire-content location requests:', err && err.message ? err.message : err);
+    requests = { expired: 0, failed: true };
+  }
+
   const purgeWords = purged && purged.ready && (purged.shows || purged.episodes || purged.keptForBuyers || purged.failed)
     ? ` · deleted after their hold: ${purged.shows} show(s), ${purged.episodes} title(s)${purged.names.length ? ` (${purged.names.slice(0, 20).join(', ')})` : ''}${purged.keptForBuyers ? `, ${purged.keptForBuyers} kept for buyers` : ''}${purged.failed ? `, ${purged.failed} failed (tried again tomorrow)` : ''}`
     : '';
-  if (flagged.length > 0 || purgeWords || (savers && (savers.shows > 0 || savers.failed))) {
+  const requestWords = requests && (requests.expired || requests.failed) ? ` · location requests: ${requests.failed ? 'failed' : `${requests.expired} expired`}` : '';
+  if (flagged.length > 0 || purgeWords || requestWords || (savers && (savers.shows > 0 || savers.failed))) {
     await recordAudit({
       // audit_log.admin_id is not null: the scheduled run signs as 'cron'
       // (as creator-payouts does), or Postgres refused the line every night.
@@ -126,9 +141,9 @@ export default async function handler(req, res) {
       action: 'auto_flag_expired_content',
       targetType: 'lifecycle',
       targetId: 'batch',
-      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${purgeWords}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
+      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${purgeWords}${requestWords}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
     });
   }
 
-  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, purged, savers });
+  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, purged, savers, requests });
 }
