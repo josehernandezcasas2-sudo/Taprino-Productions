@@ -151,8 +151,8 @@ async function after125({ poster, worker, stranger, sub }) {
   ok('…their own view reads contested and carries their note', r.json && r.json.viewerResponse && r.json.viewerResponse.pay && r.json.viewerResponse.pay.refundState === 'contested' && r.json.viewerResponse.pay.contestNote === NOTE, r.json && r.json.viewerResponse && r.json.viewerResponse.pay);
   const told = notices(poster.id, 'crew_pay_contested');
   ok('…the poster is told once, without the note', told.length === 1 && /says the job on Check pay hold contest .* happened\. The \$[\d.,]+ stays held until the studio decides — we may write to you both\./.test(told[0]) && !told[0].includes(RUN + ').'), told);
-  r = await contest(worker, d);
-  ok('a second contest → 409', r.status === 409 && r.json && r.json.code === 'contested', `${r.status} ${r.text.slice(0, 200)}`);
+  r = await contest(worker, d, NOTE, { bearer: true });
+  ok('a second contest (from the app: a token, no cookie) → 409', r.status === 409 && r.json && r.json.code === 'contested', `${r.status} ${r.text.slice(0, 200)}`);
   r = await call(`/api/crew/calls/${d.callId}`, { who: poster });
   ok('the poster’s view reads contested and never carries the note', r.status === 200 && !r.text.includes('call sheet has my name') && r.json.responses.find((x) => x.id === d.respId).pay.refundState === 'contested', r.text.includes('call sheet has my name') ? 'note leaked' : r.json && r.json.responses);
   due(d);

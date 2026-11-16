@@ -249,3 +249,130 @@ check:refs, lint, `next build`.
 
 (Each builder writes what they built, what differs from the above and why,
 and what they could not verify.)
+
+### A — refund holds on secured crew pay (branch `refund-a`)
+
+**Built, website, app and admin, as above:**
+
+- **The rules** in `lib/crewPayRules.js`. The part the app needs sits
+  between a `// shared:start` and a `// shared:end` line, and
+  `mobile/src/lib/crewPayRules.js` is a short header plus that block word
+  for word (`scripts/test-crew-pay.mjs` compares the two and loads both):
+  `payDollars` (moved into the block, same output), `payDay` (new: "Nov 19"
+  on the Pacific calendar, so a server notice and a page name the same
+  day), `REFUND_WAIT_DAYS`, `REFUND_KINDS`, `CONTEST_NOTE_MIN/MAX`,
+  `refundDueFrom`, `refundKindWords`, `refundSaysWords`, `refundState`
+  (takes a database row or a payment as the pages get it),
+  `canChangeToWorked`, the worker's box (`workerRefundBox`), the poster's
+  chip and line (`posterRefundChip`, `posterRefundLine`), the working card's
+  words (`cardRefundWords`) and the three button/placeholder strings. The
+  website only: `refundAskedCents`, `refundReasonWords`, `contestRefusal`
+  (`{ status, code, error }`: not-yours 403, not-held / decided / no-refund
+  / contested / due 409, note-short / note-long 400), the three notices,
+  `adminRefundLine` and the before-125 lines.
+- **`lib/crewPay.js`**: `askRefund` (the poster's no-show, cancellation or
+  unbook, and an admin's outcome on a quiet poster's job: held, the refund
+  fields set three days on, the crew member told `crew_pay_refund_asked`),
+  `holdForStudio` (before 125: nothing moves, the studio emailed once a
+  week per payment and answer), `withdrawRefundForRelease`,
+  `takeBackRefundForWorked`, `withdrawUnbookRefund`,
+  `contestCrewPayRefund`, `paymentForDecision`, `refundDecided` /
+  `releaseDecided` (`crew_pay_refund_decided` to both), and
+  `refundDueCrewPay` (the daily step, 200 a run, oldest due first).
+  `releaseRow` answers `{ skipped: 'refund asked' }` while a refund waits
+  undecided, and its claim also requires no refund asked; the daily
+  step's and a decision's claims require the same undecided refund as
+  read. `toPayment` carries `refundDueAt`, `refundKind`, `refundKindWords`,
+  `refundAskedCents`, `refundAskedAt`, `contestedAt`, `contestDecision`,
+  `contestDecidedAt`, `refundState` — never the note; `paymentsForCall(id,
+  { noteFor })` adds `contestNote` only to the writer's own payment, and
+  the admin list adds it for the route to take off for sub-admins.
+- **`lib/crewCalls.js`**: `setOutcome` lets the poster change "didn't
+  happen" or "cancelled" to "worked" while that refund waits (contested or
+  not): the refund is withdrawn first (guarded), then the outcome is
+  written, then the release (with the release hold); every other change
+  is refused as before. `setBooking`: unbook asks the refund (`unbooked`);
+  book or promote withdraws a waiting `unbooked` refund. Both return
+  `payNote` before 125. `decideCrewPayRefund(adminId, paymentId,
+  decision)`: refund → back now; release → the refund withdrawn, the
+  outcome `worked` by the admin (and the production crew list), then the
+  release. `funded` on the poster's view no longer counts money asked back.
+- **Routes**: `POST /api/crew/calls/<id>/contest-pay` (signed in, cookie
+  or token; answers the crew member's view of the call plus
+  `studioEmail`); `/api/admin/crew-calls` op `decide_refund` (full admins,
+  audited `crew_pay_refund_decided`), the GET takes `contestNote` off for
+  sub-admins; `/api/cron/creator-reminders` runs `refundDueCrewPay` after
+  the releases, answers `crewPayRefunds` and writes an audit line
+  `crew_pay_refunds_due` when anything was due; `/api/crew/card` GET
+  answers `myPay` too (the app's Get paid list).
+- **Pages**: the call page (web `pages/crew/calls/[[...id]].js`, app
+  `mobile/src/app/crew/calls/[id].js`): the crew member's chip, box, note
+  box and **It happened — tell the studio**, then "You told the studio on…"
+  with their own note; the poster's chip (Refund Nov 19 / Contested), line
+  and **They worked it after all**; the poster's "Didn't happen refunds you
+  in full" sentence now says three days later. The working card's list
+  (web, and new in the app: it had no list). `/admin/crew`: the line, the
+  note (full admins), **Refund the poster** / **Pay the crew member**, and
+  a paragraph on how it works. Terms section 14 (`TEXT_UPDATED`
+  2026-11-16) and a new section 7 at the end of
+  `legal/creator-share-terms-draft.md` with the paragraph and the question.
+  Three notification types in both registries: Refund asked, Refund
+  contested, Refund decided.
+
+**Different from the agreement, and why:**
+
+1. A contest is refused once the three days are up even if the daily step
+   hasn't run yet (409 `due`) — the agreement says "during the three
+   days". The crew member's box then shows its line without the form.
+2. `claimRow`'s `or(claim is null, claimed_at < stale)` on an update is two
+   plain tries now (a free claim, then a stale one), as the PostgREST note
+   asks. The `or()` did work on the rig's PostgREST 12.2 when I tried it,
+   so this is caution, not a fix of a live failure.
+3. On a row whose refund waits, `/admin/crew` shows the two decision
+   buttons instead of Release again / Refund. **Refund the poster** sends
+   back `refund_asked_cents` (the charge less the card fee for a
+   cancellation or an unbook), as the agreement says; the old whole-charge
+   Refund stays on every other held row.
+4. "Worked" reaching a waiting refund any way (the poster's change of mind,
+   an admin's outcome op) records `contest_decision = 'release'` with who
+   did it, as the decide op does.
+5. Asked again while a refund waits (an admin changing a no-show to a
+   cancellation): only the kind and the amount change; the date and any
+   contest stay. A fresh ask clears an older decision and contest.
+6. Booking again withdraws the unbook refund and clears the contest too
+   (`contested_at`, `contest_note`); no decision is recorded.
+7. A contest and the withdrawals need no claim in flight (`claim is null`),
+   so a release or refund mid-way through Stripe makes them 409 ("being
+   settled right now"). A claim left by a crash blocks them until a
+   release or refund takes it over (after ten minutes) — rare.
+8. Amounts in the words: the crew member's lines name the rate
+   (`amount_cents`); the poster's line, the contested notice and the
+   poster's "goes back to you" decision name what goes back
+   (`refund_asked_cents`).
+9. The contest route answers `studioEmail` ('sent' | 'skipped' | 'failed')
+   so the rig can see the email was tried without Resend.
+10. `/api/admin/crew-calls`' catch now keeps a refusal's `code` and sends
+    everything else through `sendError` (it used to echo any error that
+    carried a status, which an `internalError` would have leaked).
+
+**Checks run:** `scripts/test-crew-pay.mjs` (10, six new) and every
+`scripts/test-*.mjs` (62 files pass), `npm run check:refs`, `npm run lint`,
+the rig check `dev/test-rig/checks/crew-pay-hold.mjs` — 70 after 125 (49
+through the routes against real fake-Stripe charges, 21 in Chromium at 1280
+and 390: the crew member's box and button, the poster's row with no note on
+the page, the working card, `/admin/crew`, no sideways scroll, no page
+errors) and 7 at `RIG_MIGRATE_TO=124` — `sec-money` (101) and `app-return`
+(36) after 125, the smoke pass (no 5xx, no page errors), `next build`, and
+`expo export` for iOS and Android.
+
+**Not verified:** anything against real Stripe (the fake only), the
+studio's email itself (the rig has no Resend), races by timing (the guards
+are read and reasoned, not raced), and nothing in the app on a device.
+
+**Left alone (outside A):** `lib/paymentDisputes.js`'s won notice tells the
+crew member the pay is "held for you again and is sent once the poster
+confirms the work" even when a refund still waits; a crew member whose job
+the poster marked "didn't happen" still sees "You're booked" (the response
+keeps status booked); the Terms' "a disagreement about the work is settled
+between them, with us only holding or releasing the money" now sits next to
+"until we decide" — raised in the counsel question; `CLAUDE.md` not updated.
