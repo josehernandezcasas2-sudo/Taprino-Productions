@@ -1,0 +1,251 @@
+# Refund holds — build agreement (2026-11-16)
+
+Jose, 2026-11-16, on round 3's open decision ("a no-show or cancellation on paid
+crew work refunds the poster at once, with no way for the worker to contest"):
+**"Yes, hold the money for any disputes, let's see what else we can fix."**
+
+Migration **125** (`supabase/migrations/125_refund_holds.sql`, checked by
+`scripts/check-migration-125.mjs`, already in `supabase/check_migrations.sql`)
+is written and committed. Do not change it; if you need another column, say so
+in your "As built" notes instead.
+
+No new visual design: everything below uses the chips, buttons, boxes and
+notices the pages already have (`crew-chip`, `crew-btn`, the app's `Chip`, the
+working card's Get paid list, `/admin/crew`'s Secured crew pay table).
+
+---
+
+## A. Crew pay: a refund the poster asks for waits three days
+
+### The rule
+
+Any refund **the poster** starts on **held** secured pay waits
+`REFUND_WAIT_DAYS` = 3 days before Stripe is asked, so the crew member can say
+the job happened:
+
+| Poster action | `refund_kind` | Goes back (`refund_asked_cents`) |
+|---|---|---|
+| "Didn't happen" (outcome `no_show`) | `no_show` | the whole charge (`total_charged_cents`) |
+| "Cancelled" (outcome `cancelled`) | `cancelled` | the charge less the card fee (`total_charged_cents − fee_cover_cents`) |
+| Unbook (before the first day; after it is already refused) | `unbooked` | the charge less the card fee |
+
+The amounts are today's (`settleCrewPay` / `onUnbookCrewPay`), only delayed.
+An **admin settling a quiet poster's job** as no-show/cancelled (the
+`/api/admin/crew-calls` `outcome` op) also waits the three days — the worker
+still gets their say. An admin's explicit **Refund** button
+(`adminRefundCrewPay`) and an admin's decision on a contested refund are
+immediate (they are the decision).
+
+While the refund waits the row stays `status = 'held'` with `refund_due_at`,
+`refund_kind`, `refund_asked_cents`, `refund_asked_by`, `refund_asked_at` set.
+Nothing about Studio money changes (a held row is already counted as money
+that has to stay).
+
+### During the three days
+
+- **The crew member contests**: "It happened — tell the studio" with a note
+  (required, 10–1,000 characters after trimming; run it through
+  `lib/wellFormed.js` like other request text). Sets `contested_at` +
+  `contest_note`. The refund then waits for a full admin, however long. The
+  poster is told, the studio is emailed (`STUDIO_MONEY_NOTIFY_EMAIL` else
+  `SITE.contactEmail`, the call, both names, the amount, the note escaped, a
+  link to `/admin/crew`). Only the row's `worker_id`; only while the row is
+  `held`, a refund is asked and nothing is decided; once only (a second
+  contest answers 409). 10 contests a day per account (`checkRateLimit`), and
+  the poster/studio notices go once per payment.
+- **The poster changes their mind** (no-show/cancelled only): "They worked it
+  after all" → outcome `worked`. `setOutcome` allows this one change for a
+  poster (not only an admin) while the payment's refund is still waiting and
+  undecided — contested or not. It clears the refund fields, records
+  `contest_decision = 'release'`, `contest_decided_by = poster`, and goes on
+  to `releaseRow` (the release hold still applies). Never the other way.
+- **Unbooked, then booked again**: booking the same response again while its
+  `unbooked` refund waits withdraws the refund (clear the fields) — the pay is
+  held for them again. Funding is not asked again.
+- **A chargeback** on the charge meanwhile: `lib/paymentDisputes.js` moves the
+  row to `disputed` as today; the daily step skips it; won → back to `held`
+  with the refund still waiting, so the next run makes it.
+
+### After three days
+
+The daily `/api/cron/creator-reminders` gets a step `refundDueCrewPay()` (its
+own try/catch, like each step there): every `held` row with
+`refund_due_at <= now`, `contested_at is null`, `contest_decision is null` →
+`refundRow` with `refund_asked_cents` and the reason words for its kind
+("the job didn't happen" / "the booking was cancelled" / "they were taken off
+the job"). At most 200 a run; the audit line counts them.
+
+### A full admin decides a contested (or any waiting) refund
+
+`/admin/crew` → Secured crew pay: a waiting row reads "Refund asked by the
+poster · <kind words> · goes back <Nov 19>"; a contested one adds "Contested"
+and the crew member's note, with two buttons:
+
+- **Refund the poster** → `refundRow` now with `refund_asked_cents`;
+  `contest_decision = 'refund'`.
+- **Pay the crew member** → the response's outcome becomes `worked`
+  (`outcome_by` the admin), refund fields cleared,
+  `contest_decision = 'release'`, then `releaseRow` (the release hold
+  applies).
+
+New op on `/api/admin/crew-calls`: `{ op: 'decide_refund', paymentId,
+decision: 'refund' | 'release', note }` — **full admins only** (a sub-admin
+never moves crew money, as today), audited `crew_pay_refund_decided`, both
+sides told (`crew_pay_refund_decided`). A decision on a row that is no longer
+waiting answers 409 with a plain line.
+
+### Guards
+
+- `releaseRow` skips a row whose refund is waiting and undecided
+  (`{ skipped: 'refund asked' }`) — `releaseDueCrewPay`,
+  `releasePendingCrewPay` and `adminReleaseCrewPay` can't pay out money the
+  poster asked back.
+- Every write that moves a waiting refund is guarded on the row's state
+  (`status = 'held'`, the refund fields as read) so the cron, a contest, the
+  poster's change of mind and an admin decision can't both win; use plain
+  filters (PostgREST answers an `or()` on an update with "column … does not
+  exist").
+- The note is shown only to the crew member who wrote it and to full admins
+  (`/admin/crew`); the poster sees "Contested" and never the note.
+  `paymentsForCall` / `toPayment` must not carry `contestNote` to the poster.
+
+### Before migration 125
+
+A poster's no-show / cancelled / unbook on held pay **moves no money**: the
+row stays held, the studio is emailed to settle it on `/admin/crew` (the
+existing Refund / Release buttons), and the poster reads "The secured pay
+stays held until the studio settles it." The contest button and the decide op
+answer 503 `{ code: 'migration-125' }`. Detect the missing columns by the
+error naming one of them (like `mentions114`).
+
+### Words (both sides, web and app identical)
+
+Put them in `lib/crewPayRules.js` (client-safe) and the app's copy of what it
+needs. The app has no copy of `crewPayRules.js` today; create
+`mobile/src/lib/crewPayRules.js` holding only what the app uses, word for word,
+and make `scripts/test-crew-pay.mjs` check the shared parts are identical.
+
+- `REFUND_WAIT_DAYS = 3`, `refundDueFrom(from)`, `refundKindWords(kind)`
+  ("Didn't happen" / "Cancelled" / "Taken off the job"),
+  `refundState(payment, now)` → `none | waiting | contested | due`,
+  `contestRefusal(...)` (the plain lines for each refusal).
+- Worker notice (`crew_pay_refund_asked`): "<Poster> says <the job didn't
+  happen | the job was cancelled | you're off the job> on <title>. The <$X>
+  secured for you goes back to them on <Nov 19> unless you tell us
+  otherwise."
+- Worker's box on the call (web + app): "<Poster first name> says the job
+  didn't happen. The <$X> goes back to them on <Nov 19> unless you tell us
+  otherwise." + textarea "What happened? The studio reads this." + **It
+  happened — tell the studio**. After: "You told the studio on <Nov 16>. The
+  <$X> stays held until someone there decides; they may write to you both."
+- Poster's response row: chip "Refund <Nov 19>" (waiting) or "Contested"; the
+  line "The <$X> goes back to your card on <Nov 19> unless <first name> says
+  otherwise." / "<First name> says the job happened. The <$X> stays held until
+  the studio decides." + **They worked it after all** (no-show/cancelled).
+- Poster notice (`crew_pay_contested`): "<Worker> says the job on <title>
+  happened. The <$X> stays held until the studio decides — we may write to
+  you both."
+- Decision notices (`crew_pay_refund_decided`): worker "The studio looked at
+  <title>: the <$X> is yours." / "…: the <$X> goes back to the poster."; poster
+  the mirror. (The release and refund notices that follow are the existing
+  ones.)
+- Working card's Get paid list (web `pages/crew/card.js`, app's crew card
+  screen): a waiting row reads "<$X> · <title> · refund asked, goes back <Nov
+  19>" linking to the call; a contested one "· you contested it".
+
+Add the three types to both `lib/notificationTypes.js` and
+`mobile/src/lib/notificationTypes.js` (same `kind(label, 'card', 'call')`
+shape as the other `crew_pay_*`). `scripts/test-notification-types.mjs` must
+still pass.
+
+### Terms
+
+`pages/terms.js` section 14's `#secured-pay` paragraph: when the poster says a
+funded job didn't happen, cancels it or takes someone off it, the money waits
+three days before it goes back, and the crew member can tell us the job
+happened; then it stays held until we decide, and we may ask both for
+details; a poster can change "didn't happen" or "cancelled" to "worked it"
+while the money waits. Move `TEXT_UPDATED` to 2026-11-16. Add the same as a
+question for the lawyer at the end of `legal/creator-share-terms-draft.md`.
+
+### Files you will touch (at least)
+
+`lib/crewPay.js`, `lib/crewPayRules.js`, `lib/crewCalls.js` (`setOutcome`,
+`setBooking`), `pages/api/crew/calls/[id]/…` (a new `contest-pay.js` route:
+POST `{ responseId, note }`, signed in, `applyCors`, `sendError` with
+`plainStatus: 400`), `pages/api/admin/crew-calls.js`,
+`pages/api/cron/creator-reminders.js`, `pages/crew/calls/[[...id]].js`,
+`pages/crew/card.js`, `pages/admin/crew.js`, `mobile/src/app/crew/calls/[id].js`,
+the app's crew card screen, both `notificationTypes.js`, `pages/terms.js`,
+`legal/creator-share-terms-draft.md`.
+
+### Checks
+
+- `scripts/test-crew-pay.mjs`: the new rules (the three kinds' amounts, the
+  due date, `refundState` at each moment, the refusals, the app copy word for
+  word).
+- A rig check `dev/test-rig/checks/crew-pay-hold.mjs` (seeds and removes its
+  own rows; fake Stripe): after 125 — no-show → held + waiting + the worker's
+  notice, no Stripe refund yet; the cron step before the due date does nothing;
+  move `refund_due_at` into the past → the cron step refunds the whole charge;
+  cancelled → less the card fee; unbook before the first day → waits, booking
+  again withdraws it; contest → poster notified, studio emailed (or at least
+  the email attempted), cron skips it, a second contest 409, the poster can't
+  read the note, a stranger and the poster can't contest; "worked it after
+  all" → released (or held by the release hold) and the refund gone; admin
+  decides refund / release, a sub-admin refused, a decided row 409; a
+  chargeback meanwhile → cron skips; the release paths refuse a waiting row.
+  Before 125 (`RIG_MIGRATE_TO=124`): no-show moves no money and says so; contest
+  and decide answer 503 `migration-125`.
+- `npm run check:refs`, `npm run lint`, every `scripts/test-*.mjs`,
+  `next build` (see CLAUDE.md for the rig's env), both app exports
+  (`cd mobile && npx expo export --platform ios --clear` and android).
+
+---
+
+## B. Clear-cut fixes from round 3's open list
+
+1. **A self refund can't race a download** (`purchases.refund_started_at`,
+   125). `refundPurchase({ kind: 'self' })`: first claim
+   `refund_started_at = now()` with a guarded update (`status = 'completed'`,
+   `refund_started_at is null`; nothing claimed → 409 "A refund for this is
+   already on its way."), **then** read the downloads — counting rows whose
+   date isn't set yet (a download being started) as downloaded — then the
+   rest of today's checks; any refusal or a Stripe failure clears the claim.
+   `lib/downloads.js` `startDownload` for a copy whose basis is `owned`: after
+   it writes its row (today's order), read strictly whether any purchase that
+   covers the title has `refund_started_at` set or is no longer `completed`;
+   if so, delete its own undated row and refuse 409 "This title is being
+   refunded, so it can't be downloaded." A claim older than 10 minutes is
+   stale (a refund that died) and may be taken over. Before 125: today's
+   behaviour, unchanged. Admin, takedown and Stripe-mirrored refunds don't
+   claim.
+2. **The location GET routes stop running the site-wide expiry on every
+   read** (`expireStale` in `lib/locationRequests.js`, called from three
+   readers). Run it at most once a minute (`firstInWindow`, plus a
+   per-instance timestamp so a Redis outage doesn't make every read run it)
+   and from the daily cron too. Make sure every action that depends on a
+   deadline (accept, counter, pay) checks the deadline itself, so a status
+   that hasn't been expired yet can never be acted on late; add that check
+   wherever it's missing.
+3. **`/api/apply/artwork` stops storing in the public artwork bucket**: an
+   applicant's poster/still go to private storage (`uploadPrivateImage`,
+   `private:` reference) until Accept; the applicant's own status card and the
+   review queue / `/admin/applications` get a one-hour signed preview; Accept
+   copies what it uses to the public `episode-art` bucket as today's episode
+   art; Decline removes the private copies. Artwork already stored publicly
+   keeps working.
+
+Checks: the unit tests you add or touch, a rig check
+`dev/test-rig/checks/round-nov16.mjs` covering the three (the refund/download
+order both ways by driving the routes; expiry still happens and a late accept
+is refused; the artwork path private → accepted public), the existing
+downloads, money, creator-path-related and locations checks still passing,
+check:refs, lint, `next build`.
+
+---
+
+## As built
+
+(Each builder writes what they built, what differs from the above and why,
+and what they could not verify.)
