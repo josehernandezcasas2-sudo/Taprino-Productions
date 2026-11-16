@@ -6,7 +6,9 @@ import { sendError } from '../../../lib/apiErrors';
 
 // POST { token, platform, deviceName, appVersion } → { ok }: the app
 // registers (or refreshes) its Expo push token (lib/push.js, migration
-// 102). Signed in only; CORS-open for the app.
+// 102). Signed in only; CORS-open for the app. The token is stored with
+// the Clerk sign-in it came under (migration 125): once that sign-in ends
+// (signed out from elsewhere), the token stops getting pushes.
 export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -16,12 +18,12 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  const { userId } = getAuth(req);
+  const { userId, sessionId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
   if (!(await checkRateLimit(`push-register:${userId}`, 30, 3600))) return res.status(429).json({ error: 'Too many registrations. Try again later.' });
   const { token, platform, deviceName, appVersion } = req.body || {};
   try {
-    return res.status(200).json(await registerPushToken({ userId, token, platform, deviceName, appVersion }));
+    return res.status(200).json(await registerPushToken({ userId, token, platform, deviceName, appVersion, sessionId }));
   } catch (err) {
     // A bad token keeps its line (status 400 from lib/push.js); database
     // text never reaches the app's push card.

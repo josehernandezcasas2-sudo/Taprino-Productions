@@ -9,7 +9,9 @@ import { sendError } from '../../../lib/apiErrors';
 // migration 122; Jose, 2026-11-12). Upserted by endpoint, so the same
 // browser signed in as someone else is re-bound to them. Account →
 // Preferences sends it after the switch is turned on, and again when the
-// page is opened, to keep the row alive. Signed in only.
+// page is opened, to keep the row alive. Signed in only. Stored with the
+// Clerk sign-in it came under (migration 125): once that sign-in ends, the
+// browser stops getting notifications.
 // 503 { code: 'not-set-up' } without the Vercel keys, { code:
 // 'migration-122' } before the migration.
 export default async function handler(req, res) {
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  const { userId } = getAuth(req);
+  const { userId, sessionId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
   if (!(await checkRateLimit(`ratelimit:web-push-subscribe:${userId}`, 30, 3600))
     || !(await checkRateLimit(rateLimitKeyForRequest(req, 'web-push-subscribe'), 60, 3600))) {
@@ -31,7 +33,7 @@ export default async function handler(req, res) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const subscription = body.subscription && typeof body.subscription === 'object' ? body.subscription : body;
   try {
-    return res.status(200).json(await subscribeBrowser({ userId, subscription, userAgent: req.headers['user-agent'] || '' }));
+    return res.status(200).json(await subscribeBrowser({ userId, subscription, userAgent: req.headers['user-agent'] || '', sessionId }));
   } catch (err) {
     if (err && err.code && err.status === 503) return res.status(503).json({ error: err.message, code: err.code });
     return sendError(res, err, 'push/web-subscribe', 'Could not turn notifications on for this browser.');

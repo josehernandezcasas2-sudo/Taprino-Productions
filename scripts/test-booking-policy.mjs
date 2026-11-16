@@ -223,6 +223,26 @@ test('a host’s change tells people (lib/locations.js updateListing → lib/boo
   assert.match(types, /location_policy_changed: kind\('Cancellation policy changed', 'account', 'location_request'\)/);
 });
 
+test('a place\'s policy changes at most five times a day; a closed Checkout is forgotten, never a completed one (2026-11-16)', () => {
+  const loc = read('lib/locations.js');
+  const update = between(loc, 'export async function updateListing', 'export function listingToInput');
+  assert.match(loc, /const POLICY_CHANGES_PER_DAY = 5;/);
+  // Counted before the save, per place, a full admin's change aside; refused with a 429.
+  assert.match(update, /if \(before !== clean\.cancellation && !isAdmin && !\(await checkRateLimit\(`location-policy:\$\{row\.id\}`, POLICY_CHANGES_PER_DAY, 86400\)\)\) \{\s*fail\(POLICY_CHANGES_LINE, 429\);/);
+  assert.ok(update.indexOf('location-policy:') < update.indexOf("updateCompat(getSupabase(), 'locations'"), 'refused before anything is written');
+  const bp = read('lib/bookingPolicy.js');
+  const forget = between(bp, 'async function forgetClosedCheckout', 'async function closeOpenCheckout');
+  // Plain filters on the guarded update: this request, still accepted, still holding that session.
+  assert.match(forget, /\.update\(\{ stripe_checkout_session_id: null \}\)\s*\.eq\('id', requestId\)\.eq\('status', 'accepted'\)\.eq\('stripe_checkout_session_id', sessionId\)/);
+  assert.doesNotMatch(forget, /\.or\(/);
+  const close = between(bp, 'async function closeOpenCheckout', 'export async function tellPolicyChange');
+  assert.match(close, /s\.status === 'open'[\s\S]*closed = true;\s*gone = true;/);
+  assert.match(close, /s\.status === 'expired'\) \{\s*gone = true;/);
+  assert.doesNotMatch(close, /'complete'/, 'a completed session is never forgotten');
+  assert.match(close, /if \(gone\) await forgetClosedCheckout\(requestId, sessionId\);/);
+  assert.match(bp, /closeOpenCheckout\(r\.id, r\.stripe_checkout_session_id\)/);
+});
+
 test('3-D Secure on every one-off card Checkout (tips, backings, bookings, title sales, crew pay)', () => {
   for (const file of ['lib/tips.js', 'lib/pitchDonations.js', 'lib/purchases.js', 'lib/locationRequests.js', 'lib/crewPay.js']) {
     const src = read(file);

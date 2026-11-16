@@ -129,8 +129,10 @@ t('the policy on a live title: owners wait, a full admin applies, a reviewer app
   const owner = { ...live, isUploader: true, isRunner: true };
   for (const f of L.DETAIL_FIELDS.episode) assert.equal(R.fieldPolicy(f, owner), 'staged', f);
   for (const status of ['pending', 'rejected', 'draft']) for (const f of L.DETAIL_FIELDS.episode) assert.equal(R.fieldPolicy(f, { ...owner, status }), 'direct', `${status} ${f}`);
-  // Pulled: captions stay open, as before (amendment 22).
-  assert.equal(R.fieldPolicy('captions', { ...owner, held: true }), 'direct');
+  // Pulled: captions stay open (amendment 22) and, on an approved title,
+  // wait for review — it comes back as it is (2026-11-16).
+  assert.equal(R.fieldPolicy('captions', { ...owner, held: true }), 'staged');
+  assert.equal(R.fieldPolicy('captions', { ...owner, status: 'pending', held: true }), 'direct');
   assert.equal(R.fieldPolicy('genre', { ...owner, held: true }), 'locked');
   const full = { isAdmin: true, fullAdmin: true, ...live };
   for (const f of L.DETAIL_FIELDS.episode) assert.equal(R.fieldPolicy(f, { ...full, isUploader: true }), 'direct', f);

@@ -69,6 +69,47 @@ t('the index as read: anything malformed is dropped, a transfer left in flight g
   assert.equal(out.notices.length, 1);
   // Wi-Fi only is on unless it was switched off.
   assert.equal(lib.normalizeIndex({}).wifiOnly, true);
+  // The signed-out mark is a date or nothing.
+  assert.equal(lib.emptyIndex().signedOutAt, null);
+  assert.equal(lib.normalizeIndex({ signedOutAt: NOW }).signedOutAt, NOW);
+  assert.equal(lib.normalizeIndex({ signedOutAt: 'not a date' }).signedOutAt, null);
+});
+
+t('a phone seen signed out keeps its copies hidden on an offline restart; a sign-in clears the mark (2026-11-16)', () => {
+  const held = indexOf([{ episodeId: 'a', state: 'ready' }]);
+  const unknown = { known: false, userId: null };
+  const out = { known: true, userId: null };
+  const same = { known: true, userId: 'user_a' };
+  const other = { known: true, userId: 'user_b' };
+  // As before: Clerk says signed out, or someone else — hidden; the owner, or nothing said yet — shown.
+  assert.equal(lib.copiesHidden(held, out), true);
+  assert.equal(lib.copiesHidden(held, other), true);
+  assert.equal(lib.copiesHidden(held, same), false);
+  assert.equal(lib.copiesHidden(held, unknown), false, 'an offline start with no mark: the copies play (the honest limit)');
+  assert.equal(lib.copiesHidden(held, null), false);
+  // Clerk says signed out: the mark is set, once.
+  const mark = lib.signedOutMark(held, out, NOW);
+  assert.equal(mark, NOW);
+  const marked = { ...held, signedOutAt: mark };
+  assert.equal(lib.signedOutMark(marked, out, NOW + 60000), undefined, 'set once');
+  // Restarted in airplane mode: Clerk says nothing, and the copies stay hidden.
+  assert.equal(lib.copiesHidden(marked, unknown), true);
+  assert.equal(lib.signedOutMark(marked, unknown, NOW), undefined, 'nothing said: unchanged');
+  // The same account signs in again: the mark goes, the copies show.
+  assert.equal(lib.signedOutMark(marked, same, NOW), null);
+  assert.equal(lib.copiesHidden({ ...marked, signedOutAt: null }, same), false);
+  assert.equal(lib.signedOutMark(held, same, NOW), undefined, 'no mark, nothing to clear');
+  // Nothing kept for an account: nothing to mark.
+  assert.equal(lib.signedOutMark(lib.emptyIndex(), out, NOW), undefined);
+  assert.equal(lib.signedOutMark({ ...lib.emptyIndex(), userId: 'user_a' }, out, NOW), NOW, 'the account the index belongs to, even with no copies yet');
+  // Survives being written and read back.
+  assert.equal(lib.copiesHidden(lib.normalizeIndex(JSON.parse(JSON.stringify(marked))), unknown), true);
+  // The manager uses them (mobile/src/lib/downloads.js): hidden() is the rule, the mark is written at once, and an app opened offline doesn't land on Downloads it can't show.
+  const manager = readFileSync(new URL('../mobile/src/lib/downloads.js', import.meta.url), 'utf8');
+  assert.match(manager, /function hidden\(\) \{\s*return copiesHidden\(index, session\);\s*\}/);
+  assert.match(manager, /const next = signedOutMark\(index, session, Date\.now\(\)\);\s*if \(next === undefined\) return;\s*index = \{ \.\.\.index, signedOutAt: next \};\s*saveNow\(\);/);
+  assert.equal((manager.match(/noteSignedOut\(\);/g) || []).length, 2, 'signed in and signed out');
+  assert.match(manager, /Object\.keys\(index\.items\)\.length === 0 \|\| index\.signedOutAt\) return false;/);
 });
 
 t('what is kept of a title, and its labels', () => {
@@ -370,8 +411,22 @@ t('while the file is being made: every 5 s for a minute, every 15 s to five minu
   let asks = 1; // the first, when Download is pressed
   while (waited < lib.PREPARE_MAX_MS) { waited += lib.preparePollDelay(waited); if (waited < lib.PREPARE_MAX_MS) asks += 1; }
   assert.equal(asks, 58);
-  // The route takes 600 asks an hour: ten slow titles in a row stay inside it.
-  assert.ok(asks * 10 <= 600);
+  // The route takes 400 asks an hour (pages/api/downloads/start.js, 600
+  // until 2026-11-16): a season stays inside it — 13 episodes whose files
+  // each take Cloudflare five minutes, or a full phone of 25 whose files
+  // take a minute.
+  const asksFor = (readyMs) => {
+    let w = 0;
+    let k = 1;
+    while (w < readyMs && w < lib.PREPARE_MAX_MS) { w += lib.preparePollDelay(w); if (w < lib.PREPARE_MAX_MS) k += 1; }
+    return k;
+  };
+  assert.equal(asksFor(60000), 13);
+  assert.equal(asksFor(5 * 60000), 29);
+  assert.ok(13 * asksFor(5 * 60000) <= 400, 'a 13-episode season, five minutes a file');
+  assert.ok(25 * asksFor(60000) <= 400, 'a full phone, a minute a file');
+  const route = readFileSync(new URL('../pages/api/downloads/start.js', import.meta.url), 'utf8');
+  assert.match(route, /const ASKS_PER_HOUR = 400;/);
 });
 
 t('a start the server couldn’t answer is tried again twice, a little apart, before it says so', () => {

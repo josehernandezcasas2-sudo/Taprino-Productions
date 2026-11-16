@@ -29,7 +29,9 @@ export const PAGE_SYNC_EVERY_MS = 30 * 1000;
 // While Cloudflare makes the file (a film can take many minutes): ask again
 // every 5 s for the first minute, every 15 s to five minutes, every 30 s
 // after that, for twenty minutes in all — 58 asks. The route allows an
-// account 600 asks an hour and counts only NEW copies against its limit.
+// account 400 asks an hour (600 until 2026-11-16) and counts only NEW
+// copies against its new-copy limits: a 13-episode season whose files each
+// take five minutes asks 377 times.
 export const PREPARE_POLL_MS = 5000;
 export const PREPARE_SLOW_AFTER_MS = 60 * 1000;
 export const PREPARE_SLOW_POLL_MS = 15000;
@@ -147,9 +149,41 @@ export function emptyIndex() {
     enabled: null,
     limits: null,
     wifiOnly: true,
+    // When Clerk last said this phone was signed out while copies were kept
+    // for an account (null = not since its last sign-in): copiesHidden.
+    signedOutAt: null,
     items: {},
     notices: []
   };
+}
+
+// Whether the copies are hidden (2026-11-16): when Clerk positively says
+// the phone is signed out, or signed in as someone else (those are deleted
+// too) — and, while Clerk hasn't said anything yet (an app opened with no
+// connection), when the phone was last seen signed out. A phone signed out
+// from elsewhere (the owner of a lost phone, from the website) used to
+// forget that on a restart in airplane mode and play every copy to its
+// date. session = { known, userId }.
+export function copiesHidden(index, session) {
+  const s = session || {};
+  if (!s.known) return Boolean(index && index.signedOutAt);
+  if (!s.userId) return true;
+  return Boolean(index && index.userId && index.userId !== s.userId);
+}
+
+// The mark copiesHidden reads, after Clerk has spoken. → the new
+// signedOutAt, or undefined when it stays as it is: set (once) when Clerk
+// says signed out and copies are kept for an account; cleared by a sign-in
+// (another account's sign-in deletes the copies anyway); unchanged while
+// Clerk hasn't said.
+export function signedOutMark(index, session, now = Date.now()) {
+  const s = session || {};
+  const mark = index ? index.signedOutAt || null : null;
+  if (!s.known) return undefined;
+  if (s.userId) return mark ? null : undefined;
+  if (mark) return undefined;
+  const holding = Boolean(index && (index.userId || Object.keys(index.items || {}).length > 0));
+  return holding ? now : undefined;
 }
 
 // The index as read from the phone, made safe: anything malformed is
@@ -169,6 +203,7 @@ export function normalizeIndex(raw) {
   out.enabled = typeof raw.enabled === 'boolean' ? raw.enabled : null;
   out.limits = raw.limits && typeof raw.limits === 'object' ? { titles: Number(raw.limits.titles) || null, devices: Number(raw.limits.devices) || null } : null;
   out.wifiOnly = raw.wifiOnly !== false;
+  out.signedOutAt = num(raw.signedOutAt);
   const items = raw.items && typeof raw.items === 'object' && !Array.isArray(raw.items) ? raw.items : {};
   for (const id of Object.keys(items)) {
     const it = items[id];

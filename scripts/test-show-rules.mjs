@@ -984,8 +984,8 @@ function suite(R, who) {
     assert.equal(R.fieldPolicy('paidTo', { ...owner, status: 'pending' }), 'invite');
     assert.equal(R.fieldPolicy('title', { ...owner }), 'staged', 'no status reads as live');
     assert.equal(R.fieldPolicy('somethingElse', live), 'locked');
-    // The team always applies at once.
-    for (const field of ['title', 'tier', 'rating', 'video', 'paidTo', 'nonsense']) assert.equal(R.fieldPolicy(field, { isAdmin: true, status: 'approved', held: true }), 'direct', field);
+    // A full admin always applies at once, a pulled title included.
+    for (const field of ['title', 'tier', 'rating', 'video', 'paidTo', 'nonsense']) assert.equal(R.fieldPolicy(field, { isAdmin: true, fullAdmin: true, status: 'approved', held: true }), 'direct', field);
   });
 
   tt('fieldPolicy: who may change what — the uploader\'s details, the runner\'s place, credits and payee', () => {
@@ -1013,10 +1013,22 @@ function suite(R, who) {
   tt('fieldPolicy: pulled, removal requested, withdrawn (amendment 22)', () => {
     const pulled = { isUploader: true, isRunner: true, status: 'approved', held: true };
     assert.equal(R.fieldPolicy('video', pulled), 'staged');
-    assert.equal(R.fieldPolicy('captions', pulled), 'direct');
-    assert.equal(R.fieldPolicy('pageNotes', pulled), 'direct');
+    // An approved title comes back as it is (2026-11-16): the captions and
+    // the notes stay open while it is pulled, and wait for review as on a
+    // live title, so nothing unreviewed goes public when it is restored.
+    assert.equal(R.fieldPolicy('captions', pulled), 'staged');
+    assert.equal(R.fieldPolicy('pageNotes', pulled), 'staged');
+    assert.equal(R.fieldPolicy('captions', { ...pulled, status: undefined }), 'staged', 'no status reads as approved');
     for (const field of ['title', 'description', 'seriesOrder', 'tier', 'paidTo']) assert.equal(R.fieldPolicy(field, pulled), 'locked', field);
-    assert.equal(R.fieldPolicy('captions', { isUploader: true, status: 'approved', showHeld: true }), 'direct');
+    assert.equal(R.fieldPolicy('captions', { isUploader: true, status: 'approved', showHeld: true }), 'staged');
+    // Never live (in review, declined): they go up as they are typed, as before.
+    for (const status of ['pending', 'rejected']) {
+      for (const flag of ['held', 'showHeld']) {
+        assert.equal(R.fieldPolicy('captions', { isUploader: true, isRunner: true, status, [flag]: true }), 'direct', `${status} ${flag} captions`);
+        assert.equal(R.fieldPolicy('pageNotes', { isUploader: true, isRunner: true, status, [flag]: true }), 'direct', `${status} ${flag} notes`);
+        assert.equal(R.fieldPolicy('video', { isUploader: true, isRunner: true, status, [flag]: true }), 'staged', `${status} ${flag} video`);
+      }
+    }
     assert.equal(R.fieldPolicy('title', { isUploader: true, status: 'pending', showHeld: true }), 'locked');
     assert.equal(R.fieldPolicyLine('title', pulled), 'Pulled while an admin looks at it');
     for (const flag of ['deletionRequested', 'withdrawn']) {
@@ -1057,7 +1069,8 @@ function suite(R, who) {
     assert.equal(R.fieldPolicyLine('genre', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('description', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('pageNotes', live), 'Waits for approval; what’s there now stays until then');
-    assert.equal(R.fieldPolicyLine('pageNotes', { ...live, held: true }), null, 'a pulled title keeps its notes open');
+    assert.equal(R.fieldPolicyLine('pageNotes', { ...live, held: true }), 'Waits for approval; what’s there now stays until then', 'a pulled title keeps its notes open, waiting for review');
+    assert.equal(R.fieldPolicyLine('pageNotes', { ...live, status: 'pending', held: true }), null, 'one in review: at once');
     assert.equal(R.fieldPolicyLine('video', live), 'The new file goes to an admin; the current one keeps playing until then');
     assert.equal(R.fieldPolicyLine('poster', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('tier', live), 'Ask us to change who can watch');
@@ -1092,7 +1105,29 @@ function suite(R, who) {
         assert.equal(R.fieldPolicy(field, { ...editor, status }), 'direct', `${status} ${field}`);
         assert.equal(R.fieldPolicy(field, { ...reviewer, status, isUploader: true }), 'direct', `own, ${status} ${field}`);
       }
-      for (const flag of ['held', 'showHeld', 'withdrawn', 'deletionRequested']) assert.equal(R.fieldPolicy(field, { ...editor, ...live, [flag]: true }), 'direct', `${flag} ${field}`);
+      // Briefly off the site (pulled, its show pulled, withdrawn, a removal
+      // asked): still live for review (2026-11-16) — it comes back as it is.
+      for (const flag of ['held', 'showHeld', 'withdrawn', 'deletionRequested']) {
+        assert.equal(R.fieldPolicy(field, { ...editor, ...live, [flag]: true }), 'locked', `editor ${flag} ${field}`);
+        assert.equal(R.fieldPolicyLine(field, { ...editor, ...live, [flag]: true }), R.TEAM_REVIEW_LINE, `editor ${flag} ${field} line`);
+        assert.equal(R.fieldPolicy(field, { ...reviewer, ...live, [flag]: true }), 'direct', `reviewer ${flag} ${field}`);
+        assert.equal(R.fieldPolicy(field, { ...full, ...live, [flag]: true }), 'direct', `full ${flag} ${field}`);
+        // Never live: the team's change applies at once, as before.
+        assert.equal(R.fieldPolicy(field, { ...editor, status: 'pending', [flag]: true }), 'direct', `editor pending ${flag} ${field}`);
+      }
+    }
+    // What stays the team's on someone else's title applies at once off the site too.
+    for (const flag of ['held', 'withdrawn', 'deletionRequested']) {
+      for (const field of ['tier', 'rating', 'season', 'hasPage', 'channelOptIn']) assert.equal(R.fieldPolicy(field, { ...editor, ...live, [flag]: true }), 'direct', `${flag} ${field}`);
+    }
+    // A show off the site: what waits on a live show waits too.
+    for (const flag of ['held', 'deletionRequested']) {
+      const off = { target: 'show', status: 'approved', [flag]: true };
+      assert.equal(R.fieldPolicy('name', { ...off, ...editor }), 'locked', `show ${flag} name, editor`);
+      assert.equal(R.fieldPolicy('releaseYear', { ...off, ...editor }), 'locked', `show ${flag} year, editor`);
+      assert.equal(R.fieldPolicy('name', { ...off, ...reviewer }), 'direct', `show ${flag} name, reviewer`);
+      assert.equal(R.fieldPolicy('channelOptIn', { ...off, ...editor }), 'direct', `show ${flag} channels`);
+      assert.equal(R.fieldPolicy('name', { ...off, ...editor, status: 'pending', approvedEpisodes: 0 }), 'direct', `show ${flag}, nobody can see it yet`);
     }
     // Someone else's title: Who can watch, the rating, the place and the
     // switches stay the team's.

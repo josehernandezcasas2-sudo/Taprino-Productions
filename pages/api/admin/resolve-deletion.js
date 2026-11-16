@@ -113,18 +113,30 @@ export default async function handler(req, res) {
   }
 
   if (decision === 'deny') {
-    const { error } = await supabase
+    // A removal a full admin started is undone only by a full admin
+    // (2026-11-16), as for a show (lib/showAdmin.js denyShowRemoval).
+    const teamStarted = teamStartedRemoval(row);
+    if (teamStarted && roleContext.isAdmin !== true) {
+      return res.status(403).json({ code: 'full-admin', error: 'A full admin started this removal, so a full admin keeps the title up.' });
+    }
+    // Only the request read above is turned down: one that became the
+    // team's since is not.
+    let deny = supabase
       .from('episodes')
       .update({ deletion_requested: false, deletion_reason: null, deletion_requested_at: null, ...(has124(row) ? { keep_after_removal: false } : {}) })
       .eq('id', id)
       .eq('deletion_requested', true)
       .is('withdrawn_at', null);
+    deny = typeof row.deletion_reason === 'string' ? deny.eq('deletion_reason', row.deletion_reason) : deny.is('deletion_reason', null);
+    const { data: denied, error } = await deny.select('id');
     if (error) {
       console.error('resolve-deletion deny error:', error.message);
       return res.status(500).json({ error: 'Could not deny the deletion request.' });
     }
+    if (!denied || denied.length === 0) return res.status(409).json({ code: 'changed', error: 'That changed a moment ago. Reload and look again.' });
     await recordAudit({ adminId: userId, adminEmail: email, action: 'deny_episode_deletion', targetType: 'episode', targetId: id, details: row.title });
-    await notifyCreator({ userId: row.submitted_by, type: 'deletion_denied', message: `Your deletion request for "${row.title}" was denied — it's still live.`, episodeId: id });
+    // The owner asked for nothing when the team started it.
+    if (!teamStarted) await notifyCreator({ userId: row.submitted_by, type: 'deletion_denied', message: `Your deletion request for "${row.title}" was denied — it's still live.`, episodeId: id });
     return res.status(200).json({ ok: true, type, id, decision: 'deny' });
   }
 

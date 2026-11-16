@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
-import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { apiGet, apiPatch, apiPost, pathId } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
@@ -36,6 +36,8 @@ function fromListing(l) {
   };
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function ListAPlace() {
   const router = useRouter();
   const { edit } = useLocalSearchParams();
@@ -60,8 +62,10 @@ export default function ListAPlace() {
     (async () => {
       tokenRef.current = signedIn ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]) : null;
       try { const r = await apiGet('/api/locations?sort=new'); if (alive) setRules(r.rules); } catch (err) { /* chips stay empty */ }
-      if (edit && tokenRef.current) {
-        try { const l = await apiGet(`/api/locations/${edit}`, tokenRef.current); if (alive && l.listing && l.listing.mine) { setEditing(l.listing); if (filledFor.current !== edit) { filledFor.current = edit; setForm(fromListing(l.listing)); } } } catch (err) { if (alive) setError(err.message); }
+      // A place's id is a uuid: anything else in ?edit= is never read (and
+      // the id goes into the path encoded, 2026-11-16).
+      if (edit && UUID.test(String(Array.isArray(edit) ? edit[0] : edit)) && tokenRef.current) {
+        try { const l = await apiGet(`/api/locations/${pathId(edit)}`, tokenRef.current); if (alive && l.listing && l.listing.mine) { setEditing(l.listing); if (filledFor.current !== edit) { filledFor.current = edit; setForm(fromListing(l.listing)); } } } catch (err) { if (alive) setError(err.message); }
       }
       if (alive) setLoading(false);
     })();
@@ -103,7 +107,7 @@ export default function ListAPlace() {
       const token = await resolveToken(getToken);
       const body = { ...form, photos: form.photos.map(({ localUri, ...p }) => p) };
       delete body.proofLocalUri;
-      if (editing) await apiPatch(`/api/locations/${editing.id}`, body, token);
+      if (editing) await apiPatch(`/api/locations/${pathId(editing.id)}`, body, token);
       else await apiPost('/api/locations', body, token);
       router.replace('/locations/mine');
     } catch (err) {

@@ -222,13 +222,16 @@ made by `lib/webpush.mjs` `makeBrowser` — the message decrypted, as
 `webPushes` in `GET /__state`);
 `POST /__fail?user=<id>&on=1|0` (that account's reads — `GET /v1/users/<id>`
 and a users list asking for it by `user_id` — answer 500; `user=*&on=0`
-clears them all).
+clears them all); `POST /__sessions?sid=sess_rig_<user>&status=revoked`
+(2026-11-16: `GET /v1/sessions/<id>` answers that state, `active` until a
+check sets another; the push sends skip a sign-in that has ended).
 
 Not covered: Clerk's frontend. The browser loads `clerk-js` from
 `clerk.example.com`, which doesn't exist, so in a browser Clerk's client hooks
 never load: signed-in pages render from server props (the header, the pages'
 own data), but the sign-in modal, `useUser()` and Clerk's account UI don't work.
-No sessions/clients/organizations API, no handshake endpoint.
+No clients/organizations API and only `GET /v1/sessions/<id>` of the
+sessions one, no handshake endpoint.
 
 ### Stripe (:54322)
 

@@ -3,7 +3,8 @@ import { Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../lib/stableAuth';
-import { refreshPushRegistration } from '../lib/push';
+import { forgetPushWhenSignedOut, refreshPushRegistration } from '../lib/push';
+import { pushStepFor } from '../lib/pushRules';
 import { API_BASE_URL } from '../lib/api';
 
 // Renders nothing. Keeps the push token fresh while signed in and turns
@@ -181,8 +182,18 @@ export default function PushListener() {
     return () => sub.remove();
   }, []);
 
+  // Runs on every change of Clerk's state, so on a cold start and on each
+  // move between signed out and signed in (lib/pushRules.js):
+  //   signed in   register again when push is on (a sign-in that ran out,
+  //               or a brief false "signed out", heals by itself);
+  //   signed out  (from elsewhere, a sign-in that ran out, a Log out whose
+  //               server call failed) the server forgets the token by the
+  //               token alone and the phone unregisters; the preference
+  //               stays — only Log out resets it (lib/signOut.js).
   useEffect(() => {
-    if (isLoaded && isSignedIn) refreshPushRegistration(getToken);
+    const step = pushStepFor({ isLoaded, isSignedIn });
+    if (step === 'refresh') refreshPushRegistration(getToken);
+    else if (step === 'forget') forgetPushWhenSignedOut();
   }, [isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
