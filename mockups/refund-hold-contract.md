@@ -249,3 +249,110 @@ check:refs, lint, `next build`.
 
 (Each builder writes what they built, what differs from the above and why,
 and what they could not verify.)
+
+### B. As built (2026-11-16)
+
+Commits on `refund-b`: 164c15f (refund vs download), 35bd2f4 (location
+expiry), b2453da (applicant artwork), 78113d2 (the checks). No migration
+beyond 125; no app code changed (the app shows the server's lines).
+
+**1. A self refund can't race a download.**
+- Pure rules in `lib/purchaseRules.js`: `REFUND_CLAIM_STALE_MS` (10 min),
+  `refundClaimLive(startedAt, now)`, `countsAsDownloaded(row)` (a dated row
+  whatever its status, or an undated `active` one — a revoked row that never
+  had a date never had a link), `refundBlocksDownload(covering, now)` (no
+  completed covering purchase left, or any completed one with a live claim),
+  `DOWNLOAD_REFUNDING_LINE`, `REFUND_BLOCKS.inFlight` ("A refund for this is
+  already on its way.", reason "a refund is on its way"), and
+  `refundEligibility(…, { refunding })` for the Purchases card.
+- `lib/purchases.js` `refundPurchase({ kind: 'self' })`: checks the buyer,
+  then claims with a guarded update (`status = 'completed'`,
+  `refund_started_at is null`; a stale claim is taken over on the exact
+  stamp it left, so two takers can't both have it; a claim let go between
+  the two steps is retried once; refunded meanwhile → `alreadyRefunded`),
+  then reads the downloads (`downloadedTitles(…, { starting: true })`: a
+  second plain read for undated `active` rows), then today's checks. Any
+  refusal or a Stripe error lets the claim go (only its own stamp). A refund
+  Stripe made keeps the claim until the row reads refunded. 409 answers
+  `{ code: 'refunding' }` (the route now passes a `PurchaseError`'s code).
+  Before 125 (the row has no such key, or the update names the column): no
+  claim and the old downloads read.
+- `lib/downloads.js` `startDownload`, basis `owned`: once its row is in, two
+  plain reads of the buyer's purchases of the episode and of its show
+  (`id, status, refund_started_at`); a refusal deletes its own new undated
+  row (falls back to marking it undone) and answers 409 `refunding`; a read
+  that fails answers 503 `unavailable`; before 125 (the error names the
+  column) nothing is asked. **Changed from the contract's wording**: "no
+  longer completed" is read as "no completed purchase covers it any more"
+  (an old refunded purchase next to a new completed one doesn't refuse).
+  **Also**: the phone is now put on record only after that check (it used
+  to be recorded as soon as the row went in; a refused ask never records a
+  phone, as the file's own comment already promised). An existing row (the
+  phone already held or was waiting for the title) is never deleted by the
+  check, only refused.
+- The Purchases card counts a download being started and says "a refund is
+  on its way" once 125 is in (read from the purchase rows' keys).
+- `dev/test-rig/checks/sec-money.mjs` expected an undated row to leave the
+  title refundable; after 125 it now expects "downloaded to watch offline"
+  (before 125 the old expectation).
+
+**2. Location requests: the sweep no longer runs on every read.**
+- Pure rules in the new `lib/requestExpiryRules.js` (no imports):
+  `EXPIRY_EVERY_MS`, `outOfTime(row, now)` (requested/countered past
+  `responds_by`), `shownStatus(row, now)`, `expiryDue(lastAt, now)`.
+- `lib/locationRequests.js`: the three readers call `expireStaleSometimes()`
+  (a per-instance timestamp first, then `firstInWindow('location-requests:
+  expiry', 60)`); the daily `/api/cron/expire-content` runs
+  `expireStaleRequests()` (100 a round, ten rounds; the audit line and the
+  answer's `requests` count them). The sweep's update is now guarded (still
+  waiting, still past its time) and only the rows it really expired are told
+  or counted toward a host's pause.
+- **Added beyond the contract**: `toRequest` shows a request past its time as
+  `expired` (status and label) whether or not the sweep has reached it — with
+  the sweep throttled, a page would otherwise show a dead request as waiting
+  for up to a minute (every read used to sweep first).
+- Deadlines: accept, counter, decline and take-the-counter already refused a
+  late answer up front; their writes now land only while `responds_by >=
+  now` at the moment of the write (`whileInTime`, plain filters), and counter
+  and decline also only from the status they were read in (both were
+  unguarded `.eq('id')` writes that could overwrite an expired or changed
+  request). Pay has no `responds_by` (an accepted request doesn't expire);
+  its deadline is the first day, already checked when the Checkout is made —
+  **added**: the booking Checkout now expires after an hour
+  (`checkoutExpiresAt()`, as title sales and tips), so a payment can't land
+  up to a day after that check.
+
+**3. Applicants' artwork private until Accept.**
+- `/api/apply/artwork` stores with `uploadPrivateImage` (uncapped, as episode
+  art is) → `private:apply-<id>-poster|thumbnail-<random>.<ext>`; a picture
+  it replaces is removed; a failed row write removes the new ones.
+- `lib/creatorApplications.js`: `applicationArtworkPreview(ref)` (one-hour
+  `signPrivate`; a public address passes through), `withArtworkPreviews(row)`,
+  `applicantView(row)` (used by `getOwnApplication`, `/api/apply` POST,
+  `/api/apply/video`, `/api/apply/artwork`); the review queue's application
+  card; `/api/admin/applications` signs its list and every decision's answer
+  (the page merges those into its rows). `toApplicantView` is unchanged and
+  no route answers with it directly any more.
+- Accept: `artworkFor` copies a private picture's bytes to the public
+  `episode-art` bucket under `<episodeId>-poster|thumbnail-…` (a copy that
+  fails falls back to cutting from the film), the application row then names
+  the public copies and the private ones are removed. A link-only accept (no
+  master, no title) leaves the private pictures as they are.
+- Decline removes the private pictures and clears the row's two columns; a
+  public address from before is left.
+- The pages (website and app) use `poster`/`thumbnail` only as "artwork
+  received", so they need no change; a link that can't be signed reads as
+  none.
+
+**Checks.** `node scripts/test-round-nov16.mjs` (10, incl. every order of the
+refund's and the download's two steps); all 63 `scripts/test-*.mjs` pass;
+`npm run check:refs`, `npm run lint`, `next build` (with the rig's env) pass.
+`dev/test-rig/checks/round-nov16.mjs` is written but **not run** (the rig was
+in use by part A's builder): after the merge run it after 125 and with
+`RIG_MIGRATE_TO=124`, plus downloads, sec-money, money, money-fixes,
+booking-policy, sales-tax and app-return.
+
+**Not verified**: anything against the rig (the routes, PostgREST's answers to
+the guarded updates and the `.is(…, null)` filters, the fake storage's signed
+links, Next dev's module instances for the once-a-minute sweep), real Stripe,
+real Supabase Storage, a phone.
