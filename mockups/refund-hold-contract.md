@@ -344,7 +344,30 @@ beyond 125; no app code changed (the app shows the server's lines).
   received", so they need no change; a link that can't be signed reads as
   none.
 
-**Checks.** `node scripts/test-round-nov16.mjs` (10, incl. every order of the
+**Follow-ups the same day** (the coordinator, on what I had found and left
+alone): fbe6510 — `cancelRequest` and `refundBooking` write only on the
+status they read (`writeOnStatusRead`, plain filters; the outcomes in the
+pure `lib/bookingWriteRules.js` `missedWrite`): a cancel of an accepted
+request paid meanwhile loses with 409 "This booking was just paid, so it
+wasn’t cancelled…" (the producer then cancels the paid booking under its
+policy); a refund whose own `charge.refunded` mirror (`refunded_by =
+'stripe'`) wrote first is recorded over it; anything else answers 409 (saying
+the refund went through when it did). A first payment landing on a request
+already cancelled was refunded in full by `completeBookingFromSession` before
+this (a request no longer `accepted` → `refundStrayPayment`); unchanged.
+e7d59fa — `/api/purchases/refund`: 10 an hour per account, 60 per address,
+429 with Retry-After; a purchase id that isn't a uuid answers 400 (was 500).
+6e02078 — `/admin/applications` names an applicant's private pictures by
+`/api/admin/application-artwork?id=&kind=` (`lib/applicationArtworkRules.js`
+`withArtworkRoutes`), which checks `manage_applications` and 302s to a link
+signed now for ten minutes; the applicant's card and the review queue keep
+their one-hour links (they re-read on load, and the app's review deck can't
+send a cookie with an image). The unit test has 14 tests now; the rig check
+adds the refund limit, a payment landing on a just-cancelled request, four
+cancel-vs-payment races, an admin refund, and the artwork route (admin 302,
+applicant and creator 403, bad kind 400, unknown 404).
+
+**Checks.** `node scripts/test-round-nov16.mjs` (14 since the follow-ups; 10 at first, incl. every order of the
 refund's and the download's two steps); all 63 `scripts/test-*.mjs` pass;
 `npm run check:refs`, `npm run lint`, `next build` (with the rig's env) pass.
 `dev/test-rig/checks/round-nov16.mjs` is written but **not run** (the rig was

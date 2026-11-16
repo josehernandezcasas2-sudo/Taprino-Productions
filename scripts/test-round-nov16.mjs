@@ -8,7 +8,10 @@
 //   - a location request past its time reads as expired and is acted on
 //     as such without waiting for the sweep, which runs at most once a
 //     minute;
-//   - an applicant's private artwork reference stays inside its folder.
+//   - a booking's cancel or refund whose write finds the request changed
+//     (a payment landing at the same moment, the refund's own mirror);
+//   - an applicant's private artwork reference stays inside its folder,
+//     and the team's page opens it through a route that signs each time.
 // The routes themselves are checked on the rig:
 // dev/test-rig/checks/round-nov16.mjs.
 import assert from 'node:assert/strict';
@@ -17,6 +20,8 @@ import {
 } from '../lib/purchaseRules.js';
 import { EXPIRY_EVERY_MS, RESPONDING_STATUSES, expiryDue, outOfTime, shownStatus } from '../lib/requestExpiryRules.js';
 import { safePrivatePath } from '../lib/uploadRefRules.js';
+import { CANCEL_JUST_PAID_LINE, REFUND_RECORD_MISSED_LINE, REQUEST_CHANGED_LINE, missedWrite } from '../lib/bookingWriteRules.js';
+import { applicationArtworkRoute, withArtworkRoutes } from '../lib/applicationArtworkRules.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -168,6 +173,33 @@ test('expiryDue: at most once a minute on one server', () => {
   assert.equal(expiryDue(undefined, NOW), true);
 });
 
+test('missedWrite: a cancel of an accepted request that was just paid loses, and says so', () => {
+  const r = missedWrite({ was: 'accepted', now: { status: 'paid', refunded_by: null } });
+  assert.equal(r.outcome, 'just-paid');
+  assert.equal(r.line, CANCEL_JUST_PAID_LINE);
+  assert.match(CANCEL_JUST_PAID_LINE, /just paid/);
+});
+
+test('missedWrite: a refund made whose own mirror wrote first is recorded over the mirror', () => {
+  assert.equal(missedWrite({ was: 'paid', now: { status: 'refunded', refunded_by: 'stripe' }, moneyMoved: true }).outcome, 'over-mirror');
+  assert.equal(missedWrite({ was: 'done', now: { status: 'refunded', refunded_by: 'stripe' }, moneyMoved: true }).outcome, 'over-mirror');
+  // Refunded by someone else (an admin, another cancel): not written over.
+  const other = missedWrite({ was: 'paid', now: { status: 'refunded', refunded_by: 'user_x' }, moneyMoved: true });
+  assert.equal(other.outcome, 'changed');
+  assert.equal(other.line, REFUND_RECORD_MISSED_LINE);
+  // No money moved by this action: never over a mirror.
+  assert.equal(missedWrite({ was: 'paid', now: { status: 'refunded', refunded_by: 'stripe' }, moneyMoved: false }).outcome, 'changed');
+});
+
+test('missedWrite: anything else is "it changed", saying the refund went through when it did', () => {
+  assert.deepEqual(missedWrite({ was: 'requested', now: { status: 'accepted' } }), { outcome: 'changed', line: REQUEST_CHANGED_LINE });
+  assert.deepEqual(missedWrite({ was: 'accepted', now: { status: 'cancelled' } }), { outcome: 'changed', line: REQUEST_CHANGED_LINE });
+  assert.deepEqual(missedWrite({ was: 'paid', now: null }), { outcome: 'changed', line: REQUEST_CHANGED_LINE });
+  assert.deepEqual(missedWrite({ was: 'paid', now: { status: 'done' }, moneyMoved: true }), { outcome: 'changed', line: REFUND_RECORD_MISSED_LINE });
+  // Only an accepted request turning paid is "just paid".
+  assert.equal(missedWrite({ was: 'requested', now: { status: 'paid' } }).outcome, 'changed');
+});
+
 /* ---------- 3. an applicant's private artwork ---------- */
 
 test('an applicant’s artwork reference stays inside the private folder', () => {
@@ -175,6 +207,22 @@ test('an applicant’s artwork reference stays inside the private folder', () =>
   assert.equal(safePrivatePath(`apply-${id}-poster-0a1b2c3d4e5f6a7b8c.jpg`), `apply-${id}-poster-0a1b2c3d4e5f6a7b8c.jpg`);
   assert.equal(safePrivatePath(`apply-${id}-thumbnail-0a1b2c3d4e5f6a7b8c.webp`), `apply-${id}-thumbnail-0a1b2c3d4e5f6a7b8c.webp`);
   assert.equal(safePrivatePath('apply-x/../captions/a.vtt'), null);
+});
+
+test('the team’s page opens private artwork through a route that signs each time; public addresses stay', () => {
+  const id = '6f1c2b8e-3d4a-4f5b-9c6d-7e8f9a0b1c2d';
+  assert.equal(applicationArtworkRoute(id, 'poster'), `/api/admin/application-artwork?id=${id}&kind=poster`);
+  assert.equal(applicationArtworkRoute(id, 'nonsense'), `/api/admin/application-artwork?id=${id}&kind=poster`);
+  const pub = 'https://example.supabase.co/storage/v1/object/public/episode-art/apply-x-poster-1.png';
+  const row = { id, title: 'A film', poster: `private:apply-${id}-poster-0a1b.png`, thumbnail: pub };
+  const out = withArtworkRoutes(row);
+  assert.equal(out.poster, `/api/admin/application-artwork?id=${id}&kind=poster`);
+  assert.equal(out.thumbnail, pub);
+  assert.equal(out.title, 'A film');
+  assert.deepEqual(withArtworkRoutes({ id, poster: null, thumbnail: undefined }), { id, poster: null, thumbnail: null });
+  assert.equal(withArtworkRoutes(null), null);
+  // The reference itself never reaches the page.
+  assert.ok(!JSON.stringify(out).includes('private:'));
 });
 
 console.log(`\n${passed} passed`);

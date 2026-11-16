@@ -16,6 +16,8 @@
 //          its claim go; the card says so;
 //        - a refund that Stripe doesn't make lets its claim go too;
 //        - the two at the same moment, several times over: never both.
+//      Both: a buyer's own refunds stop at 10 an hour (429), and a
+//      purchase id that isn't one answers 400.
 //      Before 125 (RIG_MIGRATE_TO=124 RIG_REBUILD=1 dev/test-rig/start.sh):
 //      as before — a download being started doesn't stop a refund, and
 //      nothing answers 409 `refunding`.
@@ -27,11 +29,20 @@
 //      within the minute; the daily cron (/api/cron/expire-content)
 //      expires the rest and tells the producer; Pay opens a Checkout that
 //      stops taking payment after an hour.
+//      A cancel and the payment at the same moment
+//      (lib/bookingWriteRules.js): a payment landing on a request just
+//      cancelled is refunded in full and the request stays cancelled; a
+//      cancel racing the payment, several times over, ends either
+//      cancelled with any charge refunded in full, or paid with the cancel
+//      answering 409 "just paid" (and the paid booking then cancels under
+//      its policy) — never cancelled with the money kept, never paid after
+//      a cancel that said yes. An admin's full refund still lands, once.
 //   3. An applicant's poster and still (/api/apply/artwork) are private
 //      until Accept: stored as `private:apply-<id>-…` in the private
 //      bucket (nothing in the public artwork bucket), shown to the
-//      applicant, /admin/applications and the review queue as one-hour
-//      links; a replaced one is removed; Accept copies them to the public
+//      applicant and the review queue as one-hour links and on
+//      /admin/applications through /api/admin/application-artwork (a link
+//      signed on every open, the team only); a replaced one is removed; Accept copies them to the public
 //      artwork bucket as the new title's art and removes the private ones;
 //      Decline removes them; one stored publicly before keeps working.
 // Seeds its own titles, accounts, place, requests and applications and
@@ -59,7 +70,8 @@ const UID = { film: crypto.randomBytes(16).toString('hex'), app1: crypto.randomB
 const srcOf = (uid) => `https://customer-test.cloudflarestream.com/${uid}/manifest/video.m3u8`;
 const ID = { film: `ck-r16-film-${RUN}` };
 const LOC = crypto.randomUUID();
-const REQ = { late: crypto.randomUUID(), lateCounter: crypto.randomUUID(), inTime: crypto.randomUUID(), probe: crypto.randomUUID(), after: crypto.randomUUID() };
+const REQ = { late: crypto.randomUUID(), lateCounter: crypto.randomUUID(), inTime: crypto.randomUUID(), probe: crypto.randomUUID(), after: crypto.randomUUID(), straggler: crypto.randomUUID(), adminRefund: crypto.randomUUID() };
+const RACE_REQS = Array.from({ length: 4 }, () => crypto.randomUUID());
 const APP = { one: crypto.randomUUID(), two: crypto.randomUUID(), legacy: crypto.randomUUID() };
 const people = [];
 const sessions = [];
@@ -95,7 +107,7 @@ const ip = (who) => {
 const phone = (tag) => `ckr16${tag}_${RUN}_${crypto.randomBytes(5).toString('hex')}`;
 // The app asks to download (Bearer, no cookie, no Origin).
 const start = (who, episodeId, deviceId) => call('/api/downloads/start', { who, bearer: true, method: 'POST', body: { episodeId, deviceId, deviceName: 'Check phone', platform: 'ios', terms: 1 }, headers: { 'X-Forwarded-For': ip(who) } });
-const refund = (who, purchaseId) => call('/api/purchases/refund', { who, method: 'POST', body: { purchaseId } });
+const refund = (who, purchaseId) => call('/api/purchases/refund', { who, method: 'POST', body: { purchaseId }, headers: { 'X-Forwarded-For': ip(who) } });
 const library = async (who) => ((await call('/api/purchases', { who })).json || { items: [] }).items || [];
 const itemOf = (items, pid) => items.find((i) => i.id === pid) || null;
 
@@ -237,6 +249,22 @@ async function refundAndDownload() {
   clearCopies(buyer);
 }
 
+// A buyer's own refunds: 10 an hour per account (and 60 per address).
+async function refundLimit() {
+  section('A buyer’s own refunds stop at 10 an hour');
+  const asker = await person('r16lim');
+  let r = await refund(asker, 'not-a-purchase');
+  ok('a purchase id that isn’t one → 400 (it never reaches the database)', r.status === 400, brief(r));
+  const statuses = [];
+  for (let i = 0; i < 9; i += 1) statuses.push((await refund(asker, crypto.randomUUID())).status);
+  ok('…the next nine (no such purchase) → 404', statuses.every((st) => st === 404), statuses);
+  r = await refund(asker, crypto.randomUUID());
+  ok('the eleventh in the hour → 429 with Retry-After', r.status === 429 && Number(r.headers.get('retry-after')) > 0 && /a lot of refund requests/.test(errOf(r)), brief(r));
+  const other = await person('r16lim2');
+  r = await call('/api/purchases/refund', { who: other, method: 'POST', body: { purchaseId: crypto.randomUUID() }, headers: { 'X-Forwarded-For': ip(asker) } });
+  ok('…another account from the same address still gets an answer (404, not 429)', r.status === 404, brief(r));
+}
+
 /* ---------- 2. location requests past their time ---------- */
 
 const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
@@ -330,6 +358,84 @@ async function requestDeadlines() {
   ok('…the request past its time is expired underneath now', reqRow(REQ.after).status === 'expired', reqRow(REQ.after));
   ok('…and its producer is told once', Number(one(`select count(*)::int as n from public.notifications where user_id = ${q(producer.id)} and type = 'location_expired' and href = ${q(`/locations/requests/${REQ.after}`)}`).n) === 1);
   ok('…the request accepted in time is left alone', reqRow(REQ.inTime).status === 'accepted', reqRow(REQ.inTime));
+
+  await cancelAndPayment(producer);
+}
+
+// The fake Stripe's charge behind a Checkout session, or null.
+async function chargeOf(sid) {
+  const objs = ((await stripeHook('/__state')).json || { objects: [] }).objects || [];
+  const s = objs.find((o) => o.id === sid) || null;
+  const pi = s && s.payment_intent ? objs.find((o) => o.id === (typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent.id)) : null;
+  const chId = pi ? (typeof pi.latest_charge === 'string' ? pi.latest_charge : pi.latest_charge && pi.latest_charge.id) : null;
+  return chId ? objs.find((o) => o.id === chId) || null : null;
+}
+const fullyRefunded = (ch) => Boolean(ch) && Number(ch.amount_refunded) === Number(ch.amount) && Number(ch.amount) > 0;
+const told = (userId, type, id) => Number(one(`select count(*)::int as n from public.notifications where user_id = ${q(userId)} and type = ${q(type)} and href = ${q(`/locations/requests/${id}`)}`).n);
+const JUST_PAID = /just paid/;
+
+async function cancelAndPayment(producer) {
+  section('A payment landing on a request just cancelled is refunded in full');
+  insert('location_requests', requestRow(REQ.straggler, producer.id, 40, { status: 'accepted', accepted_at: new Date().toISOString(), responds_by: null }));
+  let r = await act(REQ.straggler, producer, { action: 'pay' });
+  const sid = sessionIdOf(r.json && r.json.url);
+  if (sid) sessions.push(sid);
+  ok('Pay opens a Checkout', r.status === 200 && sid, brief(r));
+  // The cancel's write has just landed (as if in the moment before the
+  // payment's webhook), and the producer pays in the tab still open.
+  sql(`update public.location_requests set status = 'cancelled', cancelled_at = now(), cancelled_by = ${q(producer.id)} where id = ${q(REQ.straggler)}`);
+  const done = await stripeHook(`/__checkout/${sid}/complete`, { method: 'POST' });
+  ok('the payment goes through on the fake Stripe (the webhook answers 2xx)', done.status === 200 && (done.json.deliveries || []).every((d) => d.status >= 200 && d.status < 300), done.json && done.json.deliveries);
+  let ch = await chargeOf(sid);
+  ok('…and is refunded in full at once (not kept)', fullyRefunded(ch), ch && { amount: ch.amount, refunded: ch.amount_refunded });
+  const row = one(`select status, paid_at, stripe_payment_intent_id from public.location_requests where id = ${q(REQ.straggler)}`);
+  ok('…the request stays cancelled, never paid', row.status === 'cancelled' && !row.paid_at && !row.stripe_payment_intent_id, row);
+  ok('…and the producer is told', told(producer.id, 'location_refunded', REQ.straggler) === 1);
+
+  section('A cancel racing the payment, several times over');
+  let cancelled = 0;
+  let paidFirst = 0;
+  for (let i = 0; i < RACE_REQS.length; i += 1) {
+    const id = RACE_REQS[i];
+    // Weeks ahead, a day apart: a paid one never closes another.
+    insert('location_requests', requestRow(id, producer.id, 50 + i * 2, { status: 'accepted', accepted_at: new Date().toISOString(), responds_by: null }));
+    r = await act(id, producer, { action: 'pay' });
+    const racer = sessionIdOf(r.json && r.json.url);
+    if (racer) sessions.push(racer);
+    const [cancel, paid] = await Promise.all([act(id, producer, { action: 'cancel', reason: 'Check race' }), stripeHook(`/__checkout/${racer}/complete`, { method: 'POST' })]);
+    await sleep(500);
+    const now = reqRow(id);
+    ch = await chargeOf(racer);
+    if (now.status === 'cancelled') {
+      cancelled += 1;
+      ok(`…round ${i + 1}: cancelled — the cancel said yes and any charge is refunded in full`, cancel.status === 200 && (!ch || fullyRefunded(ch)), { cancel: brief(cancel), paid: paid.status, charge: ch && { amount: ch.amount, refunded: ch.amount_refunded } });
+    } else if (now.status === 'paid') {
+      paidFirst += 1;
+      ok(`…round ${i + 1}: paid — the cancel lost and said "just paid" (409), the money kept for the booking`, cancel.status === 409 && JUST_PAID.test(errOf(cancel)) && ch && Number(ch.amount_refunded) === 0, { cancel: brief(cancel), charge: ch && { amount: ch.amount, refunded: ch.amount_refunded } });
+      const again = await act(id, producer, { action: 'cancel', reason: 'Check race, again' });
+      const after = reqRow(id);
+      ok(`…round ${i + 1}: the paid booking then cancels under its policy (200)`, again.status === 200 && ['refunded', 'cancelled'].includes(after.status), `${brief(again)} ${after.status}`);
+    } else {
+      ok(`…round ${i + 1}: ends cancelled or paid`, false, { status: now.status, cancel: brief(cancel) });
+    }
+  }
+  ok(`every round consistent (cancelled ${cancelled}×, paid first ${paidFirst}×)`, cancelled + paidFirst === RACE_REQS.length, { cancelled, paidFirst });
+
+  section('An admin’s full refund of a paid booking');
+  insert('location_requests', requestRow(REQ.adminRefund, producer.id, 70, { status: 'accepted', accepted_at: new Date().toISOString(), responds_by: null }));
+  r = await act(REQ.adminRefund, producer, { action: 'pay' });
+  const adminSid = sessionIdOf(r.json && r.json.url);
+  if (adminSid) sessions.push(adminSid);
+  await stripeHook(`/__checkout/${adminSid}/complete`, { method: 'POST' });
+  ok('paid', reqRow(REQ.adminRefund).status === 'paid', reqRow(REQ.adminRefund));
+  r = await call('/api/admin/locations', { who: ADMIN, method: 'POST', body: { op: 'refund', requestId: REQ.adminRefund, reason: 'Check r16' } });
+  ch = await chargeOf(adminSid);
+  ok('a full admin refunds it (200): refunded, the whole charge back', r.status === 200 && reqRow(REQ.adminRefund).status === 'refunded' && fullyRefunded(ch), `${brief(r)} ${JSON.stringify(reqRow(REQ.adminRefund))}`);
+  await sleep(800);
+  const rec = one(`select status, refunded_by, refund_reason from public.location_requests where id = ${q(REQ.adminRefund)}`);
+  ok('…recorded as the admin’s refund (the charge.refunded mirror never writes over it)', rec.status === 'refunded' && rec.refunded_by !== 'stripe' && rec.refund_reason === 'Check r16', rec);
+  r = await call('/api/admin/locations', { who: ADMIN, method: 'POST', body: { op: 'refund', requestId: REQ.adminRefund, reason: 'Check r16 again' } });
+  ok('…a second refund is refused (400), nothing more back', r.status === 400 && fullyRefunded(await chargeOf(adminSid)), brief(r));
 }
 
 /* ---------- 3. an applicant's artwork ---------- */
@@ -395,7 +501,21 @@ async function applicantArtwork() {
 
   r = await call('/api/admin/applications', { who: ADMIN });
   const listed = r.json && Array.isArray(r.json.applications) ? r.json.applications.find((a) => a.id === APP.one) : null;
-  ok('/admin/applications shows them as one-hour links', r.status === 200 && listed && isSignedPrivate(listed.poster) && isSignedPrivate(listed.thumbnail), listed && [listed.poster, listed.thumbnail]);
+  const ROUTE = (kind) => `/api/admin/application-artwork?id=${APP.one}&kind=${kind}`;
+  ok('/admin/applications names them through the signing route (never the reference)', r.status === 200 && listed && listed.poster === ROUTE('poster') && listed.thumbnail === ROUTE('thumbnail'), listed && [listed.poster, listed.thumbnail]);
+  r = await call(ROUTE('poster'), { who: ADMIN, accept: '*/*' });
+  const location = r.headers.get('location') || '';
+  ok('…the route sends a full admin to a link signed now (302)', r.status === 302 && isSignedPrivate(location) && /no-store/.test(r.headers.get('cache-control') || ''), `${r.status} ${location}`);
+  got = await opens(location);
+  ok('…which opens the poster', got.status === 200 && md5(got.bytes) === md5(pngBytes(PNG_B)), got.status);
+  for (const [who, name] of [[applicant, 'the applicant'], [MARA, 'a creator']]) {
+    r = await call(ROUTE('poster'), { who, accept: '*/*' });
+    ok(`…${name} is refused (403)`, r.status === 403 && !r.headers.get('location'), brief(r));
+  }
+  r = await call(`/api/admin/application-artwork?id=${APP.one}&kind=video`, { who: ADMIN, accept: '*/*' });
+  ok('…a kind that isn’t poster or thumbnail → 400', r.status === 400, brief(r));
+  r = await call(`/api/admin/application-artwork?id=${crypto.randomUUID()}&kind=poster`, { who: ADMIN, accept: '*/*' });
+  ok('…an application that isn’t there → 404', r.status === 404, brief(r));
   r = await call('/api/admin/review-queue', { who: ADMIN });
   const queued = r.json && Array.isArray(r.json.items) ? r.json.items.find((i) => i.kind === 'application' && i.id === APP.one) : null;
   ok('the review queue’s card shows the poster as a one-hour link', r.status === 200 && queued && queued.media && isSignedPrivate(queued.media.poster), queued && queued.media);
@@ -468,7 +588,7 @@ async function cleanup() {
   const ids = people.map(q).join(', ') || "''";
   const eps = [...Object.values(ID), ...createdEpisodes].map(q).join(', ');
   const apps = Object.values(APP).map(q).join(', ');
-  const hrefs = Object.values(REQ).map((id) => q(`/locations/requests/${id}`)).join(', ');
+  const hrefs = [...Object.values(REQ), ...RACE_REQS].map((id) => q(`/locations/requests/${id}`)).join(', ');
   if (HAS123) {
     sql(`delete from public.downloads where user_id in (${ids}) or episode_id in (${eps})`);
     sql(`delete from public.download_devices where user_id in (${ids})`);
@@ -506,6 +626,7 @@ await runCheck('round-nov16', async () => {
   try {
     await seed();
     await refundAndDownload();
+    await refundLimit();
     await requestDeadlines();
     await applicantArtwork();
   } finally {
