@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { apiPost, freshToken } from './api';
+import { afterForget, registersAgain } from './pushRules';
 
 // Push notifications (Jose, 2026-10-24; canvas "Suspension, push and ad
 // share", Push board; migration 102 push_tokens). The server sends every
@@ -88,7 +89,8 @@ export async function enablePush(getToken) {
   await write(PREF_KEY, 'on');
   if (status !== 'granted') return { ok: false, reason: 'denied' };
   try {
-    await register(getToken);
+    // In turn with a sign-out's forgetting still under way (inTurn below).
+    await inTurn(() => register(getToken));
     return { ok: true };
   } catch (err) {
     const msg = err && err.message ? err.message : 'Could not register.';
@@ -108,6 +110,17 @@ export async function disablePush(getToken) {
   return { ok: true };
 }
 
+// One step at a time (2026-11-16): a phone that flips from signed out to
+// signed in at once must not have its fresh registration undone by the
+// forgetting still under way (the device unregistered, the new token
+// cleared), nor the other way round.
+let pushChain = Promise.resolve();
+function inTurn(step) {
+  const run = pushChain.then(step, step);
+  pushChain = run.catch(() => {});
+  return run;
+}
+
 // Tells the server this phone's token is no longer the account's: with
 // the session when there is one, else by the token alone (the server takes
 // that too: pages/api/push/unregister.js). → whether the server said yes.
@@ -122,13 +135,29 @@ async function tellServerToForget(token, session) {
 
 // The phone stops being a push address at Expo too, so even a row the
 // server still holds is answered DeviceNotRegistered on its next send and
-// disabled there (lib/push.js). Signing in and turning push on again
-// registers afresh.
+// disabled there (lib/push.js). Registering again (refreshPushRegistration
+// on the next sign-in) makes it one again.
 async function unregisterDevice() {
   try { await Notifications.unregisterForNotificationsAsync(); } catch { /* not on this device */ }
 }
 
-// On sign-out (lib/signOut.js): the token stops belonging to this account
+// The server forgets the stored token (with the session when there is
+// one), the phone unregisters, and the token is kept until the server said
+// yes (lib/pushRules.js afterForget). → whether it was told.
+async function forgetStoredToken(session, { explicit }) {
+  const token = await read(TOKEN_KEY);
+  let told = false;
+  if (token) {
+    told = await tellServerToForget(token, session);
+    await unregisterDevice();
+  }
+  const keep = afterForget({ explicit, told });
+  if (token && keep.clearToken) await write(TOKEN_KEY, '');
+  if (keep.resetPref) await write(PREF_KEY, '');
+  return told;
+}
+
+// On Log out (lib/signOut.js): the token stops belonging to this account
 // — the server row goes while the session still exists — and the
 // preference returns to "never asked", so the next person on this phone
 // gets the card rather than the last account's choice. Until 2026-10-28
@@ -136,45 +165,42 @@ async function unregisterDevice() {
 // account's pushes. Since 2026-11-16 the token is kept when the server
 // couldn't be told, so the next start tries again (forgetPushWhenSignedOut,
 // by the token alone), and the phone unregisters from pushes itself.
-export async function forgetPushOnSignOut(getToken) {
-  const token = await read(TOKEN_KEY);
-  if (token) {
+export function forgetPushOnSignOut(getToken) {
+  return inTurn(async () => {
     let session = null;
-    try { session = await freshToken(getToken); } catch { /* by the token alone */ }
-    const told = await tellServerToForget(token, session);
-    await unregisterDevice();
-    if (told) await write(TOKEN_KEY, '');
-  }
-  await write(PREF_KEY, '');
+    if (await read(TOKEN_KEY)) {
+      try { session = await freshToken(getToken); } catch { /* by the token alone */ }
+    }
+    await forgetStoredToken(session, { explicit: true });
+  });
 }
 
-// Clerk says this phone is signed out and a token is still kept: it was
-// signed out from somewhere else (Account → Security's devices, a password
-// reset), or its own sign-out couldn't reach the server (2026-11-16). The
-// server is told by the token alone; the token is kept until it says yes,
-// so the next start tries again. The phone also unregisters from pushes,
-// and the preference goes back to "never asked" for whoever signs in next.
-let forgetting = null;
+// Clerk says this phone is signed out without the person pressing Log
+// out: signed out from somewhere else (Account → Security's devices, a
+// password reset), a sign-in that ran out, or a Log out whose server call
+// failed (2026-11-16). The server is told by the token alone and the
+// phone unregisters; the token is kept until the server says yes, so the
+// next start tries again. The preference stays as it was: when the phone
+// is signed in again, refreshPushRegistration registers it by itself.
+let forgetQueued = null;
 export function forgetPushWhenSignedOut() {
-  if (!forgetting) {
-    forgetting = (async () => {
-      const token = await read(TOKEN_KEY);
-      if (!token) return;
-      const told = await tellServerToForget(token, null);
-      await unregisterDevice();
-      await write(PREF_KEY, '');
-      if (told) await write(TOKEN_KEY, '');
-    })().catch(() => {}).finally(() => { forgetting = null; });
+  if (!forgetQueued) {
+    forgetQueued = inTurn(() => forgetStoredToken(null, { explicit: false }))
+      .catch(() => {})
+      .finally(() => { forgetQueued = null; });
   }
-  return forgetting;
+  return forgetQueued;
 }
 
-// On a signed-in start: keep the token fresh (tokens rotate; the row's
-// last_seen_at moves). Quiet: nothing is asked.
-export async function refreshPushRegistration(getToken) {
-  if (!Device.isDevice) return;
-  if ((await readPushPref()) !== 'on') return;
-  if ((await permission()) !== 'granted') return;
-  await androidChannel();
-  try { await register(getToken); } catch { /* next start */ }
+// Signed in — on a cold start and every time the phone goes from signed
+// out to signed in (components/PushListener.js): register (again) when
+// push is on and the system allows it, which also keeps the token fresh
+// (tokens rotate; the row's last_seen_at moves) and puts back a phone that
+// was unregistered while signed out. Quiet: nothing is asked.
+export function refreshPushRegistration(getToken) {
+  return inTurn(async () => {
+    if (!registersAgain({ isDevice: Boolean(Device.isDevice), pref: await readPushPref(), permission: await permission() })) return;
+    await androidChannel();
+    try { await register(getToken); } catch { /* next sign-in or start */ }
+  });
 }

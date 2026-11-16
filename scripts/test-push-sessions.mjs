@@ -2,9 +2,10 @@
 // were registered under ends (2026-11-16, migration 125;
 // lib/pushSessionRules.js): which Clerk states stop them, how a send splits
 // its rows, how often Clerk is asked and what happens when it can't be;
-// and the app's half (mobile/src/lib/push.js): the token is kept until the
-// server has been told, and a phone found signed out forgets it by the
-// token alone.
+// and the app's half (mobile/src/lib/pushRules.js, push.js): the token is
+// kept until the server has been told, a phone found signed out forgets it
+// by the token alone and keeps its preference (only Log out resets it), and
+// a phone signed in again registers again by itself.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as R from '../lib/pushSessionRules.js';
@@ -138,16 +139,75 @@ t('the door and the suspension gate let a signed-out phone forget its token', as
   assert.match(read('../lib/suspensionGate.js'), /OPEN_API_WRITES = \['\/api\/push\/unregister'/);
 });
 
-t('the app keeps its token until the server has been told, and forgets it when it finds itself signed out (mobile/src/lib/push.js)', () => {
+// mobile/package.json has no "type": "module": the app's pure file is
+// loaded as an explicit ES module (scripts/test-download-logic.mjs does the same).
+const appRules = async () => import(`data:text/javascript;base64,${Buffer.from(read('../mobile/src/lib/pushRules.js')).toString('base64')}`);
+
+t('the app\'s rules: signed in registers again, signed out forgets, nothing while Clerk hasn\'t said (mobile/src/lib/pushRules.js)', async () => {
+  assert.doesNotMatch(read('../mobile/src/lib/pushRules.js'), /^\s*import\s/m);
+  const P = await appRules();
+  assert.equal(P.pushStepFor({ isLoaded: true, isSignedIn: true }), 'refresh');
+  assert.equal(P.pushStepFor({ isLoaded: true, isSignedIn: false }), 'forget');
+  assert.equal(P.pushStepFor({ isLoaded: false, isSignedIn: false }), null, 'an offline start: Clerk hasn\'t said');
+  assert.equal(P.pushStepFor({ isLoaded: false, isSignedIn: true }), null);
+  assert.equal(P.pushStepFor({ isLoaded: true }), null, 'loaded but not saying');
+  assert.equal(P.pushStepFor(), null);
+});
+
+t('signed out without Log out keeps the preference; only Log out resets it; the token stays until the server said yes', async () => {
+  const P = await appRules();
+  assert.deepEqual(P.afterForget({ explicit: false, told: true }), { clearToken: true, resetPref: false }, 'a sign-in that ran out, or signed out from elsewhere');
+  assert.deepEqual(P.afterForget({ explicit: false, told: false }), { clearToken: false, resetPref: false }, 'the server couldn\'t be told: the next start tries again');
+  assert.deepEqual(P.afterForget({ explicit: true, told: true }), { clearToken: true, resetPref: true }, 'Log out');
+  assert.deepEqual(P.afterForget({ explicit: true, told: false }), { clearToken: false, resetPref: true }, 'Log out offline: the token waits, the next person gets the card');
+  assert.deepEqual(P.afterForget(), { clearToken: false, resetPref: false });
+});
+
+t('a phone whose push was on registers again by itself once signed in again (a brief false "signed out" heals)', async () => {
+  const P = await appRules();
+  assert.equal(P.registersAgain({ isDevice: true, pref: 'on', permission: 'granted' }), true);
+  for (const [why, x] of [
+    ['never asked', { isDevice: true, pref: '', permission: 'granted' }],
+    ['switched off', { isDevice: true, pref: 'off', permission: 'granted' }],
+    ['card put off', { isDevice: true, pref: 'later', permission: 'granted' }],
+    ['the system said no', { isDevice: true, pref: 'on', permission: 'denied' }],
+    ['a simulator', { isDevice: false, pref: 'on', permission: 'granted' }]
+  ]) assert.equal(P.registersAgain(x), false, why);
+  // The whole round, as the listener drives it: on → signed out from
+  // elsewhere (forgotten, preference kept) → signed in again → registers.
+  let pref = 'on';
+  let token = 'ExponentPushToken[x]';
+  let step = P.pushStepFor({ isLoaded: true, isSignedIn: false });
+  assert.equal(step, 'forget');
+  const keep = P.afterForget({ explicit: false, told: true });
+  if (keep.clearToken) token = '';
+  if (keep.resetPref) pref = '';
+  step = P.pushStepFor({ isLoaded: true, isSignedIn: true });
+  assert.equal(step, 'refresh');
+  assert.equal(P.registersAgain({ isDevice: true, pref, permission: 'granted' }), true, 'registers again with the preference kept');
+  assert.equal(token, '');
+});
+
+t('the app does it that way (mobile/src/lib/push.js, PushListener)', () => {
   const app = read('../mobile/src/lib/push.js');
-  const onSignOut = app.slice(app.indexOf('export async function forgetPushOnSignOut'), app.indexOf('let forgetting = null;'));
-  assert.match(onSignOut, /const told = await tellServerToForget\(token, session\);\s*await unregisterDevice\(\);\s*if \(told\) await write\(TOKEN_KEY, ''\);/);
-  const signedOut = app.slice(app.indexOf('export function forgetPushWhenSignedOut'), app.indexOf('export async function refreshPushRegistration'));
-  assert.match(signedOut, /const told = await tellServerToForget\(token, null\);\s*await unregisterDevice\(\);\s*await write\(PREF_KEY, ''\);\s*if \(told\) await write\(TOKEN_KEY, ''\);/);
-  assert.match(app, /await Notifications\.unregisterForNotificationsAsync\(\);/);
+  assert.match(app, /import \{ afterForget, registersAgain \} from '\.\/pushRules';/);
+  // One step at a time: the forgetting and the registering never overlap.
+  assert.match(app, /function inTurn\(step\) \{\s*const run = pushChain\.then\(step, step\);\s*pushChain = run\.catch\(\(\) => \{\}\);\s*return run;\s*\}/);
+  const forget = app.slice(app.indexOf('async function forgetStoredToken'), app.indexOf('// On Log out'));
+  assert.match(forget, /told = await tellServerToForget\(token, session\);\s*await unregisterDevice\(\);/);
+  assert.match(forget, /const keep = afterForget\(\{ explicit, told \}\);\s*if \(token && keep\.clearToken\) await write\(TOKEN_KEY, ''\);\s*if \(keep\.resetPref\) await write\(PREF_KEY, ''\);/);
+  assert.match(app, /export function forgetPushOnSignOut\(getToken\) \{\s*return inTurn\([\s\S]*?forgetStoredToken\(session, \{ explicit: true \}\)/);
+  assert.match(app, /inTurn\(\(\) => forgetStoredToken\(null, \{ explicit: false \}\)\)/);
+  const refresh = app.slice(app.indexOf('export function refreshPushRegistration'));
+  assert.match(refresh, /return inTurn\(async \(\) => \{\s*if \(!registersAgain\(\{ isDevice: Boolean\(Device\.isDevice\), pref: await readPushPref\(\), permission: await permission\(\) \}\)\) return;/);
   assert.match(app, /await apiPost\('\/api\/push\/unregister', \{ token \}, session \|\| null\);\s*return true;/);
+  assert.match(app, /await Notifications\.unregisterForNotificationsAsync\(\);/);
+  // Only forgetStoredToken's Log out branch writes the preference empty.
+  assert.equal((app.match(/write\(PREF_KEY, ''\)/g) || []).length, 1);
   const listener = read('../mobile/src/components/PushListener.js');
-  assert.match(listener, /if \(isLoaded && isSignedIn\) refreshPushRegistration\(getToken\);[\s\S]*else if \(isLoaded && isSignedIn === false\) forgetPushWhenSignedOut\(\);/);
+  assert.match(listener, /const step = pushStepFor\(\{ isLoaded, isSignedIn \}\);\s*if \(step === 'refresh'\) refreshPushRegistration\(getToken\);\s*else if \(step === 'forget'\) forgetPushWhenSignedOut\(\);\s*\}, \[isLoaded, isSignedIn\]\);/);
+  // Log out goes through forgetPushOnSignOut (lib/signOut.js).
+  assert.match(read('../mobile/src/lib/signOut.js'), /await forgetPushOnSignOut\(getToken\)/);
 });
 
 for (const [name, fn] of tests) {
