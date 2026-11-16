@@ -370,8 +370,22 @@ t('while the file is being made: every 5 s for a minute, every 15 s to five minu
   let asks = 1; // the first, when Download is pressed
   while (waited < lib.PREPARE_MAX_MS) { waited += lib.preparePollDelay(waited); if (waited < lib.PREPARE_MAX_MS) asks += 1; }
   assert.equal(asks, 58);
-  // The route takes 600 asks an hour: ten slow titles in a row stay inside it.
-  assert.ok(asks * 10 <= 600);
+  // The route takes 400 asks an hour (pages/api/downloads/start.js, 600
+  // until 2026-11-16): a season stays inside it — 13 episodes whose files
+  // each take Cloudflare five minutes, or a full phone of 25 whose files
+  // take a minute.
+  const asksFor = (readyMs) => {
+    let w = 0;
+    let k = 1;
+    while (w < readyMs && w < lib.PREPARE_MAX_MS) { w += lib.preparePollDelay(w); if (w < lib.PREPARE_MAX_MS) k += 1; }
+    return k;
+  };
+  assert.equal(asksFor(60000), 13);
+  assert.equal(asksFor(5 * 60000), 29);
+  assert.ok(13 * asksFor(5 * 60000) <= 400, 'a 13-episode season, five minutes a file');
+  assert.ok(25 * asksFor(60000) <= 400, 'a full phone, a minute a file');
+  const route = readFileSync(new URL('../pages/api/downloads/start.js', import.meta.url), 'utf8');
+  assert.match(route, /const ASKS_PER_HOUR = 400;/);
 });
 
 t('a start the server couldn’t answer is tried again twice, a little apart, before it says so', () => {

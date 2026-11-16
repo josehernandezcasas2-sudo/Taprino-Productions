@@ -29,7 +29,9 @@ export const PAGE_SYNC_EVERY_MS = 30 * 1000;
 // While Cloudflare makes the file (a film can take many minutes): ask again
 // every 5 s for the first minute, every 15 s to five minutes, every 30 s
 // after that, for twenty minutes in all — 58 asks. The route allows an
-// account 600 asks an hour and counts only NEW copies against its limit.
+// account 400 asks an hour (600 until 2026-11-16) and counts only NEW
+// copies against its new-copy limits: a 13-episode season whose files each
+// take five minutes asks 377 times.
 export const PREPARE_POLL_MS = 5000;
 export const PREPARE_SLOW_AFTER_MS = 60 * 1000;
 export const PREPARE_SLOW_POLL_MS = 15000;
