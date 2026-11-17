@@ -71,7 +71,7 @@ async function words() {
     ok('…the intro no longer says Studio Tapa doesn’t handle the funding', !/handle any of this funding/i.test(pitches.text) && !/links straight to the creator/i.test(pitches.text));
     // The intro paragraph itself left on 2026-11-17 (Jose: "let's take the
     // paragraph out so it looks like an actual app"; pitch-room.mjs).
-    ok('…and has no intro paragraph at all now', !/Projects looking for backing\. Where backing/.test(pitches.text) && /Back what gets/.test(pitches.text));
+    ok('…and has no intro paragraph at all now', !/Projects looking for backing\. Where backing/.test(pitches.text) && /class="prm-title"/.test(pitches.text));
   } finally {
     sql(`update public.site_settings set elevator_pitch_enabled = ${was && was.elevator_pitch_enabled === true ? 'true' : 'false'} where id = 1`);
   }

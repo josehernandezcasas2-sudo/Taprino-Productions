@@ -1,13 +1,16 @@
 // The website's Pitch Room list looks like the app's screen (2026-11-17,
 // Jose: "The website version does not look like that app version, can we
 // make it look more like it … let's take the paragraph out so it looks
-// like an actual app"). pages/pitches.js, the .prm-* styles.
+// like an actual app"; then "sum up and simplify whatever is in that
+// section … so the user can see the projects quicker"). pages/pitches.js,
+// the .prm-* styles: one title row (Pitch Room, Swipe ideas, the creator's
+// +), the search that says how many, one chip row (the sort, the kinds).
 //
 // Seeds three pitches (one with a goal and a deadline, one taking backing,
 // one with nothing but a title), switches the Pitch Room on, and checks:
-// no paragraph and no Back pill, the kicker and headline, the Discover
-// card, the creator's buttons only for a creator, search with a clear
-// button, the three sorts as buttons, the tag pills, the count, the cards
+// no paragraph and no Back pill, the short title row, Swipe ideas, the
+// creator's + only for a creator, the first card high on a phone, search
+// with a clear button and the count in it, the sort, the tag pills, the cards
 // (art or the initial, tag, heart, deadline, by-line, logline, the funding
 // line, Back it), the heart saving and unsaving, a signed-out heart asking
 // to sign in, one column on a phone and a grid beside a side-by-side head
@@ -65,20 +68,20 @@ await runCheck('pitch-room', async () => {
       const text = await pg.$eval('main', (e) => e.innerText);
       ok('the paragraph is gone', !/Projects looking for backing/.test(text) && !(await pg.$('.library-sub')), text.slice(0, 200));
       ok('no Back pill', !(await pg.$('main .back-pill, main .back-btn, main .back-button, main .library-back')) && !/^\s*Back\s*$/m.test(text));
-      ok('the kicker reads Pitch Room', (await pg.$eval('.prm-kicker', (e) => e.textContent.trim())) === 'Pitch Room');
-      ok('the headline reads “Back what gets made next.”', (await pg.$eval('.prm-title', (e) => e.innerText.replace(/\s+/g, ' ').trim())) === 'Back what gets made next.');
-      ok('the headline is the serif, as in the app', /Fraunces/.test(await pg.$eval('.prm-title', (e) => getComputedStyle(e).fontFamily)));
-      const disc = await pg.$eval('.prm-discover', (e) => ({ href: e.getAttribute('href'), text: e.innerText.replace(/\s+/g, ' ').trim(), bg: getComputedStyle(e).backgroundImage }));
-      ok('the Discover card goes to the swipe deck and says so', disc.href === '/pitches/discover' && /Discover/i.test(disc.text) && /Swipe through ideas/.test(disc.text), disc);
-      ok('…on the orange gradient', /linear-gradient/.test(disc.bg), disc.bg);
-      ok('no creator buttons signed out', !(await pg.$('.prm-creator-row')));
-      const sorts = await pg.$$eval('.prm-sort', (els) => els.map((e) => [e.textContent.trim(), e.getAttribute('aria-pressed')]));
-      ok('three sorts as buttons, Newest pressed', JSON.stringify(sorts) === JSON.stringify([['Newest', 'true'], ['Closest to goal', 'false'], ['Most saved', 'false']]), sorts);
-      const sortTops = await pg.$$eval('.prm-sort', (els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
-      ok('…in one row', new Set(sortTops).size === 1, sortTops);
+      ok('the slogan is gone too: the title is just “Pitch Room”', (await pg.$eval('.prm-title', (e) => e.innerText.trim())) === 'Pitch Room' && !/Back what gets/.test(text));
+      ok('…in the serif, as in the app', /Fraunces/.test(await pg.$eval('.prm-title', (e) => getComputedStyle(e).fontFamily)));
+      const swipe = await pg.$eval('.prm-swipe', (e) => ({ href: e.getAttribute('href'), text: e.innerText.trim(), bg: getComputedStyle(e).backgroundImage, h: e.getBoundingClientRect().height }));
+      ok('Swipe ideas is a pill to the swipe deck, on the orange gradient', swipe.href === '/pitches/discover' && swipe.text === 'Swipe ideas' && /linear-gradient/.test(swipe.bg) && swipe.h <= 44, swipe);
+      const row = await pg.evaluate(() => { const t = document.querySelector('.prm-title').getBoundingClientRect(); const a = document.querySelector('.prm-top-actions').getBoundingClientRect(); return { titleRight: t.right, actionsLeft: a.left, sameRow: Math.abs((t.top + t.bottom) / 2 - (a.top + a.bottom) / 2) < 6 }; });
+      ok('…beside the title on one row', row.sameRow && row.titleRight <= row.actionsLeft, row);
+      ok('no Discover card, no creator buttons, no count line', !(await pg.$('.prm-discover')) && !(await pg.$('.prm-add')) && !(await pg.$('.prm-creator-row')) && !(await pg.$('.prm-count')));
       const titles = await cardTitles(pg);
       ok('our three pitches are listed', ours(titles).length === 3, titles);
-      ok('the count matches the cards', (await pg.$eval('.prm-count', (e) => e.textContent.trim())) === `${titles.length} ${titles.length === 1 ? 'project' : 'projects'}`);
+      ok('the search says how many there are', (await pg.$eval('.prm-search input', (e) => e.placeholder)) === `Search ${titles.length} ${titles.length === 1 ? 'project' : 'projects'}…`);
+      const sort = await pg.$eval('.prm-sort select', (e) => ({ value: e.value, options: [...e.options].map((o) => o.textContent) }));
+      ok('the sort is one pill with the three choices, Newest first', sort.value === 'newest' && sort.options.join('|') === 'Newest|Closest to goal|Most saved' && (await pg.$eval('.prm-sort > span', (e) => e.textContent.trim())) === 'Newest', sort);
+      const firstCard = await pg.$eval('.prm-card', (e) => Math.round(e.getBoundingClientRect().top));
+      ok('the first card starts high on the phone (under 300px)', firstCard < 300, firstCard);
       const card = (title) => pg.$$eval('.prm-card', (els, t) => {
         const el = els.find((e) => e.querySelector('.prm-card-title').textContent.trim() === t);
         if (!el) return null;
@@ -107,10 +110,10 @@ await runCheck('pitch-room', async () => {
       await pg.fill('.prm-search input', 'Pat Lee');
       ok('search finds a creator’s name too', ours(await cardTitles(pg)).join('|') === T.c);
       await pg.fill('.prm-search input', '');
-      await pg.click('.prm-sort:has-text("Closest to goal")');
+      await pg.selectOption('.prm-sort select', 'closest');
       const closest = ours(await cardTitles(pg));
       ok('Closest to goal: 25% before 0%, no goal last', closest.join('|') === [T.a, T.b, T.c].join('|'), closest);
-      ok('…and that button is pressed', (await pg.$eval('.prm-sort[aria-pressed="true"]', (e) => e.textContent.trim())) === 'Closest to goal');
+      ok('…and the pill says so', (await pg.$eval('.prm-sort > span', (e) => e.textContent.trim())) === 'Closest to goal');
       const tags = await pg.$$eval('.prm-tag-pill', (els) => els.map((e) => e.textContent.trim()));
       ok('tag pills: All and the kinds in use', tags[0] === 'All' && tags.includes('Animation') && tags.includes('Documentary'), tags);
       await pg.click('.prm-tag-pill:has-text("Documentary")');
@@ -135,21 +138,20 @@ await runCheck('pitch-room', async () => {
       await goto(pg, '/pitches');
       await pg.waitForSelector('.prm-card');
       ok('nothing runs off the side at 320', (await overflowPx(pg)) <= 0);
-      const sorts = await pg.$$eval('.prm-sort', (els) => els.map((e) => e.scrollWidth <= e.clientWidth + 1));
-      ok('the three sorts still fit', sorts.every(Boolean), sorts);
+      const row = await pg.evaluate(() => { const t = document.querySelector('.prm-title').getBoundingClientRect(); const a = document.querySelector('.prm-top-actions').getBoundingClientRect(); return { titleRight: t.right, actionsLeft: a.left, swipeWords: getComputedStyle(document.querySelector('.prm-swipe span')).display }; });
+      ok('the title still fits beside Swipe (its icon alone at 320)', row.titleRight <= row.actionsLeft && row.swipeWords === 'none', row);
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();
     }
 
-    section('A creator on a phone: the two buttons, the heart saves');
+    section('A creator on a phone: the + to pitch, the heart saves');
     {
       const { ctx, page: pg, errors } = await b.open(MARA, 390);
       await goto(pg, '/pitches');
       await pg.waitForSelector('.prm-card');
-      const links = await pg.$$eval('.prm-creator-row a', (els) => els.map((e) => [e.textContent.trim(), e.getAttribute('href')]));
-      ok('Submit your project and Your pitches', JSON.stringify(links) === JSON.stringify([['+ Submit your project', '/creator/pitch/new'], ['Your pitches', '/creator/pitch/dashboard']]), links);
-      const order = await pg.evaluate(() => ['.prm-head', '.prm-discover', '.prm-creator-row'].map((s) => document.querySelector(s).getBoundingClientRect().top));
-      ok('…under the Discover card, as in the app', order[0] < order[1] && order[1] < order[2], order);
+      const add = await pg.$eval('.prm-add', (e) => ({ href: e.getAttribute('href'), label: e.getAttribute('aria-label'), text: e.textContent.trim() }));
+      ok('a round + to submit a project, beside Swipe ideas', add.href === '/creator/pitch/new' && add.label === 'Submit your project' && add.text === '+', add);
+      ok('…on the title row, which still fits', await pg.evaluate(() => { const t = document.querySelector('.prm-title').getBoundingClientRect(); const a = document.querySelector('.prm-top-actions').getBoundingClientRect(); return t.right <= a.left && document.querySelector('.prm-top-actions').contains(document.querySelector('.prm-add')); }));
       sql(`delete from public.pitch_saves where user_id = ${q(USERS.mara)} and pitch_id = ${q(A)}`);
       const heart = () => pg.$$eval('.prm-card', (els, t) => els.find((e) => e.querySelector('.prm-card-title').textContent.trim() === t).querySelector('.prm-save').click(), T.a);
       const savedRows = () => rows(`select 1 from public.pitch_saves where user_id = ${q(USERS.mara)} and pitch_id = ${q(A)}`).length;
@@ -172,13 +174,13 @@ await runCheck('pitch-room', async () => {
       const { ctx, page: pg, errors } = await b.open(VIEWER, 1280);
       await goto(pg, '/pitches');
       await pg.waitForSelector('.prm-card');
-      const head = await box(pg, '.prm-head');
-      const disc = await box(pg, '.prm-discover');
-      ok('the head and the Discover card side by side', disc.left > head.left + 200 && disc.top < head.bottom, { head, disc });
-      ok('no creator buttons for a viewer', !(await pg.$('.prm-creator-row')));
+      const title = await box(pg, '.prm-title');
+      const swipe = await box(pg, '.prm-swipe');
+      ok('the title on the left, Swipe ideas on the right of one row', swipe.left > title.right + 200 && Math.abs((swipe.top + swipe.bottom) / 2 - (title.top + title.bottom) / 2) < 8, { title, swipe });
+      ok('no + for a viewer', !(await pg.$('.prm-add')));
       const search = await box(pg, '.prm-search');
-      const sorts = await box(pg, '.prm-sorts');
-      ok('search and the sorts on one line', Math.abs((search.top + search.bottom) / 2 - (sorts.top + sorts.bottom) / 2) < 4 && sorts.left > search.right - 1, { search, sorts });
+      const chips = await box(pg, '.prm-sort');
+      ok('search and the chips on one line', Math.abs((search.top + search.bottom) / 2 - (chips.top + chips.bottom) / 2) < 6 && chips.left > search.right - 1, { search, chips });
       const lefts = await pg.$$eval('.prm-card', (els) => [...new Set(els.map((e) => Math.round(e.getBoundingClientRect().left)))]);
       ok('the cards make a grid', lefts.length >= 3, lefts);
       ok('nothing runs off the side', (await overflowPx(pg)) <= 0);

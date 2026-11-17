@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
-import { HeartIcon, SwipeDeckIcon, BackItIcon, SearchIcon, ArrowRightIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { HeartIcon, SwipeDeckIcon, BackItIcon, SearchIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import { stayHereProps } from '../lib/resumeTaskRules';
 import { PITCH_TAGS } from '../lib/pitchRules';
 import { getPitchRoomData } from '../lib/pitchRoom';
@@ -121,30 +121,22 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
       )}
 
       {/* The app's Pitch Room screen (mobile/src/app/pitches/index.js),
-          laid out the same: kicker + headline, the Discover card, the
-          creator's two buttons, search, the three sorts, the tags, the
-          count and the cards. On a laptop the head and the Discover card
-          sit side by side and the cards make a grid. */}
+          kept short so the projects come up on the first screen
+          (2026-11-17): one title row with Swipe ideas and, for a creator,
+          the + to pitch; the search (it says how many there are); one row
+          of chips with the sort and the kinds; then the cards. */}
       <main className="library-stage prm">
-        <div className={`prm-top${isCreator ? ' with-creator' : ''}`}>
-          <div className="prm-head">
-            <div className="prm-kicker">Pitch Room</div>
-            <h1 className="prm-title">Back what gets<br />made next.</h1>
+        <div className="prm-top">
+          <h1 className="prm-title">Pitch Room</h1>
+          <div className="prm-top-actions">
+            <Link href="/pitches/discover" className="prm-swipe" aria-label="Swipe through ideas">
+              <SwipeDeckIcon size={18} src={iconOverrides.pitch_swipe} />
+              <span>Swipe ideas</span>
+            </Link>
+            {isCreator && (
+              <Link href="/creator/pitch/new" className="prm-add" aria-label="Submit your project" title="Submit your project">+</Link>
+            )}
           </div>
-          <Link href="/pitches/discover" className="prm-discover">
-            <span className="prm-discover-icon"><SwipeDeckIcon size={26} src={iconOverrides.pitch_swipe} /></span>
-            <span className="prm-discover-words">
-              <span className="prm-discover-kicker">Discover</span>
-              <span className="prm-discover-title">Swipe through ideas</span>
-            </span>
-            <ArrowRightIcon size={20} />
-          </Link>
-          {isCreator && (
-            <div className="prm-creator-row">
-              <Link href="/creator/pitch/new" className="prm-ghost">+ Submit your project</Link>
-              <Link href="/creator/pitch/dashboard" className="prm-ghost">Your pitches</Link>
-            </div>
-          )}
         </div>
 
         <div className="prm-tools">
@@ -154,7 +146,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by title or creator…"
+              placeholder={searchPlaceholder(pitches.length)}
               aria-label="Search by title or creator"
               autoComplete="off"
             />
@@ -162,26 +154,31 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
               <button type="button" className="prm-clear" onClick={() => setSearchQuery('')} aria-label="Clear the search">✕</button>
             )}
           </label>
-          <div className="prm-sorts" role="group" aria-label="Sort the projects">
-            {SORTS.map((s) => (
-              <button key={s.key} type="button" className="prm-sort" aria-pressed={sortBy === s.key} onClick={() => setSortBy(s.key)}>
-                {s.label}
-              </button>
-            ))}
+          <div className="prm-chips">
+            {/* The sort is a pill; the page's own <select> lies over it,
+                so the phone's own picker opens and a tap never zooms. */}
+            <span className="prm-sort">
+              <span aria-hidden="true">{SORTS.find((s) => s.key === sortBy).label}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} aria-label="Sort the projects">
+                {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </span>
+            {usedTags.length > 2 && (
+              <>
+                <span className="prm-chip-rule" aria-hidden="true" />
+                <span className="prm-tags" role="group" aria-label="Show one kind of project">
+                  {usedTags.map((t) => (
+                    <button key={t} type="button" className="prm-tag-pill" aria-pressed={activeTag === t} onClick={() => setActiveTag(t)}>
+                      {t}
+                    </button>
+                  ))}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        {usedTags.length > 2 && (
-          <div className="prm-tags" role="group" aria-label="Show one kind of project">
-            {usedTags.map((t) => (
-              <button key={t} type="button" className="prm-tag-pill" aria-pressed={activeTag === t} onClick={() => setActiveTag(t)}>
-                {t}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="prm-count">{visiblePitches.length} {visiblePitches.length === 1 ? 'project' : 'projects'}</div>
 
         {visiblePitches.length === 0 ? (
           <div className="prm-empty">
@@ -293,6 +290,12 @@ function raisedDollars(p) {
 function fundingPct(p) {
   if (!p.funding_goal) return null;
   return Math.min(100, Math.round((raisedDollars(p) / p.funding_goal) * 100));
+}
+
+// The search box says how many projects there are, so no separate count
+// line is needed (the app's screen says the same).
+function searchPlaceholder(n) {
+  return n > 0 ? `Search ${n} ${n === 1 ? 'project' : 'projects'}…` : 'Search by title or creator…';
 }
 
 function money(n, cents) {
