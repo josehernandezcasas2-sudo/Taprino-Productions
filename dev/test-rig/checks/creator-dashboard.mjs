@@ -443,7 +443,7 @@ await runCheck('creator-dashboard', async () => {
       await pp.locator('.tabbar .tabbar-item', { hasText: 'Account' }).tap();
       await pp.locator('.tabbar-dropup').waitFor({ timeout: 10000 });
       const acct = await pp.locator('.tabbar-dropup-item').allInnerTexts();
-      ok('the Account menu no longer lists My Work, Your Numbers or Money', acct.length > 3 && !acct.some((t) => /^(My Work|Your Numbers|Money)$/.test(t.trim())), acct.join('|'));
+      ok('the Account menu no longer lists My Work, Your Numbers or Money', acct.length >= 2 && acct[0].trim() === 'Settings / Account' && !acct.some((t) => /^(My Work|Your Numbers|Money)$/.test(t.trim())), acct.join('|'));
       ok('no page errors at 390', phone.errors.length === 0, phone.errors.join(' | '));
       await phone.ctx.close();
 

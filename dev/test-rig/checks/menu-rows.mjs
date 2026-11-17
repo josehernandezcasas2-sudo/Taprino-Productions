@@ -52,6 +52,8 @@ await runCheck('menu-rows', async () => {
       const acct = await tabMenu(pg, 'Account');
       ok('the tab bar’s Account menu: Log in / Create account and Become a creator', texts(acct).join('|') === 'Log in / Create account|Become a creator', acct);
       ok('…to the account page and /apply', acct[0] && acct[0].href === '/account' && acct[1] && acct[1].href === '/apply', acct);
+      const watchOut = texts(await tabMenu(pg, 'Watch'));
+      ok('signed out the Watch menu has My List (it works on the device) and no My Recs', watchOut.includes('My List') && !watchOut.includes('My Recs'), watchOut);
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();
     }
@@ -62,10 +64,16 @@ await runCheck('menu-rows', async () => {
       await goto(pg, '/stream');
       const acct = await tabMenu(pg, 'Account');
       const t = texts(acct);
-      ok('Settings / Account, Membership, Your purchases, My List and My Recs are there', ['Settings / Account', 'Membership', 'Your purchases', 'My List', 'My Recs'].every((x) => t.includes(x)), t);
-      const cw = acct.find((i) => i.text === 'Continue Watching');
-      ok('Continue Watching points at Stream, where the row is', cw && cw.href === '/stream#continue-watching', cw);
-      ok('Become a creator is there for a viewer', t.includes('Become a creator'), t);
+      // Summed up on 2026-11-17: Membership, Your purchases and Artist
+      // Support are the account page's tiles; the lists are under Watch.
+      ok('the Account menu is short: Settings / Account, View profile, Become a creator', t[0] === 'Settings / Account' && t.includes('Become a creator') && t.length <= 4, t);
+      ok('…no Membership, Your purchases, Artist Support, My List, My Recs or Continue Watching', !['Membership', 'Your purchases', 'Artist Support', 'My List', 'My Recs', 'Continue Watching'].some((x) => t.includes(x)), t);
+      const watchRows = await tabMenu(pg, 'Watch');
+      const w = texts(watchRows);
+      ok('My List and My Recs are the Watch menu’s first rows', w.indexOf('My List') >= 0 && w.indexOf('My Recs') === w.indexOf('My List') + 1 && w.indexOf('My List') <= 1, w);
+      ok('…to /wishlist and /recs', watchRows.find((i) => i.text === 'My List').href === '/wishlist' && watchRows.find((i) => i.text === 'My Recs').href === '/recs', watchRows);
+      await goto(pg, '/wishlist');
+      ok('on My List the Watch tab is lit', await pg.$$eval('.tabbar .tabbar-item.active', (els) => els.map((e) => e.textContent.trim().replace(/\s+/g, ' ')).join('|')).then((x) => /Watch/i.test(x) && !/Account/i.test(x)));
       ok('no Dashboard tab for a viewer', !(await tabs(pg)).some((x) => /Dashboard/i.test(x)));
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();

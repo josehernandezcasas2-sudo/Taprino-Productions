@@ -81,6 +81,12 @@ const GROUPS = {
     // in the app and lists the phones that hold them.
     items: (roles, settings) => [
       ...(settings && settings.downloadsEnabled ? [{ href: '/downloads', label: DOWNLOAD_WORDS.nav }] : []),
+      // The lists moved here from Account (Jose, 2026-11-17: "some of those
+      // … fall … under lists"). My List works on the device signed out, as
+      // the header's link does; My Recs needs an account. Continue Watching
+      // is the first row on Stream, so it has no row of its own.
+      { href: '/wishlist', label: 'My List' },
+      ...(roles.isSignedIn ? [{ href: '/recs', label: 'My Recs' }] : []),
       // Live TV, Podcasts and Vertical follow their admin switches, as the
       // header's links do (2026-11-17).
       ...(settings && settings.liveTvEnabled !== false ? [{ href: '/live', label: 'Live TV' }] : []),
@@ -91,6 +97,8 @@ const GROUPS = {
     ],
     match: (p, q) =>
       p === '/downloads' ||
+      p === '/wishlist' ||
+      p === '/recs' ||
       p === '/live' ||
       p === '/live/[slug]' ||
       (p === '/type/[type]' && (q.type === 'series' || q.type === 'movie')) ||
@@ -114,19 +122,11 @@ const GROUPS = {
       // Their public page, as anyone else sees it (/api/my-role sends
       // the @handle URL once signed in).
       ...(roles.profileHref ? [{ href: roles.profileHref, label: 'View profile' }] : []),
-      // The account hub's pages (option B, 2026-10-29): status + Manage
-      // subscription for members, the Tapa + benefits + Join for
-      // everyone else; the titles they own and the tips they sent.
-      { href: '/account/membership', label: 'Membership' },
-      { href: '/account/purchases', label: 'Your purchases' },
-      // Membership Artist Support: the creators a member's share goes to.
-      { href: '/artist-support', label: 'Artist Support' },
-      { href: '/wishlist', label: 'My List' },
-      // The account page's old quick links (2026-10-12) live here now.
-      { href: '/recs', label: 'My Recs' },
-      // The row lives on Stream since the Connect home of 2026-10-28 (it
-      // pointed at the home page, which has none).
-      { href: '/stream#continue-watching', label: 'Continue Watching' },
+      // Summed up on 2026-11-17 (Jose: "some of those seem repetitive and
+      // either fall within settings or under lists"): Membership, Your
+      // purchases and Artist Support are the account page's tiles (Artist
+      // Support from Membership); My List and My Recs are the Watch menu's
+      // first rows; Continue Watching is the first row on Stream.
       // My Work, Your Numbers and Money sat here until the Dashboard tab
       // (2026-11-14): everyone who could see them has that tab now.
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : []),
@@ -137,7 +137,7 @@ const GROUPS = {
     // The /creator pages light the Dashboard tab for the people who have
     // it; for anyone else there (a host on Money) Account stays lit: see
     // the button below.
-    match: (p) => p === '/account' || p === '/artist-support' || p === '/wishlist' || p === '/schedule'
+    match: (p) => p === '/account' || p.startsWith('/account/') || p === '/artist-support' || p === '/schedule'
   }
 };
 

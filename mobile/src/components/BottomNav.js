@@ -78,15 +78,21 @@ const GROUPS = {
     // the settings can't be read. The count is how many titles are here.
     // Live TV, Podcasts and Vertical follow their admin switches, as the
     // top bar's rows do (2026-11-17).
-    items: ({ downloads, flags }) => [
+    items: ({ downloads, flags, role }) => [
       ...(downloads.show ? [{ href: '/downloads', label: DOWNLOAD_WORDS.nav, glyph: 'download', count: downloads.count }] : []),
+      // The lists moved here from Account, as on the website (Jose,
+      // 2026-11-17: "some of those … fall … under lists"). My List works on
+      // the phone signed out; My Recs needs an account; Continue Watching is
+      // the first row on Stream.
+      { href: '/account/wishlist', label: 'My List' },
+      ...(role.isSignedIn ? [{ href: '/recs', label: 'My Recs' }] : []),
       ...(flags.liveTv ? [{ href: '/live', label: 'Live TV' }] : []),
       { href: '/watch/series', label: 'Watch Series' },
       { href: '/watch/movies', label: 'Watch Movies' },
       ...(flags.podcasts ? [{ href: '/watch/podcasts', label: 'Podcasts' }] : []),
       ...(flags.vertical ? [{ href: '/watch/vertical', label: 'Vertical' }] : [])
     ],
-    match: (p) => p.startsWith('/watch') || p === '/live' || p.startsWith('/live/') || p === '/downloads' || p.startsWith('/downloads/')
+    match: (p) => p.startsWith('/watch') || p === '/live' || p.startsWith('/live/') || p === '/downloads' || p.startsWith('/downloads/') || p === '/account/wishlist' || p === '/recs'
   },
   account: {
     label: 'Account',
@@ -104,24 +110,19 @@ const GROUPS = {
     ] : [
       { href: '/account', label: 'Settings / Account' },
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
-      // The account hub's screens (option B, 2026-10-29).
-      { href: '/account/membership', label: 'Membership' },
-      { href: '/account/purchases', label: 'Your purchases' },
-      // Membership Artist Support: the creators a member's share goes to.
-      { href: '/account/artist-support', label: 'Artist Support' },
+      // Summed up on 2026-11-17, as on the website (Jose: "some of those
+      // seem repetitive and either fall within settings or under lists"):
+      // Membership, Your purchases and Artist Support are the Account
+      // screen's tiles (Artist Support from Membership); My List and My Recs
+      // are the Watch menu's first rows; Continue Watching is Stream's first
+      // row; My locations is Locations' "Your places" and the top bar's
+      // account panel. My Work, Your Numbers and Money are the Dashboard's
+      // tabs (2026-11-14).
       { href: '/messages', label: 'Messages', badge: 'messages' },
-      { href: '/account/wishlist', label: 'My List' },
-      // The Account screen's old quick links (2026-10-12) live here now.
-      { href: '/recs', label: 'My Recs' },
-      { href: '/stream', label: 'Continue Watching' },
-      // My Work, Your Numbers and Money are the Dashboard's tabs for the
-      // people who have the Dashboard tab (2026-11-14); My Work stayed here
-      // for everyone else, who have no work to show (2026-11-17: gone).
-      { href: '/locations/mine', label: 'My locations' },
       ...(!role.isCreator && !role.isAdmin ? [{ href: '/apply', label: 'Become a creator' }] : [])
     ]),
     // Your work lights the Dashboard tab for the people who have it.
-    match: (p, { hasDashboard } = {}) => (p.startsWith('/account') && !(hasDashboard && p === '/account/my-work')) || p.startsWith('/messages')
+    match: (p, { hasDashboard } = {}) => (p.startsWith('/account') && p !== '/account/wishlist' && !(hasDashboard && p === '/account/my-work')) || p.startsWith('/messages')
   }
 };
 

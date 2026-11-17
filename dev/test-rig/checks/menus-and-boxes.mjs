@@ -289,12 +289,14 @@ async function otherPanels(b) {
 
 // ---- 4. the tab bar's own menu -------------------------------------------------------
 async function tabBarMenu(b) {
-  section('The tab bar’s Account menu on a phone held sideways (844×390)');
+  // The Watch menu since 2026-11-17: the Account menu was summed up to a
+  // few rows (the lists moved to Watch), so Watch is the longest one now.
+  section('The tab bar’s Watch menu on a phone held sideways (844×390)');
   const { ctx, page: pg, errors } = await b.open(ADMIN, 390);
   await pg.setViewportSize({ width: 844, height: 390 });
   await goto(pg, '/stream');
-  const btn = pg.locator('.tabbar .tabbar-item', { hasText: 'Account' });
-  ok('the tab bar has Account', (await btn.count()) === 1);
+  const btn = pg.locator('.tabbar .tabbar-item', { hasText: 'Watch' });
+  ok('the tab bar has Watch', (await btn.count()) === 1);
   await btn.tap();
   await pg.locator('.tabbar-dropup').waitFor({ timeout: 10000 });
   await pg.waitForTimeout(300);
@@ -307,7 +309,7 @@ async function tabBarMenu(b) {
   });
   ok('the menu starts on screen, under the header', m.top >= m.headerBottom - 1 && m.top >= 0, m);
   ok('…and ends above the bar', m.bottom <= m.barTop, m);
-  ok('it has more rows than fit, so it scrolls', m.scrollHeight > m.clientHeight + 1 && m.rows >= 6, m);
+  ok('it has more rows than fit, so it scrolls', m.scrollHeight > m.clientHeight + 1 && m.rows >= 5, m);
   await shot(pg, 'tabbar-sideways');
   const ends = await pg.evaluate(() => {
     const menu = document.querySelector('.tabbar-dropup');
