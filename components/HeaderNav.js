@@ -565,7 +565,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               <>
                 <div className="dropdown-label">Account</div>
                 <Link href="/account" className="dropdown-item"><ArrowRightIcon size={15} src={iconOverrides.arrow_right} /> Log in / Create account</Link>
-                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <div className="dropdown-divider" />
                 <Link href="/apply" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Become a creator</Link>
               </>

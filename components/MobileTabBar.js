@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PANEL_LEAST, keepScrollInside, riseRoom } from '../lib/menuScroll';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useAuth } from '@clerk/nextjs';
 import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, DashboardIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
 import CreatePostModal from './CreatePostModal';
 import { DOWNLOAD_WORDS } from '../lib/downloadRules';
@@ -58,9 +59,11 @@ const GROUPS = {
     label: 'Discover',
     Icon: CompassIcon,
     iconKey: 'tab_discover',
-    items: [
+    // Vertical Discover only while vertical is switched on, as the header
+    // (2026-11-17: the bar showed it whatever the switch said).
+    items: (roles, settings) => [
       { href: '/pitches/discover', label: 'Pitch Discover' },
-      { href: '/vertical/discover', label: 'Vertical Discover' },
+      ...(settings && settings.verticalEnabled !== false ? [{ href: '/vertical/discover', label: 'Vertical Discover' }] : []),
       { href: '/crew', label: 'Crew Call' },
       { href: '/locations', label: 'Locations' },
       { href: '/productions', label: 'Productions' },
@@ -78,11 +81,13 @@ const GROUPS = {
     // in the app and lists the phones that hold them.
     items: (roles, settings) => [
       ...(settings && settings.downloadsEnabled ? [{ href: '/downloads', label: DOWNLOAD_WORDS.nav }] : []),
-      { href: '/live', label: 'Live TV' },
+      // Live TV, Podcasts and Vertical follow their admin switches, as the
+      // header's links do (2026-11-17).
+      ...(settings && settings.liveTvEnabled !== false ? [{ href: '/live', label: 'Live TV' }] : []),
       { href: '/type/series', label: 'Watch Series' },
       { href: '/type/movie', label: 'Watch Movies' },
-      { href: '/podcasts', label: 'Podcasts' },
-      { href: '/vertical/browse', label: 'Vertical' }
+      ...(settings && settings.podcastsEnabled !== false ? [{ href: '/podcasts', label: 'Podcasts' }] : []),
+      ...(settings && settings.verticalEnabled !== false ? [{ href: '/vertical/browse', label: 'Vertical' }] : [])
     ],
     match: (p, q) =>
       p === '/downloads' ||
@@ -97,11 +102,14 @@ const GROUPS = {
     label: 'Account',
     Icon: AccountIcon,
     iconKey: 'tab_account',
-    // A function rather than a plain array — "My Work" only makes sense
-    // for accounts that actually have something to submit or track,
-    // matching the exact same isCreator || isAdmin gate the desktop
-    // header nav already uses for its own "Your work" link.
-    items: (roles) => [
+    // A function rather than a plain array: what the menu holds depends on
+    // who is looking. Signed out it is the way in and Become a creator, as
+    // the header's account menu (Jose, 2026-11-17: the rows that need an
+    // account came off it — every one of them only led to the sign-in card).
+    items: (roles) => (!roles.isSignedIn ? [
+      { href: '/account', label: 'Log in / Create account' },
+      { href: '/apply', label: 'Become a creator' }
+    ] : [
       { href: '/account', label: 'Settings / Account' },
       // Their public page, as anyone else sees it (/api/my-role sends
       // the @handle URL once signed in).
@@ -116,11 +124,16 @@ const GROUPS = {
       { href: '/wishlist', label: 'My List' },
       // The account page's old quick links (2026-10-12) live here now.
       { href: '/recs', label: 'My Recs' },
-      { href: '/#continue-watching', label: 'Continue Watching' },
+      // The row lives on Stream since the Connect home of 2026-10-28 (it
+      // pointed at the home page, which has none).
+      { href: '/stream#continue-watching', label: 'Continue Watching' },
       // My Work, Your Numbers and Money sat here until the Dashboard tab
       // (2026-11-14): everyone who could see them has that tab now.
-      ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
-    ],
+      ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : []),
+      // The header's account menu has it for the same people; the app's
+      // bottom bar too.
+      ...(!roles.isCreator && !roles.isAdmin ? [{ href: '/apply', label: 'Become a creator' }] : [])
+    ]),
     // The /creator pages light the Dashboard tab for the people who have
     // it; for anyone else there (a host on Money) Account stays lit: see
     // the button below.
@@ -152,6 +165,35 @@ export default function MobileTabBar() {
       .then(setRoles)
       .catch(() => {});
   }, []);
+
+  // A sign-out (or a sign-in from the box) that stays on the same page
+  // keeps the bar mounted, so the answer above went stale: the Dashboard
+  // tab stayed on a signed-out page (Jose's screenshot, 2026-11-17). Once
+  // Clerk has said who is here, a later change of person asks again;
+  // nobody signed in needs no request. The first answer Clerk gives is the
+  // one the request above already read from the cookie.
+  const { isLoaded: authLoaded, userId } = useAuth();
+  const authKey = authLoaded ? (userId || '') : null;
+  const seenAuthKey = useRef(null);
+  useEffect(() => {
+    if (authKey === null) return undefined;
+    if (seenAuthKey.current === null) {
+      seenAuthKey.current = authKey;
+      return undefined;
+    }
+    if (seenAuthKey.current === authKey) return undefined;
+    seenAuthKey.current = authKey;
+    if (!authKey) {
+      setRoles({ isSignedIn: false, isCreator: false, isAdmin: false });
+      return undefined;
+    }
+    let live = true;
+    fetch('/api/my-role')
+      .then((r) => r.json())
+      .then((d) => { if (live) setRoles(d); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [authKey]);
 
   // Same self-fetch reasoning as above, for Pitch Room's on/off toggle —
   // public and cached, so this costs nothing extra beyond what HeaderNav

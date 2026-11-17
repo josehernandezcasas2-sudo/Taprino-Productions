@@ -42,10 +42,13 @@ const GROUPS = {
   home: {
     label: 'Home',
     Icon: HouseIcon,
-    items: [
+    // Pitch Room only while the admin switch is on, as the website's tab
+    // bar and the top bar (it showed whatever the switch said until
+    // 2026-11-17).
+    items: ({ flags }) => [
       { href: '/', label: 'Connect' },
       { href: '/stream', label: 'Stream' },
-      { href: '/pitches', label: 'Pitch Room' },
+      ...(flags.pitchRoom ? [{ href: '/pitches', label: 'Pitch Room' }] : []),
       { href: '/university', label: 'Film University' },
       { href: '/about', label: 'About' }
     ],
@@ -54,9 +57,11 @@ const GROUPS = {
   discover: {
     label: 'Discover',
     Icon: CompassIcon,
-    items: [
+    // Vertical Discover only while vertical is switched on, as the top bar
+    // (2026-11-17).
+    items: ({ flags }) => [
       { href: '/pitches/discover', label: 'Pitch Discover' },
-      { href: '/vertical/discover', label: 'Vertical Discover' },
+      ...(flags.vertical ? [{ href: '/vertical/discover', label: 'Vertical Discover' }] : []),
       { href: '/crew', label: 'Crew Call' },
       { href: '/locations', label: 'Locations' },
       { href: '/productions', label: 'Productions' },
@@ -71,13 +76,15 @@ const GROUPS = {
     // "Getting there" screen) while the admin switch is on, or while this
     // phone holds copies — so they stay reachable with no connection, when
     // the settings can't be read. The count is how many titles are here.
-    items: ({ downloads }) => [
+    // Live TV, Podcasts and Vertical follow their admin switches, as the
+    // top bar's rows do (2026-11-17).
+    items: ({ downloads, flags }) => [
       ...(downloads.show ? [{ href: '/downloads', label: DOWNLOAD_WORDS.nav, glyph: 'download', count: downloads.count }] : []),
-      { href: '/live', label: 'Live TV' },
+      ...(flags.liveTv ? [{ href: '/live', label: 'Live TV' }] : []),
       { href: '/watch/series', label: 'Watch Series' },
       { href: '/watch/movies', label: 'Watch Movies' },
-      { href: '/watch/podcasts', label: 'Podcasts' },
-      { href: '/watch/vertical', label: 'Vertical' }
+      ...(flags.podcasts ? [{ href: '/watch/podcasts', label: 'Podcasts' }] : []),
+      ...(flags.vertical ? [{ href: '/watch/vertical', label: 'Vertical' }] : [])
     ],
     match: (p) => p.startsWith('/watch') || p === '/live' || p.startsWith('/live/') || p === '/downloads' || p.startsWith('/downloads/')
   },
@@ -86,11 +93,16 @@ const GROUPS = {
     Icon: AccountIcon,
     // A function, like MobileTabBar.js's: "View profile" only exists once
     // the signed-in viewer's own profile is known (TopNav's cache).
-    items: ({ profileHref, role, hasDashboard }) => [
-      // Signed out, this row is the bar's way to the sign-in card: a
-      // creator who signs in from it lands on the Dashboard
-      // (components/dashboard/useSignInLanding.js).
-      { href: role.isSignedIn ? '/account' : `/account?${GENERAL_SIGN_IN}`, label: 'Settings / Account' },
+    // Signed out it is the way in and Become a creator, as the top bar's
+    // account panel and the website (Jose, 2026-11-17: the rows that need
+    // an account came off it — every one only led to the sign-in card).
+    items: ({ profileHref, role }) => (!role.isSignedIn ? [
+      // The bar's way to the sign-in card: a creator who signs in from it
+      // lands on the Dashboard (components/dashboard/useSignInLanding.js).
+      { href: `/account?${GENERAL_SIGN_IN}`, label: 'Log in / Create account' },
+      { href: '/apply', label: 'Become a creator' }
+    ] : [
+      { href: '/account', label: 'Settings / Account' },
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
       // The account hub's screens (option B, 2026-10-29).
       { href: '/account/membership', label: 'Membership' },
@@ -102,12 +114,12 @@ const GROUPS = {
       // The Account screen's old quick links (2026-10-12) live here now.
       { href: '/recs', label: 'My Recs' },
       { href: '/stream', label: 'Continue Watching' },
-      // My Work, Your Numbers and Money: the Dashboard's tabs for the
-      // people who have the Dashboard tab (2026-11-14).
-      ...(hasDashboard ? [] : [{ href: '/account/my-work', label: 'My Work' }]),
+      // My Work, Your Numbers and Money are the Dashboard's tabs for the
+      // people who have the Dashboard tab (2026-11-14); My Work stayed here
+      // for everyone else, who have no work to show (2026-11-17: gone).
       { href: '/locations/mine', label: 'My locations' },
-      ...(role.isSignedIn && !role.isCreator ? [{ href: '/apply', label: 'Become a creator' }] : [])
-    ],
+      ...(!role.isCreator && !role.isAdmin ? [{ href: '/apply', label: 'Become a creator' }] : [])
+    ]),
     // Your work lights the Dashboard tab for the people who have it.
     match: (p, { hasDashboard } = {}) => (p.startsWith('/account') && !(hasDashboard && p === '/account/my-work')) || p.startsWith('/messages')
   }
@@ -158,9 +170,17 @@ export default function BottomNav() {
   // admin switch from the settings every screen already shares.
   const downloadCount = useDownloadCount();
   const [downloadsEnabled, setDownloadsEnabled] = useState(false);
+  // The rows behind an admin switch, as the top bar reads them: hidden
+  // until the settings are read, then Pitch Room only when it is on and
+  // Live TV, Podcasts and Vertical unless they are off.
+  const [flags, setFlags] = useState({ pitchRoom: false, liveTv: false, podcasts: false, vertical: false });
   useEffect(() => {
     let alive = true;
-    loadSettings().then((s) => { if (alive && s) setDownloadsEnabled(s.downloadsEnabled === true); });
+    loadSettings().then((s) => {
+      if (!alive || !s) return;
+      setDownloadsEnabled(s.downloadsEnabled === true);
+      setFlags({ pitchRoom: s.elevatorPitchEnabled === true, liveTv: s.liveTvEnabled !== false, podcasts: s.podcastsEnabled !== false, vertical: s.verticalEnabled !== false });
+    });
     return () => { alive = false; };
   }, [openKey]);
   const downloads = { show: downloadsEnabled || downloadCount > 0, count: downloadCount };
@@ -246,7 +266,7 @@ export default function BottomNav() {
           >
             <ScrollView style={{ maxHeight: dropupMaxHeight }} keyboardShouldPersistTaps="handled">
             <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
-            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role, downloads, hasDashboard }) : openGroup.items).map((entry) => (
+            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role, downloads, hasDashboard, flags }) : openGroup.items).map((entry) => (
               <Pressable
                 key={entry.href}
                 style={({ pressed }) => [styles.dropupItem, entry.glyph && styles.dropupItemRow, pressed && styles.dropupItemPressed]}

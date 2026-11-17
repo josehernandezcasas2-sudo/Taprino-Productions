@@ -139,8 +139,7 @@ async function loadMembership(getToken) {
 // a tap opens what the notification points at), and the account photo.
 // The photo opens the site's account dropdown (`.account-dropdown`: who
 // you are and your plan, then every account, creator and admin row the
-// website lists, and Sign Out; signed out, Log in / My Wishlist / Become
-// a creator). All three panels live in one transparent Modal placed just
+// website lists, and Sign Out; signed out, Log in and Become a creator). All three panels live in one transparent Modal placed just
 // under the bar, so they sit above every screen and BottomNav the way
 // the website's dropdowns do. The brand tap goes home, or straight to
 // Stream for an account with "Here only for the stream?" turned on.
@@ -468,7 +467,6 @@ export default function TopNav() {
                 {/* The general way in: a creator who signs in from here
                     lands on the Dashboard (useSignInLanding.js). */}
                 <MenuRow Icon={ArrowRightIcon} label="Log in / Create account" onPress={() => go(`/account?${GENERAL_SIGN_IN}`)} />
-                <MenuRow Icon={HeartIcon} label="My Wishlist" onPress={() => go('/account/wishlist')} />
                 <View style={styles.panelDivider} />
                 <MenuRow Icon={ClapperboardIcon} label="Become a creator" onPress={() => go('/apply')} />
               </>
