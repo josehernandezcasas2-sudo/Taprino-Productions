@@ -1,9 +1,10 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { HeartIcon, SwipeDeckIcon, BackItIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { useClerk } from '@clerk/nextjs';
+import { HeartIcon, SwipeDeckIcon, BackItIcon, SearchIcon, ArrowRightIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { stayHereProps } from '../lib/resumeTaskRules';
 import { PITCH_TAGS } from '../lib/pitchRules';
 import { getPitchRoomData } from '../lib/pitchRoom';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -52,13 +53,16 @@ export async function getServerSideProps({ req, res }) {
 export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, savedIds, bypassingDisabled }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
+  const { openSignIn } = useClerk();
   const [saved, setSaved] = useState(new Set(savedIds));
   const [activeTag, setActiveTag] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'closest' | 'saved'
 
   async function toggleSave(pitchId) {
-    if (!isSignedIn) return;
+    // Signed out, the heart asks them to sign in and keeps them on this
+    // page, as the app's alert does.
+    if (!isSignedIn) { openSignIn(stayHereProps(router.asPath)); return; }
     setSaved((prev) => {
       const next = new Set(prev);
       next.has(pitchId) ? next.delete(pitchId) : next.add(pitchId);
@@ -71,33 +75,10 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
     }).catch(() => {});
   }
 
-  function fundingPct(p) {
-    if (!p.funding_goal) return null;
-    const raised = p.funding_enabled ? (p.liveRaisedCents || 0) / 100 : (p.funding_raised || 0);
-    return Math.min(100, Math.round((raised / p.funding_goal) * 100));
-  }
-
-  // Whole calendar days until the deadline date, comparing dates only
-  // (not time-of-day) so "the deadline is tomorrow" reads as 1 day left,
-  // not 2. A deadline of today floors to 1 rather than 0, so it reads as
-  // "last day" instead of looking already-expired. Returns null once the
-  // deadline has passed rather than a negative number — this is
-  // self-reported, informal metadata, not an authoritative cutoff, so
-  // it's treated the same as "no deadline set" instead of implying the
-  // project is definitively over.
-  function daysLeft(p) {
-    if (!p.funding_deadline) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const deadline = new Date(p.funding_deadline + 'T00:00:00');
-    const diffDays = Math.round((deadline - today) / 86400000);
-    return diffDays < 0 ? null : Math.max(1, diffDays);
-  }
-
   const q = searchQuery.trim().toLowerCase();
   const visiblePitches = pitches
     .filter((p) => activeTag === 'All' || p.tag === activeTag)
-    .filter((p) => !q || p.title.toLowerCase().includes(q) || (p.creator_name || '').toLowerCase().includes(q))
+    .filter((p) => !q || p.title.toLowerCase().includes(q) || (p.creatorDisplayName || '').toLowerCase().includes(q))
     .sort((a, b) => {
       if (sortBy === 'saved') return (b.savedCount || 0) - (a.savedCount || 0);
       if (sortBy === 'closest') {
@@ -139,141 +120,149 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         </div>
       )}
 
-      <main className="library-stage">
-        <BackButton fallbackHref="/stream" />
-        <div className="library-heading">Pitch Room</div>
-        <div className="library-sub">
-          Projects looking for backing. Where backing is open you can back a project from its
-          page: the payment goes through Stripe straight to the creator&rsquo;s account, and you see
-          what they receive before you pay. Save one to follow along and get notified when they
-          post an update.
-        </div>
-
-        <div style={{ margin: '1rem 0 1.4rem' }}>
-          <Link href="/pitches/discover" className="account-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', width: 'auto', textDecoration: 'none' }}>
-            <SwipeDeckIcon size={18} src={iconOverrides.pitch_swipe} />
-            Discover — ride through ideas
+      {/* The app's Pitch Room screen (mobile/src/app/pitches/index.js),
+          laid out the same: kicker + headline, the Discover card, the
+          creator's two buttons, search, the three sorts, the tags, the
+          count and the cards. On a laptop the head and the Discover card
+          sit side by side and the cards make a grid. */}
+      <main className="library-stage prm">
+        <div className={`prm-top${isCreator ? ' with-creator' : ''}`}>
+          <div className="prm-head">
+            <div className="prm-kicker">Pitch Room</div>
+            <h1 className="prm-title">Back what gets<br />made next.</h1>
+          </div>
+          <Link href="/pitches/discover" className="prm-discover">
+            <span className="prm-discover-icon"><SwipeDeckIcon size={26} src={iconOverrides.pitch_swipe} /></span>
+            <span className="prm-discover-words">
+              <span className="prm-discover-kicker">Discover</span>
+              <span className="prm-discover-title">Swipe through ideas</span>
+            </span>
+            <ArrowRightIcon size={20} />
           </Link>
+          {isCreator && (
+            <div className="prm-creator-row">
+              <Link href="/creator/pitch/new" className="prm-ghost">+ Submit your project</Link>
+              <Link href="/creator/pitch/dashboard" className="prm-ghost">Your pitches</Link>
+            </div>
+          )}
         </div>
 
-        {isCreator && (
-          <div style={{ margin: '0 0 1.6rem' }}>
-            <Link href="/creator/pitch/new" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
-              Submit your project
-            </Link>
-            <Link href="/creator/pitch/dashboard" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginLeft: '0.7rem' }}>
-              Your pitches
-            </Link>
+        <div className="prm-tools">
+          <label className="prm-search">
+            <SearchIcon size={16} />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title or creator…"
+              aria-label="Search by title or creator"
+              autoComplete="off"
+            />
+            {searchQuery && (
+              <button type="button" className="prm-clear" onClick={() => setSearchQuery('')} aria-label="Clear the search">✕</button>
+            )}
+          </label>
+          <div className="prm-sorts" role="group" aria-label="Sort the projects">
+            {SORTS.map((s) => (
+              <button key={s.key} type="button" className="prm-sort" aria-pressed={sortBy === s.key} onClick={() => setSortBy(s.key)}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {usedTags.length > 2 && (
+          <div className="prm-tags" role="group" aria-label="Show one kind of project">
+            {usedTags.map((t) => (
+              <button key={t} type="button" className="prm-tag-pill" aria-pressed={activeTag === t} onClick={() => setActiveTag(t)}>
+                {t}
+              </button>
+            ))}
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by title or creator…"
-            className="pitch-search-input"
-            style={{ flex: '1 1 220px' }}
-          />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="pitch-sort-select"
-          >
-            <option value="newest">Newest</option>
-            <option value="closest">Closest to goal</option>
-            <option value="saved">Most saved</option>
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.4rem' }}>
-          {usedTags.map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTag(t)}
-              className="account-btn-secondary"
-              style={{
-                width: 'auto',
-                padding: '0.35rem 0.85rem',
-                fontSize: '0.78rem',
-                background: activeTag === t ? 'var(--brass)' : undefined,
-                color: activeTag === t ? '#241a05' : undefined
-              }}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <div className="prm-count">{visiblePitches.length} {visiblePitches.length === 1 ? 'project' : 'projects'}</div>
 
         {visiblePitches.length === 0 ? (
-          <div className="poster-empty">
+          <div className="prm-empty">
             {pitches.length === 0
               ? 'Nothing here yet — check back soon.'
               : 'No projects match your search or filter.'}
           </div>
         ) : (
-          <div className="pitch-grid">
+          <div className="prm-grid">
             {visiblePitches.map((p) => {
               const pct = fundingPct(p);
               const remaining = daysLeft(p);
+              const isSaved = saved.has(p.id);
               return (
-                <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
-                    {p.tag && <span className="pitch-tag">{p.tag}</span>}
+                <Link key={p.id} href={`/pitches/${p.id}`} className="prm-card">
+                  <div className={`prm-art${p.thumbnail ? '' : ' bare'}`} style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
+                    {/* No art uploaded yet: a quiet gradient with the
+                        title's initial rather than an empty box. */}
+                    {!p.thumbnail && <span className="prm-initial" aria-hidden="true">{(p.title || '?')[0].toUpperCase()}</span>}
+                    <span className="prm-scrim" aria-hidden="true" />
+                    {p.tag && <span className="prm-card-tag">{p.tag}</span>}
                     <button
-                      className="pitch-save"
-                      onClick={(e) => { e.preventDefault(); toggleSave(p.id); }}
+                      type="button"
+                      className={`prm-save${isSaved ? ' on' : ''}`}
+                      aria-pressed={isSaved}
+                      aria-label={isSaved ? `Stop following ${p.title}` : `Save ${p.title} to follow along`}
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleSave(p.id); }}
                     >
-                      <HeartIcon size={16} active={saved.has(p.id)} src={saved.has(p.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} />
+                      <HeartIcon size={14} active={isSaved} src={isSaved ? iconOverrides.heart_active : iconOverrides.heart_inactive} />
                     </button>
-                  </div>
-                  <div className="pitch-info">
-                    <h4>{p.title}</h4>
-                    {p.creator_name && (
-                      p.created_by ? (
-                        // A real <Link> here would nest an <a> inside the
-                        // card's own <Link> (invalid HTML — browsers
-                        // un-nest it, which can visibly relocate it out of
-                        // the card). A keyboard-operable span with the
-                        // same click-through-to-navigate behavior instead.
-                        <span
-                          className="creator creator-link"
-                          role="link"
-                          tabIndex={0}
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/profile/${p.created_by}`); }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault(); e.stopPropagation();
-                              router.push(`/profile/${p.created_by}`);
-                            }
-                          }}
-                        >
-                          {p.creator_name}
-                        </span>
-                      ) : (
-                        <div className="creator">{p.creator_name}</div>
-                      )
-                    )}
-                    {pct !== null && (
-                      <>
-                        <div className="pitch-progress-track"><div className="pitch-progress-fill" style={{ width: `${pct}%` }} /></div>
-                        <div className="pitch-progress-label">
-                          {p.funding_enabled
-                            ? `$${((p.liveRaisedCents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of $${Number(p.funding_goal).toLocaleString('en-US')} goal`
-                            : `$${Number(p.funding_raised || 0).toLocaleString('en-US')} of $${Number(p.funding_goal).toLocaleString('en-US')} goal`}
-                        </div>
-                      </>
-                    )}
-                    {p.funding_enabled && <div className="pitch-back-cta"><BackItIcon size={11} src={iconOverrides.back_it} /> Back it</div>}
                     {remaining !== null && (
-                      <div className="pitch-deadline">
-                        {remaining === 1 ? 'Last day' : `${remaining} days left`}
+                      <span className="prm-deadline">{remaining === 1 ? 'Last day' : `${remaining} days left`}</span>
+                    )}
+                  </div>
+                  <div className="prm-body">
+                    <h2 className="prm-card-title">{p.title}</h2>
+                    {p.creatorDisplayName && (
+                      <div className="prm-by">
+                        by{' '}
+                        {p.created_by ? (
+                          // A real <Link> here would nest an <a> inside the
+                          // card's own <Link> (invalid HTML — browsers
+                          // un-nest it, which can visibly relocate it out of
+                          // the card). A keyboard-operable span with the
+                          // same click-through-to-navigate behavior instead.
+                          <span
+                            className="prm-by-link"
+                            role="link"
+                            tabIndex={0}
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/profile/${p.created_by}`); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault(); e.stopPropagation();
+                                router.push(`/profile/${p.created_by}`);
+                              }
+                            }}
+                          >
+                            {p.creatorDisplayName}
+                          </span>
+                        ) : p.creatorDisplayName}
                       </div>
                     )}
-                    {p.savedCount > 0 && (
-                      <div className="pitch-saved-count">
-                        {p.savedCount} {p.savedCount === 1 ? 'person' : 'people'} following this
+                    {p.logline && <p className="prm-logline">{p.logline}</p>}
+                    {pct !== null && (
+                      <div className="prm-funding">
+                        <div className="prm-track"><div className="prm-fill" style={{ width: `${Math.max(pct, 2)}%` }} /></div>
+                        <div className="prm-funding-row">
+                          <span className="prm-raised">
+                            {money(raisedDollars(p), p.funding_enabled)}
+                            <span className="prm-goal"> of {money(p.funding_goal)}</span>
+                          </span>
+                          <span className="prm-pct">{pct}%</span>
+                        </div>
+                      </div>
+                    )}
+                    {(p.savedCount > 0 || p.funding_enabled) && (
+                      <div className="prm-foot">
+                        {p.savedCount > 0 ? (
+                          <span className="prm-following">♥ {p.savedCount} {p.savedCount === 1 ? 'person' : 'people'} following</span>
+                        ) : <span />}
+                        {p.funding_enabled && <span className="prm-back-it"><BackItIcon size={12} src={iconOverrides.back_it} /> Back it</span>}
                       </div>
                     )}
                   </div>
@@ -287,4 +276,42 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
       <MobileTabBar />
     </>
   );
+}
+
+const SORTS = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'closest', label: 'Closest to goal' },
+  { key: 'saved', label: 'Most saved' }
+];
+
+// Same rules as the app's screen: live donation totals for in-platform
+// funding, the self-reported number otherwise; null when there's no goal.
+function raisedDollars(p) {
+  return p.funding_enabled ? (p.liveRaisedCents || 0) / 100 : Number(p.funding_raised || 0);
+}
+
+function fundingPct(p) {
+  if (!p.funding_goal) return null;
+  return Math.min(100, Math.round((raisedDollars(p) / p.funding_goal) * 100));
+}
+
+function money(n, cents) {
+  return `$${Number(n).toLocaleString('en-US', cents ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 })}`;
+}
+
+// Whole calendar days until the deadline date, comparing dates only
+// (not time-of-day) so "the deadline is tomorrow" reads as 1 day left,
+// not 2. A deadline of today floors to 1 rather than 0, so it reads as
+// "last day" instead of looking already-expired. Returns null once the
+// deadline has passed rather than a negative number — this is
+// self-reported, informal metadata, not an authoritative cutoff, so
+// it's treated the same as "no deadline set" instead of implying the
+// project is definitively over.
+function daysLeft(p) {
+  if (!p.funding_deadline) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const deadline = new Date(p.funding_deadline + 'T00:00:00');
+  const diffDays = Math.round((deadline - today) / 86400000);
+  return diffDays < 0 ? null : Math.max(1, diffDays);
 }

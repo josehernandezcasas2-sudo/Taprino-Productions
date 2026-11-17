@@ -6,7 +6,8 @@ import { useAuth } from '../../lib/stableAuth';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
-import { colors, fonts, absoluteFill } from '../../lib/theme';
+import { colors, fonts, absoluteFill, brassTint } from '../../lib/theme';
+import BackItGlyph from '../../components/BackItGlyph';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 import WishlistHeart from '../../components/WishlistHeart';
@@ -176,9 +177,6 @@ export default function PitchRoom() {
 
       <Text style={styles.eyebrow}>Pitch Room</Text>
       <Text style={styles.heading}>Back what gets{'\n'}made next.</Text>
-      <Text style={styles.sub}>
-        Projects looking for backing. Where backing is open you can back a project from its page: the payment goes through Stripe straight to the creator's account, and you see what they receive before you pay. Save one to follow along and get notified when they post an update.
-      </Text>
 
       <Pressable onPress={() => router.push('/pitches/discover')} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
         <LinearGradient colors={[colors.brass, colors.brassDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.discoverCard}>
@@ -321,8 +319,18 @@ function PitchCard({ pitch, saved, onToggleSave, onOpen, onOpenCreator }) {
           </View>
         ) : null}
 
-        {pitch.savedCount > 0 ? (
-          <Text style={styles.following}>♥ {pitch.savedCount} {pitch.savedCount === 1 ? 'person' : 'people'} following</Text>
+        {pitch.savedCount > 0 || pitch.funding_enabled ? (
+          <View style={styles.foot}>
+            {pitch.savedCount > 0 ? (
+              <Text style={styles.following}>♥ {pitch.savedCount} {pitch.savedCount === 1 ? 'person' : 'people'} following</Text>
+            ) : <View />}
+            {pitch.funding_enabled ? (
+              <View style={styles.backIt}>
+                <BackItGlyph size={12} color={colors.brass} />
+                <Text style={styles.backItText}>Back it</Text>
+              </View>
+            ) : null}
+          </View>
         ) : null}
       </View>
     </Pressable>
@@ -340,8 +348,7 @@ const styles = StyleSheet.create({
   adminBannerText: { color: colors.inkDim, fontFamily: fonts.body, fontSize: 13, lineHeight: 18 },
 
   eyebrow: { fontFamily: fonts.monoMedium, fontSize: 11, letterSpacing: 2.4, textTransform: 'uppercase', color: colors.olive, marginBottom: 10 },
-  heading: { fontFamily: fonts.bodyBold, fontSize: 34, lineHeight: 38, color: colors.ink, marginBottom: 12 },
-  sub: { fontFamily: fonts.body, fontSize: 14.5, lineHeight: 21, color: colors.inkDim, marginBottom: 20 },
+  heading: { fontFamily: fonts.bodyBold, fontSize: 34, lineHeight: 38, color: colors.ink, marginBottom: 20 },
 
   discoverCard: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 16, marginBottom: 14 },
   discoverIcon: { width: 46, height: 46, borderRadius: 14, backgroundColor: 'rgba(36,26,5,0.14)', alignItems: 'center', justifyContent: 'center' },
@@ -398,5 +405,8 @@ const styles = StyleSheet.create({
   goal: { fontFamily: fonts.display, fontSize: 13, color: colors.inkFaint },
   pct: { fontFamily: fonts.monoBold, fontSize: 12, color: colors.olive },
 
-  following: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint, marginTop: 12 }
+  foot: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12 },
+  following: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint },
+  backIt: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: brassTint(0.5), borderRadius: 999, paddingVertical: 2, paddingHorizontal: 9 },
+  backItText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.4, color: colors.brass }
 });

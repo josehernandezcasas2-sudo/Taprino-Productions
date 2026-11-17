@@ -69,7 +69,9 @@ async function words() {
     const pitches = await page('/pitches', MARA);
     ok('/pitches: 200', pitches.status === 200, pitches.status);
     ok('…the intro no longer says Studio Tapa doesn’t handle the funding', !/handle any of this funding/i.test(pitches.text) && !/links straight to the creator/i.test(pitches.text));
-    ok('…it says backing goes through Stripe to the creator', /Where backing is open you can back a project from its\s+page/.test(pitches.text) && /through Stripe straight to the creator/.test(pitches.text));
+    // The intro paragraph itself left on 2026-11-17 (Jose: "let's take the
+    // paragraph out so it looks like an actual app"; pitch-room.mjs).
+    ok('…and has no intro paragraph at all now', !/Projects looking for backing\. Where backing/.test(pitches.text) && /Back what gets/.test(pitches.text));
   } finally {
     sql(`update public.site_settings set elevator_pitch_enabled = ${was && was.elevator_pitch_enabled === true ? 'true' : 'false'} where id = 1`);
   }
