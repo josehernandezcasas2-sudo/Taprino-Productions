@@ -14529,3 +14529,26 @@ a.tabbar-item { text-decoration: none; }
   .td-btn, .td-check .td-btn, .td-toggle-btn, .acct-back.td-back { min-height: 44px; }
 }
 /* === end Title dashboard === */
+
+/* ---- No zoom when a field is tapped (2026-11-17) --------------------------
+   Jose: "when clicking certain buttons or text areas, it zooms me in … not
+   supposed to happen unless it needs to". Safari on an iPhone zooms the page
+   whenever a text field under 16px takes focus, and almost every field on
+   the site was 11–15px; a quick double tap on a button zooms too. On a touch
+   screen every text field is at least 16px (the few drawn bigger keep their
+   size), and a double tap no longer zooms. Pinching to zoom still works
+   everywhere: the viewport tag sets no maximum scale, on purpose. Clerk's
+   sign-in fields (.cl-formFieldInput, Clerk's own class) are fields too. */
+html { touch-action: manipulation; }
+a, button, input, select, textarea, label, summary, [role="button"] { touch-action: manipulation; }
+@media (pointer: coarse) {
+  /* :where() keeps this rule the weakest, so the bigger fields below win. */
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="hidden"]), textarea, select, [contenteditable="true"], .cl-formFieldInput) {
+    font-size: 16px !important;
+  }
+  .ebx-field input.is-title,
+  .apl-field input.new-show-name,
+  .show-ed-input.is-title { font-size: 1.05rem !important; }
+  .show-ed-stepper input { font-size: 1.1rem !important; }
+  .sell-price input { font-size: 1.2rem !important; }
+}
