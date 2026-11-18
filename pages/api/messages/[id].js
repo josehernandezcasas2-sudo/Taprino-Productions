@@ -4,7 +4,9 @@ import { applyCors } from '../../../lib/cors';
 
 // One conversation.
 //   GET   ?since=<iso> → { thread, messages } (only { messages } with since)
-//   POST  { body }     → { threadId, message }
+//   POST  { body, context? } → { threadId, message } (a context — a new
+//         subject brought from a page — goes with this message; checked in
+//         lib/messageContext.js)
 //   PATCH { muted }    → { muted }
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -24,8 +26,8 @@ export default async function handler(req, res) {
       return res.status(200).json(await getConversation(userId, threadId, { since }));
     }
     if (req.method === 'POST') {
-      const { body } = req.body || {};
-      return res.status(201).json(await sendMessage(userId, { threadId, body }));
+      const { body, context } = req.body || {};
+      return res.status(201).json(await sendMessage(userId, { threadId, body, context }));
     }
     if (req.method === 'PATCH') {
       const { muted } = req.body || {};
