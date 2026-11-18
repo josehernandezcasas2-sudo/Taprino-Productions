@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '@clerk/nextjs';
 import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, DashboardIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
 import CreatePostModal from './CreatePostModal';
+import AvatarPhoto from './AvatarPhoto';
 import { DOWNLOAD_WORDS } from '../lib/downloadRules';
 import { DASHBOARD_PATH, seesDashboard } from '../lib/creatorDashboardRules';
 
@@ -194,6 +195,22 @@ export default function MobileTabBar() {
       .catch(() => {});
     return () => { live = false; };
   }, [authKey]);
+
+  // A photo saved on the account page shows on the Account tab at once
+  // (components/account/ProfileSection.js announces it).
+  useEffect(() => {
+    function onUpdated(e) {
+      const d = (e && e.detail) || {};
+      if (!('avatarUrl' in d) && !('avatarPosition' in d) && !('avatarZoom' in d)) return;
+      setRoles((r) => {
+        const prev = r.avatar || {};
+        const url = 'avatarUrl' in d ? d.avatarUrl : prev.url;
+        return { ...r, avatar: url ? { url, position: 'avatarPosition' in d ? d.avatarPosition : prev.position || null, zoom: 'avatarZoom' in d ? d.avatarZoom : prev.zoom || null } : null };
+      });
+    }
+    window.addEventListener('taprino:own-profile-updated', onUpdated);
+    return () => window.removeEventListener('taprino:own-profile-updated', onUpdated);
+  }, []);
 
   // Same self-fetch reasoning as above, for Pitch Room's on/off toggle —
   // public and cached, so this costs nothing extra beyond what HeaderNav
@@ -426,7 +443,14 @@ export default function MobileTabBar() {
         aria-expanded={openMenu === 'account'}
         aria-haspopup="menu"
       >
-        <span className="tabbar-glyph"><AccountIcon size={20} src={iconOverrides.tab_account} /></span>
+        {/* Option B (2026-11-18): the photo left the header for this tab.
+            Signed in with a photo, the tab draws it (its focal point and
+            zoom, as every avatar on the site); otherwise the icon. */}
+        <span className="tabbar-glyph">
+          {roles.isSignedIn && roles.avatar && roles.avatar.url
+            ? <AvatarPhoto url={roles.avatar.url} position={roles.avatar.position} zoom={roles.avatar.zoom} className="tabbar-avatar" />
+            : <AccountIcon size={20} src={iconOverrides.tab_account} />}
+        </span>
         <span className="tabbar-label">Account <span className="tabbar-caret" aria-hidden="true"><CaretUpIcon size={7} src={iconOverrides.tab_caret} /></span></span>
       </button>
 

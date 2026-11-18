@@ -25,10 +25,19 @@ export default async function handler(req, res) {
   // Suspensions (migration 102): the app's gate reads this on sign-in
   // and when it comes to the foreground; null when nothing is in force.
   let suspended = null;
+  // The tab bar's Account tab and the app's bottom bar draw the person's own
+  // photo since the photo left the header (2026-11-18), with its focal point
+  // and zoom like every avatar on the site; the ☰ menu's card has the name.
+  let avatar = null;
+  let displayName = null;
   if (userId) {
     const [profile, s] = await Promise.all([getOwnProfile(userId).catch(() => null), getSuspensionFor(userId)]);
     profileHref = `/profile/${(profile && profile.handle) || userId}`;
     suspended = s;
+    if (profile && profile.avatar_url) {
+      avatar = { url: profile.avatar_url, position: profile.avatar_position || null, zoom: profile.avatar_zoom ? Number(profile.avatar_zoom) : null };
+    }
+    displayName = profile && profile.display_name ? profile.display_name : null;
   }
   return res.status(200).json({
     isSignedIn: !!userId,
@@ -38,6 +47,8 @@ export default async function handler(req, res) {
     // Sub-admins too — HeaderNav shows the Admin Portal link on this.
     canAccessAdmin: !!canAccessAdmin,
     profileHref,
+    avatar,
+    displayName,
     suspended
   });
 }

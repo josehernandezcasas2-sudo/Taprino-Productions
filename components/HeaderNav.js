@@ -1,26 +1,30 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { avatarImgStyle } from '../lib/profileBanner';
 import { keepScrollInside, panelRoom, viewBottom } from '../lib/menuScroll';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
-import { SITE } from '../lib/siteConfig';
+import SiteMenu from './SiteMenu';
+import SignInHere from './SignInHere';
+import { MENU_WORDS, menuSide } from '../lib/siteMenuRules';
 import { isStreamPath } from '../lib/streamSection';
-import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, AntennaIcon, LogoutIcon, ArrowRightIcon, AccountIcon, DashboardIcon, HamburgerMenuIcon, usePlayerIconOverrides, ChatIcon } from './PlayerIcons';
+import { SearchIcon, BellIcon, HamburgerMenuIcon, usePlayerIconOverrides, ChatIcon } from './PlayerIcons';
 
-// Redesigned to match the horizontal-nav mockup: logo + top-level links on
-// the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
-// Studio Tapa + pill + a circular avatar on the right. All the FUNCTIONALITY
-// from the old hamburger-driven version is preserved — search, the account
-// dropdown (settings/admin/wishlist/subscription/creator links/sign out),
-// and the creator notifications bell — only the outer chrome changed.
+// The site's header: the ☰, the wordmark + kicker and the primary links on
+// the left; search, Messages and the bell on the right (signed out: search
+// and Sign in).
 //
-// Genre browsing (previously buried in the hamburger dropdown) now lives
-// behind a small "More" menu on desktop and the hamburger on mobile, since
-// there isn't room for 10 genres as top-level links the way the mockup's
-// five fixed content-type links fit.
+// Option B (Jose, 2026-11-18, on the canvas
+// https://claude.ai/artifact/RFSJUdzGefwe1v11cCJA6M): the photo and its
+// account menu left the header — the photo is the tab bar's Account tab now
+// — and the Tapa + pill went with them (Join Tapa + is in the menu's card).
+// Everything the photo's menu held is in the ☰ menu (components/SiteMenu.js,
+// lib/siteMenuRules.js): you, the places on each half of the site, Your
+// things, Creator, Team, Settings & account, Help & legal and Log out. It is
+// on every page the header is on, which matters where there is no tab bar
+// (admin, the submit steps, the show pages). Messages left the primary links
+// for an icon of its own beside the bell.
 // A layout effect in the browser (an opening panel is placed before it is
 // painted, so it never jumps), a plain effect on the server, where a
 // layout effect only logs a warning.
@@ -31,7 +35,8 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const router = useRouter();
   const { signOut } = useClerk();
   const { notifications, unreadCount, messagesUnread, markRead, markAllRead } = useNotifications(isSignedIn);
-  const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | 'notifications' | null
+  const [openMenu, setOpenMenu] = useState(null); // 'ham' (the menu) | 'search' | 'notifications' | null
+  const hamRef = useRef(null);
   // Escape closes whichever menu is open.
   useEffect(() => {
     if (!openMenu) return undefined;
@@ -46,8 +51,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [searchValue, setSearchValue] = useState('');
   const [siteSettings, setShopSettings] = useState(null);
   const [ownProfile, setOwnProfile] = useState(null);
-  const [isScheduler, setIsScheduler] = useState(false);
-  const [isSubAdmin, setIsSubAdmin] = useState(false);
+  // What /api/my-role says about this person: the menu's Creator and Team
+  // sections. The page's own isAdmin / isCreator count too (some pages pass
+  // them before the answer arrives).
+  const [role, setRole] = useState(null);
   const rootRef = useRef(null);
 
   // The primary links scroll inside their own box once they outgrow the
@@ -95,17 +102,18 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       .catch(() => setShopSettings({ shopEnabled: false, shopUrl: null }));
   }, [isAdmin]);
 
-  // Content Schedulers are creators too, so only creators need to ask
-  // whether they also get the channel scheduler link.
-  // Also whether a signed-in non-admin is a sub-admin (gets the Admin
-  // Portal link), since pages only pass isAdmin down.
+  // Who this is, for the menu: a sub-admin, a content scheduler, and a
+  // creator or admin on a page that didn't say (pages only pass isAdmin /
+  // isCreator, and not all of them).
   useEffect(() => {
-    if (!isSignedIn || isAdmin) return;
+    if (!isSignedIn) { setRole(null); return undefined; }
+    let live = true;
     fetch('/api/my-role')
       .then((r) => r.json())
-      .then((d) => { setIsScheduler(!!d.isContentScheduler); setIsSubAdmin(!!d.canAccessAdmin); })
+      .then((d) => { if (live) setRole(d); })
       .catch(() => {});
-  }, [isSignedIn, isCreator, isAdmin]);
+    return () => { live = false; };
+  }, [isSignedIn]);
 
   // Same self-fetch reasoning as siteSettings above — HeaderNav renders on
   // every page, so this is cheaper than threading userId/avatarUrl/
@@ -130,6 +138,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
 
   useEffect(() => {
     function handleOutside(e) {
+      // The ☰ menu is drawn into <body>, outside the header: a click in it
+      // is not a click outside (its backdrop closes it by itself).
+      if (e.target && typeof e.target.closest === 'function' && e.target.closest('.site-menu-root')) return;
       if (rootRef.current && !rootRef.current.contains(e.target)) {
         setOpenMenu(null);
       }
@@ -137,6 +148,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     document.addEventListener('click', handleOutside);
     return () => document.removeEventListener('click', handleOutside);
   }, []);
+
+  // A move to another page closes whatever is open (the menu's links close
+  // it themselves; this covers Back and anything that navigates by itself).
+  useEffect(() => { setOpenMenu(null); }, [router.asPath]);
 
   useEffect(() => {
     if (openMenu === 'search' && searchInputRef.current) {
@@ -196,9 +211,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     setOpenMenu(null);
   }
 
-  const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
-  const ownAvatarUrl = isSignedIn && ownProfile ? ownProfile.avatarUrl : null;
-  const ownAvatarStyle = avatarImgStyle(isSignedIn && ownProfile ? ownProfile.avatarPosition : null, isSignedIn && ownProfile ? ownProfile.avatarZoom : null);
   const ownProfileHref = isSignedIn && ownProfile && ownProfile.userId ? `/profile/${ownProfile.handle || ownProfile.userId}` : null;
 
   // Deriving "what's active" from the real URL rather than trusting each
@@ -261,7 +273,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         { href: '/locations', label: 'Locations', match: currentPath.startsWith('/locations') },
         { href: '/productions', label: 'Productions', match: currentPath.startsWith('/productions') },
         { href: '/resources', label: 'Resources', match: currentPath.startsWith('/resources') },
-        ...(isSignedIn ? [{ href: '/messages', label: 'Messages', match: currentPath.startsWith('/messages'), badge: messagesUnread }] : []),
         ...(siteSettings && siteSettings.verticalEnabled !== false
           ? [{ href: '/vertical/discover', label: 'Vertical Discover', match: currentPath === '/vertical/discover' }]
           : []),
@@ -287,8 +298,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             icon buttons have (.nav-hamburger; Jose, 2026-10-28, the app's
             TopNav matches). */}
         <button
+          ref={hamRef}
           className={`icon-btn nav-hamburger ${openMenu === 'ham' ? 'active' : ''}`}
-          aria-label="Browse by type and genre"
+          aria-label={MENU_WORDS.open}
+          aria-haspopup="dialog"
           aria-expanded={openMenu === 'ham'}
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'ham' ? null : 'ham')); }}
         >
@@ -343,44 +356,26 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         </nav>
 
         {openMenu === 'ham' && (
-          <div ref={panelRef} className="dropdown dropdown-left open menu-panel hamburger-dropdown">
-            <div className="dropdown-label">Browse by type</div>
-            {typeLinks.map((l) => (
-              <Link key={l.href} href={l.href} className={`dropdown-item ${l.match ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-                {l.label}
-              </Link>
-            ))}
-            <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
-            {isSignedIn && <Link href="/recs" className="dropdown-item" onClick={() => setOpenMenu(null)}>My Recs</Link>}
-            {/* Pitch Room moved into typeLinks above — Connect-side only now. */}
-            {siteSettings && siteSettings.liveTvEnabled !== false && (
-              <Link href="/live" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
-            )}
-            {siteSettings && siteSettings.shopEnabled && siteSettings.shopUrl && (
-              <a href={siteSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="dropdown-item">Shop</a>
-            )}
-
-            {/* Genres are a Stream-library browsing concept (/genre/X pages
-                live under the watch catalogue) — showing them on Connect
-                pages, where there's nothing genre-tagged to browse into,
-                was the same mismatch typeLinks used to have. */}
-            {inStreamSection && mainGenres && mainGenres.length > 0 && (
-              <>
-                <div className="dropdown-divider" />
-                <div className="dropdown-label">Browse by genre</div>
-                {mainGenres.map((g) => (
-                  <Link
-                    key={g}
-                    href={`/genre/${encodeURIComponent(g)}`}
-                    className={`dropdown-item ${activeGenre === g ? 'active-cat' : ''}`}
-                    onClick={() => setOpenMenu(null)}
-                  >
-                    {g}
-                  </Link>
-                ))}
-              </>
-            )}
-          </div>
+          <SiteMenu
+            onClose={() => setOpenMenu(null)}
+            onSearch={() => setOpenMenu('search')}
+            onSignOut={() => { setOpenMenu(null); signOut({ redirectUrl: '/' }); }}
+            initialSide={menuSide(inStreamSection)}
+            isSignedIn={isSignedIn}
+            isSubscriber={isSubscriber}
+            roles={{
+              isAdmin: Boolean(isAdmin || (role && role.isAdmin)),
+              isCreator: Boolean(isCreator || (role && role.isCreator)),
+              canAccessAdmin: Boolean(role && role.canAccessAdmin),
+              isContentScheduler: Boolean(role && role.isContentScheduler)
+            }}
+            settings={siteSettings}
+            ownProfile={ownProfile}
+            profileHref={ownProfileHref}
+            mainGenres={inStreamSection ? mainGenres : null}
+            activeGenre={activeGenre}
+            returnFocus={hamRef}
+          />
         )}
       </div>
 
@@ -428,6 +423,17 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
 
         {isSignedIn && (
           <>
+            <Link
+              href="/messages"
+              className={`icon-btn header-messages ${currentPath.startsWith('/messages') ? 'active' : ''}`}
+              aria-label={`Messages${messagesUnread > 0 ? ` (${messagesUnread} unread)` : ''}`}
+              style={{ position: 'relative' }}
+            >
+              <ChatIcon size={19} />
+              {messagesUnread > 0 && (
+                <span className="notification-badge">{messagesUnread > 9 ? '9+' : messagesUnread}</span>
+              )}
+            </Link>
             <button
               className={`icon-btn ${openMenu === 'notifications' ? 'active' : ''}`}
               aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
@@ -470,106 +476,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           </>
         )}
 
-        {!isSubscriber && (
-          <Link href="/account" className="tapa-plus-pill">
-            {SITE.premiumTier}
-          </Link>
-        )}
-
-        <button
-          className={`avatar-btn ${openMenu === 'account' ? 'active' : ''}`}
-          aria-label="Account menu"
-          aria-expanded={openMenu === 'account'}
-          onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'account' ? null : 'account')); }}
-        >
-          {ownAvatarUrl ? (
-            <Image src={ownAvatarUrl} alt="" fill sizes="34px" className="avatar-img" style={ownAvatarStyle} />
-          ) : isSignedIn && avatarLetter ? (
-            avatarLetter
-          ) : (
-            // Signed out: the person glyph, never a "☺" — iOS draws that
-            // character as a colour emoji (Jose, 2026-10-28; the app's
-            // TopNav had the same).
-            <AccountIcon size={18} />
-          )}
-        </button>
-
-        {openMenu === 'account' && (
-          <div ref={panelRef} className="dropdown dropdown-right open menu-panel account-dropdown">
-            {isSignedIn ? (
-              <>
-                {ownProfileHref ? (
-                  <Link href={ownProfileHref} className="account-dropdown-header account-dropdown-header-link" onClick={() => setOpenMenu(null)}>
-                    <div className="account-dropdown-avatar">
-                      {ownAvatarUrl ? (
-                        <Image src={ownAvatarUrl} alt="" fill sizes="38px" className="avatar-img" style={ownAvatarStyle} />
-                      ) : (
-                        avatarLetter || <AccountIcon size={20} />
-                      )}
-                    </div>
-                    <div>
-                      <div className="account-dropdown-email">{email || 'Your account'}</div>
-                      <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="account-dropdown-header">
-                    <div className="account-dropdown-avatar">{avatarLetter || <AccountIcon size={20} />}</div>
-                    <div>
-                      <div className="account-dropdown-email">{email || 'Your account'}</div>
-                      <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
-                    </div>
-                  </div>
-                )}
-                <div className="dropdown-divider" />
-                <Link href="/account" className="dropdown-item"><SettingsIcon size={15} src={iconOverrides.settings} /> Account Settings</Link>
-                {ownProfileHref && (
-                  <Link href={ownProfileHref} className="dropdown-item"><AccountIcon size={15} /> View public profile</Link>
-                )}
-                {(isAdmin || isSubAdmin) && <Link href="/admin" className="dropdown-item"><LockIcon size={15} src={iconOverrides.admin_lock} /> Admin Portal</Link>}
-                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
-                <Link href="/crew/card" className="dropdown-item"><AccountIcon size={15} /> My working card</Link>
-                <Link href="/locations/mine" className="dropdown-item"><AccountIcon size={15} /> My locations</Link>
-                <Link href="/locations/requests" className="dropdown-item"><AccountIcon size={15} /> Location requests</Link>
-                <Link href="/productions#mine" className="dropdown-item"><AccountIcon size={15} /> My productions</Link>
-                <Link href="/messages" className="dropdown-item"><ChatIcon size={15} /> Messages{messagesUnread > 0 && <span className="nav-badge">{messagesUnread > 9 ? '9+' : messagesUnread}</span>}</Link>
-                <Link href="/recs" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> My Recs</Link>
-                {siteSettings && siteSettings.elevatorPitchEnabled && (
-                  <Link href="/pitches" className="dropdown-item"><TargetIcon size={15} src={iconOverrides.target} /> Pitch Room</Link>
-                )}
-                {/* /account/membership does the right thing for everyone:
-                    plan picker, Manage subscription for a paying member,
-                    the free-access note for the team. Opening Stripe's
-                    portal from here showed an empty page to accounts with
-                    no subscription (admins, comped). */}
-                <Link href="/account/membership" className="dropdown-item">
-                  {isSubscriber ? <CardIcon size={15} src={iconOverrides.card} /> : <SparkleIcon size={15} src={iconOverrides.sparkle} />}
-                  {' '}{isSubscriber ? 'Membership' : `Join ${SITE.premiumTier}`}
-                </Link>
-                {(isCreator || isAdmin || isSubAdmin) && <div className="dropdown-divider" />}
-                {/* The creator's Dashboard (2026-11-14): the same people
-                    who get its tab in the tab bar. */}
-                {(isCreator || isAdmin || isSubAdmin) && <Link href="/creator/dashboard" className="dropdown-item"><DashboardIcon size={15} src={iconOverrides.tab_dashboard} /> Dashboard</Link>}
-                {isCreator && <Link href="/creator/analytics" className="dropdown-item"><BarChartIcon size={15} src={iconOverrides.bar_chart} /> Your numbers</Link>}
-                {(isCreator || isAdmin) && <Link href="/creator/money" className="dropdown-item"><CardIcon size={15} src={iconOverrides.card} /> Money</Link>}
-                {(isCreator || isAdmin) && <div className="dropdown-divider" />}
-                {(isCreator || isAdmin) && <Link href="/creator/submit" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Submit your work</Link>}
-                {(isCreator || isAdmin) && <Link href="/creator/my-work" className="dropdown-item"><FolderIcon size={15} src={iconOverrides.folder} /> Your work</Link>}
-                {(isAdmin || isScheduler) && <Link href="/schedule" className="dropdown-item"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel scheduler</Link>}
-                {!isCreator && !isAdmin && <div className="dropdown-divider" />}
-                {!isCreator && !isAdmin && <Link href="/apply" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Become a creator</Link>}
-                <div className="dropdown-divider" />
-                <button className="dropdown-item" onClick={() => signOut({ redirectUrl: '/' })}><LogoutIcon size={15} src={iconOverrides.logout} /> Sign Out</button>
-              </>
-            ) : (
-              <>
-                <div className="dropdown-label">Account</div>
-                <Link href="/account" className="dropdown-item"><ArrowRightIcon size={15} src={iconOverrides.arrow_right} /> Log in / Create account</Link>
-                <div className="dropdown-divider" />
-                <Link href="/apply" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Become a creator</Link>
-              </>
-            )}
-          </div>
+        {!isSignedIn && (
+          <SignInHere>
+            <button type="button" className="header-signin-pill">{MENU_WORDS.signIn}</button>
+          </SignInHere>
         )}
       </div>
     </header>

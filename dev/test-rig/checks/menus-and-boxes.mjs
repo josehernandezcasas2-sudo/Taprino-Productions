@@ -6,13 +6,14 @@
 //   1. The words: the signed-out account card no longer says "Real email +
 //      password now", the Pitch Room intro no longer says Studio Tapa
 //      doesn't handle the funding.
-//   2. The account menu at a tablet held sideways (Jose's screenshot,
-//      1000×695), a laptop, a short laptop window, a phone and a phone held
-//      sideways: its top edge is the bar's bottom edge, it ends on screen
-//      (above the phone's tab bar), its last row (Sign Out) can be scrolled
-//      into view, and neither a wheel nor a finger on it moves the page —
-//      at the list's ends too.
-//   3. The browse panel and the notifications panel hang the same way.
+//   2. The ☰ menu (since 2026-11-18 it holds what the header's account menu
+//      did) at a tablet held sideways (Jose's screenshot, 1000×695), a
+//      laptop, a short laptop window, a phone and a phone held sideways: it
+//      is the screen's height, its list scrolls by itself, its last thing
+//      (Log out) can be reached, and neither a wheel nor a finger on it — or
+//      on the dimmed page beside a drawer — moves the page, at the list's
+//      ends too.
+//   3. The notifications and search panels hang from under the bar.
 //   4. The tab bar's own menu on a phone held sideways: on screen, under
 //      the header, its first and last rows reachable.
 //   5. Your work's "Edit submission" and "Title & description" boxes: the
@@ -131,106 +132,97 @@ function hangs(label, m) {
   ok(`${label}: it is inside the screen's width`, m.panel && m.panel.left >= 0 && m.panel.right <= m.viewW + 1, m.panel);
 }
 
-// ---- 2. the account menu ----------------------------------------------------------------
-async function accountMenu(b) {
+// ---- 2. the ☰ menu ------------------------------------------------------------------
+// Since 2026-11-18 (option B) the header's photo menu is gone; everything it
+// held is in the ☰ menu (components/SiteMenu.js), a full-screen sheet on a
+// phone and a drawer from the left on anything wider. The same promise: it
+// fits the screen, its list scrolls by itself, its last thing (Log out) can
+// be reached, and neither a wheel nor a finger moves the page behind — at
+// the list's ends too, and over the dimmed page beside a drawer.
+async function siteMenu(b) {
+  const sel = '.site-menu .sm-body';
+  const fits = (label, f) => ok(`${label}: it is the screen's height and inside its width`, f && Math.abs(f.top) <= 1 && Math.abs(f.bottom - f.viewH) <= 1 && f.left >= 0 && f.right <= f.viewW + 1, f);
+  const frame = (pg) => pg.evaluate(() => { const el = document.querySelector('.site-menu'); if (!el) return null; const b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right, width: b.width, viewH: window.innerHeight, viewW: window.innerWidth }; });
   for (const size of SIZES) {
-    section(`The account menu on ${size.name}`);
-    // The admin's menu is the longest (every creator and admin row).
+    section(`The ☰ menu on ${size.name}`);
+    // The admin's menu is the longest (Creator and Team too).
     const { ctx, page: pg, errors } = await b.open(ADMIN, size.touch ? 390 : 1280);
     await pg.setViewportSize({ width: size.width, height: size.height });
     await goto(pg, '/stream');
     const room = await pg.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
     ok('the page behind is long enough to scroll', room > 200, room);
 
-    await pg.locator('button[aria-label="Account menu"]').click();
-    const sel = '.account-dropdown';
+    const ham = pg.locator('button.nav-hamburger');
+    if (size.touch) await ham.tap(); else await ham.click();
     await pg.locator(sel).waitFor({ timeout: 10000 });
-    await pg.locator(`${sel} >> text=Sign Out`).waitFor({ timeout: 15000 }).catch(() => {});
-    await pg.waitForTimeout(250);
-    let m = await measure(pg, sel);
-    hangs('the menu', m);
+    await pg.waitForTimeout(500);
+    // Open every section: the longest the list can be.
+    for (const head of await pg.$$('.site-menu .sm-section-head[aria-expanded="false"]')) await head.click();
+    await pg.waitForTimeout(200);
+    fits('the menu', await frame(pg));
     await shot(pg, `menu-${size.key}`);
-
+    const m = await measure(pg, sel);
     const scrolls = m.scrollHeight > m.clientHeight + 1;
-    const mustScroll = size.height < 700;
-    ok(mustScroll ? 'it has more rows than fit, so it scrolls' : `it ${scrolls ? 'scrolls' : 'fits whole'}`, mustScroll ? scrolls : true, { scrollHeight: m.scrollHeight, clientHeight: m.clientHeight });
+    ok('with every section open the list is longer than the screen, so it scrolls', scrolls, { scrollHeight: m.scrollHeight, clientHeight: m.clientHeight });
 
     const cx = m.panel.left + m.panel.width / 2;
-    const cy = m.panel.top + Math.min(m.panel.height / 2, 120);
     if (size.touch) {
-      // A finger moving up scrolls the list.
-      if (scrolls) {
-        await drag(pg, cx, m.panel.top + m.panel.height - 30, m.panel.top + 30);
-        const after = await measure(pg, sel);
-        ok('a finger on the menu scrolls the menu', after.scrollTop > 0, after.scrollTop);
-        ok('…and the page behind stays where it was', after.pageY === 0, after.pageY);
-      }
-      // At the list's end (or on a list that fits) the same finger moves nothing.
-      await pg.evaluate((s) => { const p = document.querySelector(s); p.scrollTop = p.scrollHeight; }, sel);
       await drag(pg, cx, m.panel.top + m.panel.height - 30, m.panel.top + 30);
       let after = await measure(pg, sel);
+      ok('a finger on the menu scrolls the menu', after.scrollTop > 0, after.scrollTop);
+      ok('…and the page behind stays where it was', after.pageY === 0, after.pageY);
+      await pg.evaluate((s) => { const p = document.querySelector(s); p.scrollTop = p.scrollHeight; }, sel);
+      await drag(pg, cx, m.panel.top + m.panel.height - 30, m.panel.top + 30);
+      after = await measure(pg, sel);
       ok('at the end of the list a finger does not move the page', after.pageY === 0, after.pageY);
       await pg.evaluate((s) => { document.querySelector(s).scrollTop = 0; }, sel);
       await drag(pg, cx, m.panel.top + 30, m.panel.top + m.panel.height - 30);
       after = await measure(pg, sel);
       ok('at the top of the list a finger pulling down does not move the page', after.pageY === 0, after.pageY);
-    } else {
-      await pg.mouse.move(cx, cy);
-      if (scrolls) {
-        await pg.mouse.wheel(0, 160);
-        await pg.waitForTimeout(250);
-        const after = await measure(pg, sel);
-        ok('a wheel on the menu scrolls the menu', after.scrollTop > 0, after.scrollTop);
-        ok('…and the page behind stays where it was', after.pageY === 0, after.pageY);
+      if (size.width > 640) {
+        // Beside the drawer: the dimmed page doesn't move under a finger either.
+        await drag(pg, Math.min(size.width - 30, m.panel.right + 120), size.height - 40, 40);
+        after = await measure(pg, sel);
+        ok('a finger on the dimmed page beside it does not move the page', after.pageY === 0, after.pageY);
       }
-      // Far more wheel than the list has: it stops at the end, the page still doesn't move.
-      for (let i = 0; i < 12; i += 1) await pg.mouse.wheel(0, 400);
-      await pg.waitForTimeout(300);
+    } else {
+      await pg.mouse.move(cx, m.panel.top + 120);
+      await pg.mouse.wheel(0, 160);
+      await pg.waitForTimeout(250);
       let after = await measure(pg, sel);
+      ok('a wheel on the menu scrolls the menu', after.scrollTop > 0, after.scrollTop);
+      ok('…and the page behind stays where it was', after.pageY === 0, after.pageY);
+      for (let i = 0; i < 16; i += 1) await pg.mouse.wheel(0, 400);
+      await pg.waitForTimeout(300);
+      after = await measure(pg, sel);
       ok('past the end of the list the page still does not move', after.pageY === 0, after.pageY);
-      for (let i = 0; i < 12; i += 1) await pg.mouse.wheel(0, -400);
+      for (let i = 0; i < 16; i += 1) await pg.mouse.wheel(0, -400);
       await pg.waitForTimeout(300);
       after = await measure(pg, sel);
       ok('past the top of the list the page still does not move', after.pageY === 0 && after.scrollTop === 0, { pageY: after.pageY, scrollTop: after.scrollTop });
+      await pg.mouse.move(Math.min(size.width - 40, m.panel.right + 200), Math.min(size.height - 40, 300));
+      for (let i = 0; i < 4; i += 1) await pg.mouse.wheel(0, 400);
+      await pg.waitForTimeout(300);
+      after = await measure(pg, sel);
+      ok('a wheel on the dimmed page beside it does not move the page', after.pageY === 0, after.pageY);
     }
 
-    // Every row can be reached: the last one comes into view inside the panel.
+    // The last thing can be reached: Log out, with nothing lying over it.
     await pg.evaluate((s) => { const p = document.querySelector(s); p.scrollTop = p.scrollHeight; }, sel);
     await pg.waitForTimeout(150);
-    const last = await pg.evaluate((s) => {
-      const p = document.querySelector(s);
-      const items = [...p.querySelectorAll('.dropdown-item')];
-      const el = items[items.length - 1];
+    const last = await pg.evaluate(() => {
+      const el = document.querySelector('.site-menu .sm-logout');
       const b = el.getBoundingClientRect();
-      const pr = p.getBoundingClientRect();
       const hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-      return { text: el.textContent.trim(), top: b.top, bottom: b.bottom, panelTop: pr.top, panelBottom: pr.bottom, onTop: Boolean(hit && (hit === el || el.contains(hit))), viewH: window.innerHeight };
-    }, sel);
-    ok('the last row is Sign Out', last.text === 'Sign Out', last.text);
-    ok('…and it can be scrolled into view', last.top >= last.panelTop - 1 && last.bottom <= last.panelBottom + 1 && last.bottom <= last.viewH, last);
-    ok('…with nothing lying over it', last.onTop, last);
+      return { text: el.textContent.trim(), bottom: b.bottom, viewH: window.innerHeight, onTop: Boolean(hit && (hit === el || el.contains(hit))) };
+    });
+    ok('the last thing is Log out, on screen, with nothing over it', last.text === 'Log out' && last.bottom <= last.viewH && last.onTop, last);
     await shot(pg, `menu-${size.key}-end`);
-    // …and the first again.
-    await pg.evaluate((s) => { document.querySelector(s).scrollTop = 0; }, sel);
-    const first = await pg.evaluate((s) => { const p = document.querySelector(s); const el = p.firstElementChild; const b = el.getBoundingClientRect(); return { top: b.top, panelTop: p.getBoundingClientRect().top }; }, sel);
-    ok('back at the top the first row sits under the bar', first.top >= first.panelTop - 1, first);
 
-    // Outside the menu the page scrolls as it always did (a mouse).
-    if (!size.touch) {
-      await pg.mouse.move(Math.max(40, m.panel.left - 200), Math.min(size.height - 40, m.panel.top + 200));
-      await pg.mouse.wheel(0, 240);
-      await pg.waitForTimeout(300);
-      const after = await measure(pg, sel);
-      ok('a wheel outside the menu scrolls the page', after.pageY > 0, after.pageY);
-      ok('…and the menu stays under the bar', after.panel && Math.abs(after.panel.top - after.bar.bottom) <= 1, after.panel ? { panelTop: after.panel.top, barBottom: after.bar.bottom } : null);
-      await pg.evaluate(() => window.scrollTo(0, 0));
-    }
-
-    // The window changes while it is open: the room is measured again.
+    // The window changes while it is open: still the screen's height.
     await pg.setViewportSize({ width: size.width, height: Math.max(320, size.height - 120) });
     await pg.waitForTimeout(300);
-    m = await measure(pg, sel);
-    hangs('after the window got shorter, the menu', m);
+    fits('after the window got shorter, the menu', await frame(pg));
     await pg.setViewportSize({ width: size.width, height: size.height });
 
     ok('no sideways scroll', (await overflowPx(pg)) <= 0, await overflowPx(pg));
@@ -239,34 +231,19 @@ async function accountMenu(b) {
   }
 }
 
-// ---- 3. the browse, notification and search panels -----------------------------------
+// ---- 3. the notification and search panels -----------------------------------
 async function otherPanels(b) {
   for (const size of [{ name: 'a short tablet window (1000×520)', key: 'tablet', width: 1000, height: 520, touch: false }, { name: 'a phone (390×844)', key: 'phone', width: 390, height: 844, touch: true }, { name: 'a small phone (320×640)', key: 'small', width: 320, height: 640, touch: true }]) {
-    section(`The browse, notifications and search panels on ${size.name}`);
+    section(`The notifications and search panels on ${size.name}`);
     const { ctx, page: pg, errors } = await b.open(MARA, size.touch ? 390 : 1280);
     await pg.setViewportSize({ width: size.width, height: size.height });
     await goto(pg, '/stream');
     const press = (sel) => (size.touch ? pg.locator(sel).first().tap() : pg.locator(sel).first().click());
 
-    await press('button[aria-label="Browse by type and genre"]');
-    await pg.locator('.hamburger-dropdown').waitFor({ timeout: 10000 });
-    await pg.waitForTimeout(600);
-    let m = await measure(pg, '.hamburger-dropdown');
-    hangs('the browse panel', m);
-    await shot(pg, `browse-${size.key}`);
-    if (!size.touch) {
-      await pg.mouse.move(m.panel.left + 80, m.panel.top + 80);
-      for (let i = 0; i < 10; i += 1) await pg.mouse.wheel(0, 400);
-      await pg.waitForTimeout(300);
-      m = await measure(pg, '.hamburger-dropdown');
-      ok('a wheel on the browse panel never moves the page', m.pageY === 0, m.pageY);
-    }
-    await pg.keyboard.press('Escape');
-
     await press('button[aria-label^="Notifications"]');
     await pg.locator('.notification-dropdown').waitFor({ timeout: 10000 });
     await pg.waitForTimeout(300);
-    m = await measure(pg, '.notification-dropdown');
+    let m = await measure(pg, '.notification-dropdown');
     hangs('the notifications panel', m);
     ok('the notifications panel is never taller than 360px', m.panel.height <= 361, m.panel.height);
     await shot(pg, `bell-${size.key}`);
@@ -492,7 +469,7 @@ await runCheck('menus-and-boxes', async () => {
   try {
     await words();
     b = await browser();
-    await accountMenu(b);
+    await siteMenu(b);
     await otherPanels(b);
     await tabBarMenu(b);
     await boxes(b);

@@ -1,9 +1,9 @@
 // The menus' rows for who is looking (2026-11-17, Jose: "let's remove the
 // my wishlist from here … see if you can find anything else like that").
 //
-// Signed out, the header's account menu and the tab bar's Account menu are
-// the way in and Become a creator, nothing that only leads to the sign-in
-// card; a viewer's Account menu has Become a creator, a creator's doesn't;
+// Signed out, the ☰ menu (the header's account menu until 2026-11-18) and
+// the tab bar's Account menu are the way in and Become a creator, nothing
+// that only leads to the sign-in card; a viewer's Account menu has Become a creator, a creator's doesn't;
 // Continue Watching points at Stream, where the row is; the tab bar has no
 // Dashboard tab for a viewer; Live TV, Podcasts, Vertical and Vertical
 // Discover follow their admin switches, as the header's links do. The
@@ -15,12 +15,19 @@ import { USERS, ok, section, runCheck, rows, sql, session, SIGNED_OUT, browser, 
 const MARA = session(USERS.mara);
 const VIEWER = session(USERS.viewer);
 
-const accountMenu = async (pg) => {
-  await pg.locator('.avatar-btn').first().click();
-  await pg.locator('.account-dropdown').waitFor({ timeout: 10000 });
-  const items = await pg.$$eval('.account-dropdown .dropdown-item', (els) => els.map((e) => e.textContent.trim()));
+// What the ☰ menu holds: every link and button in it, by its words.
+const siteMenu = async (pg) => {
+  await pg.locator('button.nav-hamburger').first().click();
+  await pg.locator('.site-menu').waitFor({ timeout: 10000 });
+  await pg.waitForTimeout(300);
+  const more = await pg.$('.site-menu .sm-more[aria-expanded="false"]');
+  if (more) await more.click();
+  for (const head of await pg.$$('.site-menu .sm-section-head[aria-expanded="false"]')) await head.click();
+  const items = await pg.$$eval('.site-menu a, .site-menu .sm-btn, .site-menu .sm-logout', (els) => els.map((e) => (e.querySelector('.sm-tile-label, .sm-section-title') || e).textContent.trim()));
+  const sections = await pg.$$eval('.site-menu .sm-section', (els) => els.map((e) => e.getAttribute('data-section')));
   await pg.keyboard.press('Escape').catch(() => {});
-  return items;
+  await pg.waitForTimeout(200);
+  return { items, sections };
 };
 
 const tabMenu = async (pg, label) => {
@@ -45,8 +52,9 @@ await runCheck('menu-rows', async () => {
     {
       const { ctx, page: pg, errors } = await b.open(SIGNED_OUT, 390);
       await goto(pg, '/');
-      const header = await accountMenu(pg);
-      ok('the header’s account menu: Log in and Become a creator, no My Wishlist', header.length === 2 && /Log in/.test(header[0]) && /Become a creator/.test(header[1]) && !header.some((t) => /Wishlist/.test(t)), header);
+      const menu = await siteMenu(pg);
+      ok('the ☰ menu: Sign in, Create account and Make films?, no Log out', ['Sign in', 'Create account', 'Make films?'].every((x) => menu.items.includes(x)) && !menu.items.includes('Log out'), menu.items);
+      ok('…only Help & legal among the sections, nothing that needs an account', menu.sections.join('|') === 'help' && !menu.items.some((t) => /Wishlist|My Recs|My working card|Membership|Purchases/.test(t)), menu);
       const tabNames = await tabs(pg);
       ok('the tab bar has no Dashboard tab', !tabNames.some((t) => /Dashboard/i.test(t)), tabNames);
       const acct = await tabMenu(pg, 'Account');
@@ -86,8 +94,9 @@ await runCheck('menu-rows', async () => {
       ok('the Dashboard tab is there', (await tabs(pg)).some((x) => /Dashboard/i.test(x)));
       const t = texts(await tabMenu(pg, 'Account'));
       ok('no Become a creator for a creator', !t.includes('Become a creator'), t);
-      const header = await accountMenu(pg);
-      ok('the header’s signed-in menu keeps My Wishlist', header.some((x) => /My Wishlist/.test(x)), header);
+      const menu = await siteMenu(pg);
+      ok('the ☰ menu has My List and My Recs, and Log out', menu.items.includes('My List') && menu.items.includes('My Recs') && menu.items.includes('Log out'), menu.items);
+      ok('…and the Creator section, without Make films?', menu.sections.includes('creator') && !menu.items.includes('Make films?'), menu);
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();
     }
