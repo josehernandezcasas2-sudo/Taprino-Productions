@@ -144,3 +144,59 @@ The boards' markup (exact colours and sizes) is in the session scratchpad:
 ## As built
 (each builder adds its notes here: what changed, anything that differs, what
 was verified and what wasn't)
+
+### As built — website (2026-11-18)
+
+**Files.** `pages/messages/[[...id]].js` rewritten (inbox, conversation,
+New message, ⋯, empty states, the subject chip); a `.dm2-*` block in
+`styles/globals.css` just before "No zoom when a field is tapped" (the old
+`.dm-*` rules stay: `/admin/messages` uses some); `pages/productions/[id]/index.js`
+(the owner's **Message** on each crew row that isn't them, inside the
+existing row actions; a crew member's **Message the producer**, now in one
+`.crew-actions` row with "Take me off this"); `pages/locations/[id].js`
+("Ask about a date" carries `&ref=<listing id>`); the check
+`dev/test-rig/checks/messages-simpler.mjs` (`SHOTS=<dir>` keeps a screenshot
+of each screen).
+
+**How it hangs together.** getServerSideProps resolves `?kind=&ref=&label=`
+with `resolveContext` (a new conversation → the subject card, or the refused
+line in place of the composer; an existing one → `pending` for the chip, or
+the refused line above a composer that still works — the conversation itself
+is allowed). A subject the thread is already about shows no chip. A send with
+the chip passes `context`, then the address goes back to `/messages/<id>`
+(shallow). The header and the tab bar sit in `display: contents` wrappers
+(sticky still works, checked) that hide under 900px while a conversation is
+open; the conversation is then `position: fixed` over the visual viewport
+(`--dm2-vvh` / `--dm2-vvt`, so a phone's keyboard comes off it). From 900px
+the page is a 380px + rest grid, `100dvh − --header-h` tall (minus the
+floating tab bar's 90px from 900 to 1180), so nothing scrolls but the panes.
+No footer for a signed-in visitor at any width; the signed-out card keeps it.
+
+**Differs from the agreement.** Block's confirm is a step inside the ⋯
+sheet/menu (no `window.confirm`); Mute and Report show only on a conversation
+that exists (not while composing); ⋯'s first row is `MESSAGE_WORDS.viewProfile`
+(the board said "View Dee's profile"); the laptop's top row also has the
+board's View profile pill; "That conversation isn't here." is a note above the
+inbox, not a full-screen page; "Say hello" is hidden while there's no
+composer; times and day labels are drawn once the page is in the browser (the
+viewer's clock, no hydration mismatch); the search and To boxes are 16px on a
+laptop too (the board had 14).
+
+**Words not in the rules** (typed in the page): the signed-out button "Sign in
+or create an account" (kept from the old page), the × aria-label "Close",
+the fallbacks "Could not send that." / "Could not send that report." (only when
+the server sends no line), "Messages couldn't load just now." (server); on the
+production page "Message" and "Message the producer".
+
+**Verified** on the rig: `messages-simpler.mjs` 128 ok, 0 FAIL (API, inbox at
+390/1280, full-screen conversation at 390 and 320, two panes at 1280 and the
+tab bar at 1000, Enter / Shift+Enter / touch Enter, growth and the count, ⋯
+sheet and menu with mute on/off and the block confirm against the database,
+the production page's links → redirect → chip → saved context → subject card,
+the chip's ×, refused page + API, New message suggestions / name / @handle /
+nobody / new and existing conversations / Escape / dimmed area / the page not
+moving, the empty inbox, signed out, no sideways scroll at 320/390/1280, no
+page errors); `check:refs`, `lint`, `test-message-rules.mjs`,
+`test-sign-in-here.mjs`, `menu-rows.mjs` (24). **Not verified**: a real
+phone's keyboard against the visual-viewport sizing, iOS Safari, Clerk's real
+sign-in box (the rig doesn't load it), `next build`.

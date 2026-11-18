@@ -40,6 +40,10 @@ export async function getServerSideProps({ req, res, params }) {
 
 const payClass = (t) => (t === 'paid' || t === 'union' ? 'paid' : t === 'deferred' ? 'deferred' : 'unpaid');
 
+// A conversation about this production, with someone on it
+// (/messages resolves the subject and opens an existing conversation).
+const messageHref = (userId, productionId) => `/messages?to=${encodeURIComponent(userId)}&kind=production&ref=${encodeURIComponent(productionId)}`;
+
 export default function ProductionPage(props) {
   const { data: initial, notFound, setupError, isSignedIn, viewerId, isAdmin, releases, bookedPlaces } = props;
   const router = useRouter();
@@ -81,6 +85,8 @@ export default function ProductionPage(props) {
   const byDept = {};
   for (const m of members) (byDept[m.department] = byDept[m.department] || []).push(m);
   const inside = isOwner || isMember || isAdmin;
+  // On the crew (not the owner): a way to write to the producer.
+  const writeProducer = Boolean(isMember && !isOwner && p.owner && p.owner.userId && p.owner.userId !== viewerId);
   const confirmed = members.filter((m) => m.worked).length;
 
   return (
@@ -122,9 +128,19 @@ export default function ProductionPage(props) {
               </div>
             </>
           )}
-          {!canEdit && isMember && (
-            <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={async () => { if (window.confirm('Take yourself off this production? Your credit on it goes too.')) { const r = await api(`/api/productions/${p.id}/members`, { op: 'leave' }); if (r) router.replace(router.asPath); } }}>Take me off this</button>
-          )}
+          {writeProducer || (!canEdit && isMember) ? (
+            <div className="crew-actions">
+              {/* The production's conversations stay between the people on it
+                  (lib/messageContext.js): a crew member writes to the producer
+                  from here, the subject the production itself. */}
+              {writeProducer && (
+                <Link href={messageHref(p.owner.userId, p.id)} className="crew-btn sm">Message the producer</Link>
+              )}
+              {!canEdit && isMember && (
+                <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={async () => { if (window.confirm('Take yourself off this production? Your credit on it goes too.')) { const r = await api(`/api/productions/${p.id}/members`, { op: 'leave' }); if (r) router.replace(router.asPath); } }}>Take me off this</button>
+              )}
+            </div>
+          ) : null}
           {!isSignedIn && <SignInHere><button type="button" className="crew-btn sm">Sign in</button></SignInHere>}
         </div>
       </header>
@@ -159,6 +175,7 @@ export default function ProductionPage(props) {
                     </div>
                     {canEdit && (
                       <div className="cc-resp-acts">
+                        {isOwner && m.person.userId && m.person.userId !== viewerId && <Link href={messageHref(m.person.userId, p.id)} className="crew-btn sm">Message</Link>}
                         {!m.worked && !m.mine && canConfirm && <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => api(`/api/productions/${p.id}/members`, { memberId: m.id, worked: true }, 'PATCH')}>Worked it</button>}
                         {m.worked && isAdmin && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => api(`/api/productions/${p.id}/members`, { memberId: m.id, worked: false }, 'PATCH')}>Undo</button>}
                         <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm(`Remove ${m.person.displayName} from the crew list?`)) api(`/api/productions/${p.id}/members`, { memberId: m.id }, 'DELETE'); }}>Remove</button>

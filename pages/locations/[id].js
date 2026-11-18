@@ -194,7 +194,7 @@ export default function ListingPage(props) {
             </div>
             {!l.mine && (
               <div className="crew-actions" style={{ marginTop: '0.6rem' }}>
-                {isSignedIn ? <Link href={`/messages?to=${encodeURIComponent(l.host.userId)}&kind=location&label=${encodeURIComponent(l.title)}`} className="crew-btn sm">Ask about a date</Link> : null}
+                {isSignedIn ? <Link href={`/messages?to=${encodeURIComponent(l.host.userId)}&kind=location&ref=${encodeURIComponent(l.id)}&label=${encodeURIComponent(l.title)}`} className="crew-btn sm">Ask about a date</Link> : null}
                 <Link href={l.host.profilePath} className="crew-btn sm ghost">Profile</Link>
               </div>
             )}
