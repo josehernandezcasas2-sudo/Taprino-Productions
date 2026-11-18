@@ -160,8 +160,9 @@ export function emptyFilters(near = null) {
 
 // Filters on a tab that the Filters chip counts (search and place are on
 // screen already).
-export function filterCount(tab, f) {
-  if (!f) return 0;
+export function filterCount(tab, given) {
+  if (!given) return 0;
+  const f = { ...emptyFilters(), ...given };
   if (tab === 'calls') return (f.callRole ? 1 : 0) + (f.pay.length ? 1 : 0) + (f.remote ? 1 : 0) + (f.matches ? 1 : 0) + (f.urgent ? 1 : 0) + (f.kind ? 1 : 0) + (f.production ? 1 : 0);
   if (tab === 'people') return (f.roles.length ? 1 : 0) + (f.gear ? 1 : 0) + (f.open ? 1 : 0) + (f.free ? 1 : 0) + (f.verified ? 1 : 0);
   if (tab === 'cast') return (f.ageMin || f.ageMax ? 1 : 0) + (f.union ? 1 : 0) + (f.open ? 1 : 0) + (f.free ? 1 : 0) + (f.verified ? 1 : 0);
@@ -172,9 +173,45 @@ export function filtersLabel(tab, f) {
   return n ? `${CREW_WORDS.filters} · ${n}` : CREW_WORDS.filters;
 }
 
+// Filters belong to each tab; only the place (near + within) is shared,
+// so "Camera" on Gear never filters People. withPlace carries the place
+// from one tab's filters into another's.
+export function withPlace(f, near, within) {
+  return { ...emptyFilters(), ...(f || {}), near: near || null, within: near ? (num(within) === null ? DEFAULT_WITHIN : num(within)) : 0 };
+}
+
+// The Calls badge counts urgent calls near the viewer's place, whatever
+// the Calls tab's search and filters are: one quiet read of this path.
+export function urgentBadgePath(near, within) {
+  return apiPathFor('calls', { near, within });
+}
+
+// The Filters sheet's button on a phone: "Show 7 people".
+export function showButton(tab, total) {
+  const [one, many] = NOUNS[tab] || NOUNS.people;
+  const n = num(total);
+  if (n === null) return 'Show results';
+  return `Show ${n} ${n === 1 ? one : many}`;
+}
+
+// The small words on chips and in the sheet.
+export function urgentChip(count) {
+  const n = num(count) || 0;
+  return n ? `⚡ Urgent · ${n}` : '⚡ Urgent';
+}
+export function productionChip(title) {
+  const t = text(title);
+  return t ? `For ${t}` : 'For one production';
+}
+export const REMOVE_FILTER_HINT = 'Removes this filter';
+export const moreLabel = (n) => `+ ${n} more`;
+export const hoursLabel = (h) => `${h} h`;
+export const menuChip = (label) => `${label} ▾`;
+
 // Clear All on a tab: that tab's filters and its search; the place stays.
-export function clearedFilters(tab, f) {
+export function clearedFilters(tab, given) {
   const base = emptyFilters();
+  const f = { ...base, ...(given || {}) };
   const keep = { ...f, q: '' };
   if (tab === 'calls') return { ...keep, callRole: '', pay: [], remote: false, matches: false, urgent: false, kind: '', production: '' };
   if (tab === 'people') return { ...keep, roles: [], gear: '', open: false, free: false, verified: false };
@@ -186,7 +223,8 @@ export function clearedFilters(tab, f) {
 export function apiPathFor(tab, f) {
   const p = [];
   const add = (k, v) => p.push(`${k}=${encodeURIComponent(v)}`);
-  const s = f || emptyFilters();
+  // A partial object is fine ({ near, within } for the Calls badge).
+  const s = { ...emptyFilters(), ...(f || {}) };
   if (text(s.q)) add('q', text(s.q));
   if (s.near && Number.isFinite(Number(s.near.lat)) && Number.isFinite(Number(s.near.lng))) {
     add('lat', s.near.lat); add('lng', s.near.lng); add('within', num(s.within) || 0);

@@ -162,4 +162,27 @@ t('empty lists and the free strip', () => {
   assert.equal(on.button, 'Turn off');
 });
 
+t('partial filters, the shared place, the badge and the small words', () => {
+  assert.equal(R.apiPathFor('calls', { near: LA, within: 25 }), '/api/crew/calls?lat=34.05&lng=-118.24&within=25');
+  assert.equal(R.urgentBadgePath(null, 0), '/api/crew/calls');
+  assert.equal(R.filterCount('calls', { urgent: true }), 1);
+  assert.equal(R.clearedFilters('gear', { gear: 'Camera' }).gear, '');
+  const people = { ...R.emptyFilters(), gear: 'Camera', free: true };
+  const moved = R.withPlace(people, LA, null);
+  assert.equal(moved.near, LA);
+  assert.equal(moved.within, 50);
+  assert.equal(moved.gear, 'Camera', 'a tab keeps its own filters');
+  assert.equal(R.withPlace(people, null, 25).within, 0);
+  assert.equal(R.showButton('people', 7), 'Show 7 people');
+  assert.equal(R.showButton('calls', 1), 'Show 1 open call');
+  assert.equal(R.showButton('gear', null), 'Show results');
+  assert.equal(R.urgentChip(2), '⚡ Urgent · 2');
+  assert.equal(R.urgentChip(0), '⚡ Urgent');
+  assert.equal(R.productionChip('Night Bus'), 'For Night Bus');
+  assert.equal(R.productionChip(''), 'For one production');
+  assert.equal(R.moreLabel(21), '+ 21 more');
+  assert.equal(R.hoursLabel(4), '4 h');
+  assert.equal(R.menuChip('Role'), 'Role ▾');
+});
+
 console.log(`\n${n} checks passed`);
