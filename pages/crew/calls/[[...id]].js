@@ -13,31 +13,48 @@ import { Avatar } from '../../../components/crew/CrewBits';
 import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getOwnCard } from '../../../lib/crewCards';
-import { listCalls, getCall } from '../../../lib/crewCalls';
+import { getCall } from '../../../lib/crewCalls';
 import { getSupabase } from '../../../lib/supabase';
 import { ownerProductions } from '../../../lib/productions';
-import { CREW_ROLES, CAST_ROLES, UNION_STATUS, WITHIN_CHOICES } from '../../../lib/crewOptions';
+import { CREW_ROLES, CAST_ROLES, UNION_STATUS } from '../../../lib/crewOptions';
 import { SelfTapeField, TapePlayer, playingAge } from '../../../components/crew/CastingBits';
-import { PAY_TYPES, PAY_HINT, MAX_SPOTS, MAX_ENDORSEMENT_CHARS, URGENT_WITHIN_HOURS, AVAILABLE_NOW_CHOICES } from '../../../lib/crewCallRules';
+import { PAY_TYPES, PAY_HINT, MAX_SPOTS, MAX_ENDORSEMENT_CHARS, URGENT_WITHIN_HOURS } from '../../../lib/crewCallRules';
 import { payDollars, crewPayQuote, MIN_CREW_PAY_CENTS, MAX_CREW_PAY_CENTS, workerRefundBox, posterRefundChip, posterRefundLine, canChangeToWorked, CONTEST_PLACEHOLDER, CONTEST_BUTTON, WORKED_AFTER_ALL_BUTTON, CONTEST_NOTE_MIN, CONTEST_NOTE_MAX } from '../../../lib/crewPayRules';
 import { getCrewPayCutPercent } from '../../../lib/crewPay';
 import { SITE } from '../../../lib/siteConfig';
 import { segmentsRefused } from '../../../lib/pageSegments';
 
-// The Crew Call board (step 3, mockup signed off 2026-10-10).
-//   /crew/calls           the board: filters on the left, calls, one open
-//   /crew/calls/<id>      that call open (on a phone: just the call)
+// Crew Call's calls (step 3, mockup signed off 2026-10-10).
+//   /crew/calls           forwards to /crew, where the board lives since
+//                         Crew Call, simpler (2026-11-18), keeping
+//                         ?urgent=, ?production= and ?kind=
+//   /crew/calls/<id>      that call, on its own at every width
 //   /crew/calls/new       post a call (?project=pitch:<id> or ?production=<id> preselects)
 // Respond = a message to the poster with the call attached. The poster
 // books people, and after the last day says who worked it — that is
 // where the track record (TierChip) comes from.
-const DEFAULT_WITHIN = 50;
 
 export async function getServerSideProps({ req, res, params, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   // One segment at most, and never one that looks like a file: the
   // middleware skips those addresses (lib/pageSegments.js).
   if (segmentsRefused(params && params.id)) return { notFound: true };
+  const slug = params && params.id && params.id[0] ? String(params.id[0]) : null;
+
+  // The board moved to /crew, where Crew Call opens on Calls (Crew Call,
+  // simpler, 2026-11-18): /crew/calls forwards there (307), keeping the
+  // filters an older link carries.
+  if (!slug) {
+    const keep = new URLSearchParams();
+    for (const k of ['urgent', 'production', 'kind']) {
+      const v = query ? query[k] : undefined;
+      const one = Array.isArray(v) ? v[0] : v;
+      if (one) keep.set(k, String(one));
+    }
+    const qs = keep.toString();
+    return { redirect: { destination: `/crew${qs ? `?${qs}` : ''}`, permanent: false } };
+  }
+
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   const base = {
     mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
@@ -48,15 +65,13 @@ export async function getServerSideProps({ req, res, params, query }) {
     isCreator: account.isCreator,
     viewerId: account.userId || null
   };
-  const slug = params.id && params.id[0] ? String(params.id[0]) : null;
-
-  let own = null;
-  if (account.isSignedIn) {
-    try { own = await getOwnCard(account.userId); } catch (err) { /* no card */ }
-  }
-  const near = own && own.place ? { label: own.place.label, lat: own.place.lat, lng: own.place.lng } : null;
 
   if (slug === 'new') {
+    let own = null;
+    if (account.isSignedIn) {
+      try { own = await getOwnCard(account.userId); } catch (err) { /* no card */ }
+    }
+    const near = own && own.place ? { label: own.place.label, lat: own.place.lat, lng: own.place.lng } : null;
     if (!account.isSignedIn) return { props: { ...base, mode: 'new', projects: [], productions: [], preselect: null, preselectProduction: null, near } };
     const supabase = getSupabase();
     const [pitches, series, productions, crewPayCutPercent] = await Promise.all([
@@ -72,52 +87,37 @@ export async function getServerSideProps({ req, res, params, query }) {
     return { props: { ...base, mode: 'new', projects, productions, preselect: query.project ? String(query.project) : null, preselectProduction: query.production ? String(query.production) : null, near, crewPayCutPercent } };
   }
 
-  let board = { calls: [], total: 0, hasCard: false };
+  // One call, on its own at every width: no board beside it, so no list
+  // is read.
   let active = null;
   let notFound = false;
+  let failed = false;
   try {
-    board = await listCalls({ lat: near ? near.lat : undefined, lng: near ? near.lng : undefined, withinMiles: near ? DEFAULT_WITHIN : 0 }, { viewerId: account.userId || null });
-    if (slug) {
-      try {
-        active = await getCall(slug, { viewerId: account.userId || null, isAdmin: account.isAdmin });
-      } catch (err) {
-        if (err.status === 404 || err.status === 503) notFound = true; else throw err;
-      }
-    }
+    active = await getCall(slug, { viewerId: account.userId || null, isAdmin: account.isAdmin });
   } catch (err) {
-    console.error('crew calls page:', err.message);
+    if (err.status === 404 || err.status === 503) notFound = true;
+    else { console.error('crew call page:', err.message); failed = true; }
   }
-  return { props: { ...base, mode: 'board', board, active, notFound, near, hasCard: Boolean(own), freeNowUntil: own && own.availableNowUntil ? own.availableNowUntil : null } };
+  return { props: { ...base, mode: 'call', active, notFound, failed } };
 }
 
-const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} miles`);
 function fmtRange(a, b) {
   const f = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   if (!a) return 'Dates to confirm';
   return !b || b === a ? f(a) : `${f(a)}–${f(b)}`;
 }
-function ago(iso) {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 60) return 'just now';
-  const h = Math.floor(mins / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  if (d < 30) return `${Math.floor(d / 7)}w ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 const payClass = (t) => (t === 'paid' || t === 'union' ? 'paid' : t === 'deferred' ? 'deferred' : 'unpaid');
 
 export default function CrewCallsPage(props) {
   if (props.mode === 'new') return <PostCall {...props} />;
-  return <Board {...props} />;
+  return <CallPage {...props} />;
 }
 
 function Shell({ title, children, mainGenres, isSignedIn, email, isAdmin, isCreator, isSubscriber }) {
   return (
     <>
       <Head>
-        <title>{title} — Crew Call — {SITE.name}</title>
+        <title>{`${title} — Crew Call — ${SITE.name}`}</title>
         <meta name="description" content="Crew calls: who's needed, when, where, how it pays. Post one or respond." />
       </Head>
       <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
@@ -141,160 +141,20 @@ function PersonLine({ p, prefix }) {
   );
 }
 
-/* ---------------- the board ---------------- */
+/* ---------------- one call, on its own ---------------- */
 
-function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, board: initial, active: initialActive, notFound, near: initialNear, hasCard, freeNowUntil: initialFreeNow }) {
-  const router = useRouter();
-  const [urgentOnly, setUrgentOnly] = useState(false);
-  const [kind, setKind] = useState('');
-  const [freeNowUntil, setFreeNowUntil] = useState(initialFreeNow);
-  const [freeBusy, setFreeBusy] = useState(false);
-  const [q, setQ] = useState('');
-  const [role, setRole] = useState('');
-  const [pay, setPay] = useState([]);
-  const [remoteOnly, setRemoteOnly] = useState(false);
-  const [matches, setMatches] = useState(false);
-  const [near, setNear] = useState(initialNear);
-  const [within, setWithin] = useState(initialNear ? DEFAULT_WITHIN : 0);
-  const [board, setBoard] = useState(initial);
+// /crew/calls/<id>: the call alone at every width under a "‹ Calls" link
+// back to Crew Call (the board itself is /crew since 2026-11-18).
+function CallPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, active: initialActive, notFound, failed }) {
   const [active, setActive] = useState(initialActive);
-  const [loading, setLoading] = useState(false);
-  const first = useRef(true);
-  const reqId = useRef(0);
-
   useEffect(() => { setActive(initialActive); }, [initialActive]);
-
-  useEffect(() => {
-    if (first.current) { first.current = false; return undefined; }
-    const id = ++reqId.current;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (q.trim()) params.set('q', q.trim());
-      if (role) params.set('role', role);
-      if (pay.length) params.set('pay', pay.join(','));
-      if (remoteOnly) params.set('remote', '1');
-      if (matches) params.set('matches', '1');
-      if (urgentOnly) params.set('urgent', '1');
-      if (kind) params.set('kind', kind);
-      if (near) { params.set('lat', String(near.lat)); params.set('lng', String(near.lng)); params.set('within', String(within)); }
-      try {
-        const res = await fetch(`/api/crew/calls?${params.toString()}`);
-        const data = await res.json();
-        if (id === reqId.current && res.ok) setBoard(data);
-      } catch (err) { /* keep what we have */ } finally { if (id === reqId.current) setLoading(false); }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [q, role, pay, remoteOnly, matches, near, within, urgentOnly, kind]);
-
-  const togglePay = (k) => setPay((list) => (list.includes(k) ? list.filter((x) => x !== k) : [...list, k]));
-  const hasFilters = Boolean(q.trim() || role || pay.length || remoteOnly || matches || urgentOnly || kind);
-
-  // "I'm free right now" (migration 105): a few hours on the card, so
-  // urgent calls nearby reach this person first.
-  async function setFree(hours) {
-    setFreeBusy(true);
-    try {
-      const res = await fetch('/api/crew/available-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) });
-      const data = await res.json();
-      if (res.ok) setFreeNowUntil(data.availableNowUntil);
-    } catch (err) { /* leave as is */ } finally { setFreeBusy(false); }
-  }
-  const freeNowOn = Boolean(freeNowUntil) && Date.parse(freeNowUntil) > Date.now();
-
   return (
-    <Shell title="Calls" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber}>
-      <div className="crew-head">
-        <div>
-          <span className="crew-eyebrow">Connect · Crew Call</span>
-          <h1>Calls</h1>
-          <p>Who's needed, when, where, how it pays. Anyone with an account can post a call or respond to one; what you've actually done shows next to your name.</p>
-        </div>
-        {isSignedIn
-          ? <Link href="/crew/calls/new" className="crew-btn primary">+ Post a call</Link>
-          : <SignInHere><button type="button" className="crew-btn primary">Sign in to post a call</button></SignInHere>}
-      </div>
-      <div className="crew-subnav" role="tablist">
-        <Link href="/crew" className="crew-tab">Find people</Link>
-        <Link href="/crew?tab=gear" className="crew-tab">Gear</Link>
-        <span className="crew-tab on" aria-current="page">Calls{board.total ? ` · ${board.total}` : ''}</span>
-      </div>
-
-      <div className={`crew-find cc-board${active || notFound ? ' has-detail' : ''}`}>
-        <aside className="crew-filters">
-          <input type="search" className="crew-input" placeholder="Role, title, place, project…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search calls" />
-          <div className="crew-panel crew-filter-panel">
-            <div className="crew-toggle" role="group" aria-label="Kind of call">
-              <button type="button" aria-pressed={kind === ''} onClick={() => setKind('')}>All</button>
-              <button type="button" aria-pressed={kind === 'crew'} onClick={() => setKind('crew')}>Crew</button>
-              <button type="button" aria-pressed={kind === 'cast'} onClick={() => setKind('cast')}>Casting</button>
-            </div>
-            <label className="crew-field"><span>Role</span>
-              <select className="crew-select" value={role} onChange={(e) => setRole(e.target.value)}>
-                <option value="">Any role</option>
-                {(kind === 'cast' ? CAST_ROLES : CREW_ROLES).map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </label>
-            <div className="crew-field"><span>Pay</span>
-              <div className="crew-chips crew-filterchips">
-                {Object.entries(PAY_TYPES).map(([k, v]) => <button key={k} type="button" aria-pressed={pay.includes(k)} onClick={() => togglePay(k)}>{v}</button>)}
-              </div>
-            </div>
-            <div className="crew-field"><span>Near</span>
-              <PlaceSearch value={near} onChange={(p) => { setNear(p); if (p && within === 0) setWithin(DEFAULT_WITHIN); }} placeholder="City, or use your location" compact />
-              {near && (
-                <select className="crew-select" value={within} onChange={(e) => setWithin(Number(e.target.value))} aria-label="Distance">
-                  {WITHIN_CHOICES.map((n) => <option key={n} value={n}>{withinLabel(n)}</option>)}
-                </select>
-              )}
-            </div>
-            <div className="crew-chips">
-              {hasCard && <button type="button" className={`crew-btn sm${matches ? ' on' : ''}`} aria-pressed={matches} onClick={() => setMatches((v) => !v)}>● Matches my card</button>}
-              <button type="button" className={`crew-btn sm${remoteOnly ? ' on' : ''}`} aria-pressed={remoteOnly} onClick={() => setRemoteOnly((v) => !v)}>Remote</button>
-              <button type="button" className={`crew-btn sm${urgentOnly ? ' on' : ''}`} aria-pressed={urgentOnly} onClick={() => setUrgentOnly((v) => !v)}>⚡ Urgent{board.urgentCount ? ` · ${board.urgentCount}` : ''}</button>
-            </div>
-            {hasFilters && <button type="button" className="crew-btn sm ghost" onClick={() => { setQ(''); setRole(''); setPay([]); setRemoteOnly(false); setMatches(false); setUrgentOnly(false); setKind(''); }}>Clear filters</button>}
-          </div>
-          {hasCard && (
-            <div className={`crew-panel crew-freenow${freeNowOn ? ' on' : ''}`}>
-              <span className="crew-eyebrow">{freeNowOn ? '● Free right now' : 'Free right now?'}</span>
-              {freeNowOn
-                ? <p className="crew-muted" style={{ margin: '0.3rem 0 0.5rem' }}>Until <b>{new Date(freeNowUntil).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</b> you’re first in line for urgent calls nearby and on top of the directory.</p>
-                : <p className="crew-muted" style={{ margin: '0.3rem 0 0.5rem' }}>Someone always bails. Say you can jump in and urgent calls nearby reach you first.</p>}
-              <div className="crew-chips">
-                {freeNowOn
-                  ? <button type="button" className="crew-btn sm" disabled={freeBusy} onClick={() => setFree(0)}>Turn off</button>
-                  : AVAILABLE_NOW_CHOICES.map((h) => <button key={h} type="button" className="crew-btn sm" disabled={freeBusy} onClick={() => setFree(h)}>{h} h</button>)}
-              </div>
-            </div>
-          )}
-          <div className="crew-panel crew-muted">Calls close themselves a week after the last day. Pay is always labelled — <b>paid, union, deferred, unpaid, other</b>. On a call marked <b>🔒 pay secured</b> the poster has agreed to fund each booked person through {SITE.name}: held until they confirm you worked, then sent to your payout account. Everything else is settled between you.</div>
-        </aside>
-
-        <div className="cc-list">
-          <div className="crew-rhead">
-            <span className="crew-mono">{board.total} open {board.total === 1 ? 'call' : 'calls'}{loading ? ' · updating…' : ''}</span>
-            <span className="crew-mono">{near ? `nearest to ${near.label} + remote` : 'newest first'}</span>
-          </div>
-          {board.calls.length === 0 && (
-            <div className="crew-panel crew-empty">
-              {hasFilters ? 'No calls match. Clear a filter or widen the distance.' : isSignedIn ? <>No open calls yet. <Link href="/crew/calls/new">Post the first one</Link>.</> : 'No open calls yet. Sign in to post the first one.'}
-            </div>
-          )}
-          {board.calls.map((c) => (
-            <Link key={c.id} href={`/crew/calls/${c.id}`} className={`crew-panel cc-call${active && active.call.id === c.id ? ' sel' : ''}`} scroll={false}>
-              <div className="cc-title">{c.urgent && <span className="cc-urgent">⚡ Urgent{c.neededLabel ? ` · ${c.neededLabel}` : ''}</span>}{c.kind === 'cast' && <span className="cc-cast">🎭 Casting{c.characterName ? ` · ${c.characterName}` : ''}</span>}{c.title}<span className={`cc-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.paySecured && <span className="cc-secured" title={`${payDollars(c.payRateCents)} per person, funded through ${SITE.name} and released when the poster confirms the job`}>🔒 {payDollars(c.payRateCents)} secured</span>}{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.productionTitle && <span className="crew-chip olive">for {c.productionTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
-              <div className="cc-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{fmtRange(c.startsOn, c.endsOn)}</span><span>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</span>{c.payNote && <span>{c.payNote}</span>}</div>
-              <div className="cc-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
-            </Link>
-          ))}
-        </div>
-
-        <aside className="cc-detail">
-          {notFound && <div className="crew-panel crew-empty">That call isn't here any more.<br /><Link href="/crew/calls" className="crew-btn sm" style={{ marginTop: '0.6rem' }}>Back to the board</Link></div>}
-          {active && <CallDetail key={active.call.id} data={active} viewerId={viewerId} isSignedIn={isSignedIn} isAdmin={isAdmin} onChange={setActive} />}
-          {!active && !notFound && <div className="crew-panel crew-empty cc-pick">Pick a call.</div>}
-        </aside>
+    <Shell title={active ? active.call.title : 'Calls'} mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber}>
+      <div className="ccx-call-page">
+        <Link href="/crew" className="ccx-back"><span aria-hidden="true">‹</span> Calls</Link>
+        {notFound && <div className="crew-panel crew-empty">That call isn't here any more.<br /><Link href="/crew" className="crew-btn sm" style={{ marginTop: '0.6rem' }}>Back to Crew Call</Link></div>}
+        {failed && <div className="crew-panel crew-empty" role="alert">Crew Call couldn’t load just now. Try again in a moment.</div>}
+        {active && <CallDetail key={active.call.id} data={active} viewerId={viewerId} isSignedIn={isSignedIn} isAdmin={isAdmin} onChange={setActive} />}
       </div>
     </Shell>
   );
@@ -402,7 +262,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
   return (
     <div className="crew-panel cc-detail-panel">
       <div className="cc-detail-top">
-        <Link href="/crew/calls" className="crew-btn sm ghost cc-back" aria-label="Back to the board">‹</Link>
+        <Link href="/crew" className="crew-btn sm ghost cc-back" aria-label="Back to Crew Call">‹</Link>
         <span className={`crew-eyebrow${call.urgent ? ' cc-urgent-eye' : ''}`}>{call.urgent ? '⚡ Urgent call' : call.status === 'open' ? 'Open call' : 'Closed'}{call.urgent && call.status !== 'open' ? ' · closed' : ''}{call.urgent && call.neededLabel ? ` · ${call.neededLabel}` : ''}{call.projectTitle ? ` · from a ${call.projectType === 'pitch' ? 'Pitch Room project' : 'series'}` : ''}</span>
       </div>
       <h2 className="cc-h2">{call.title}</h2>
@@ -615,7 +475,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
 
       <div className="crew-actions cc-foot">
         {!isPoster && isSignedIn && <ReportButton targetType="call" targetId={call.id} title={call.title} className="crew-mono" />}
-        {isAdmin && !isPoster && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm('Remove this call from the board?')) setStatus('removed').then(() => router.push('/crew/calls')); }}>Remove (admin)</button>}
+        {isAdmin && !isPoster && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm('Remove this call from the board?')) setStatus('removed').then(() => router.push('/crew')); }}>Remove (admin)</button>}
       </div>
     </div>
   );
@@ -649,7 +509,7 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
 
   return (
     <Shell title="Post a call" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber}>
-      <div className="crew-crumbs"><Link href="/crew">Crew Call</Link><span>/</span><Link href="/crew/calls">Calls</Link><span>/</span><span>Post a call</span></div>
+      <div className="crew-crumbs"><Link href="/crew">Crew Call</Link><span>/</span><Link href="/crew">Calls</Link><span>/</span><span>Post a call</span></div>
       {!isSignedIn ? (
         <div className="crew-panel crew-signin">
           <span className="crew-eyebrow">Crew Call</span>
@@ -744,7 +604,7 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
             </label>
             <label className="crew-field"><span>Details</span><textarea className="crew-input" rows={6} value={form.details} onChange={(e) => set({ details: e.target.value })} placeholder="What the days look like, what you have already, what they should bring." maxLength={2000} /></label>
             {error && <div className="crew-status error" role="alert">{error}</div>}
-            <div className="crew-actions"><button type="submit" className="crew-btn primary" disabled={busy}>{busy ? 'Posting…' : 'Post the call'}</button><Link href="/crew/calls" className="crew-btn ghost">Cancel</Link></div>
+            <div className="crew-actions"><button type="submit" className="crew-btn primary" disabled={busy}>{busy ? 'Posting…' : 'Post the call'}</button><Link href="/crew" className="crew-btn ghost">Cancel</Link></div>
           </form>
           <aside className="crew-aside">
             <div className="crew-panel crew-wc-side">

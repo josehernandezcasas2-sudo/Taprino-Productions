@@ -94,7 +94,7 @@ export default function ResourcesPage({ mainGenres, isSignedIn, isSubscriber, em
           {isAdmin && <Link href="/admin/partners" className="crew-btn">Manage partners</Link>}
         </div>
         <div className="crew-subnav" role="tablist">
-          <Link href="/crew" className="crew-tab">Find people</Link>
+          <Link href="/crew?tab=people" className="crew-tab">Find people</Link>
           <Link href="/locations" className="crew-tab">Locations</Link>
           <Link href="/productions" className="crew-tab">Productions</Link>
           <span className="crew-tab on" aria-current="page">Resources{data.total ? ` · ${data.total}` : ''}</span>

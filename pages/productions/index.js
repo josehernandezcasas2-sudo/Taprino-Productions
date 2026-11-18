@@ -73,8 +73,8 @@ export default function ProductionsPage(props) {
           : <SignInHere><button type="button" className="crew-btn primary">Sign in to start one</button></SignInHere>}
       </div>
       <div className="crew-subnav" role="tablist">
-        <Link href="/crew" className="crew-tab">Find people</Link>
-        <Link href="/crew/calls" className="crew-tab">Calls</Link>
+        <Link href="/crew?tab=people" className="crew-tab">Find people</Link>
+        <Link href="/crew" className="crew-tab">Calls</Link>
         <Link href="/locations" className="crew-tab">Locations</Link>
         <span className="crew-tab on" aria-current="page">Productions{board.total ? ` · ${board.total}` : ''}</span>
       </div>

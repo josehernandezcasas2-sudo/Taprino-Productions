@@ -140,7 +140,7 @@ export default function Home({
             {isSignedIn && (
               <div className="hb-since">
                 <span>Since you last looked:</span>
-                {counts.openCalls > 0 && <Link href="/crew/calls" className="hb-chip brass">{counts.openCalls} {counts.openCalls === 1 ? 'call' : 'calls'}{nearSuffix}{counts.urgent ? ` · ${counts.urgent} urgent` : ''}</Link>}
+                {counts.openCalls > 0 && <Link href="/crew" className="hb-chip brass">{counts.openCalls} {counts.openCalls === 1 ? 'call' : 'calls'}{nearSuffix}{counts.urgent ? ` · ${counts.urgent} urgent` : ''}</Link>}
                 {counts.freeNow > 0 && <Link href="/crew?free=1" className="hb-chip gold">{counts.freeNow} free right now</Link>}
                 {messagesUnread > 0 && <Link href="/messages" className="hb-chip plain">{messagesUnread} unread {messagesUnread === 1 ? 'message' : 'messages'}</Link>}
                 {desk && desk.unreadCount > 0 && <span className="hb-chip plain">{desk.unreadCount} {desk.unreadCount === 1 ? 'thing needs' : 'things need'} you</span>}
@@ -225,7 +225,7 @@ export default function Home({
                     <h3>{p.title}</h3>
                     <p>{[p.membersCount ? `${p.membersCount} crew` : null, p.daysCount ? `${p.daysCount} ${p.daysCount === 1 ? 'day' : 'days'}` : null, p.placeLabel].filter(Boolean).join(' · ')}</p>
                     <div className="hb-pin-actions">
-                      {p.openCalls > 0 && <Link href={`/crew/calls?production=${p.id}`} className="hb-chip brass">{p.openCalls} {p.openCalls === 1 ? 'spot' : 'spots'} still open</Link>}
+                      {p.openCalls > 0 && <Link href={`/crew?production=${p.id}`} className="hb-chip brass">{p.openCalls} {p.openCalls === 1 ? 'spot' : 'spots'} still open</Link>}
                       <Link href={`/productions/${p.id}`} className="hb-link">See the production →</Link>
                     </div>
                   </article>
@@ -380,7 +380,7 @@ export default function Home({
 
             <div className="hb-desk-card">
               <div className="hb-desk-label">This week{nearSuffix}</div>
-              <Link href="/crew/calls" className="hb-week-row"><span>Open calls</span><b className="brass">{counts.openCalls || 0}</b></Link>
+              <Link href="/crew" className="hb-week-row"><span>Open calls</span><b className="brass">{counts.openCalls || 0}</b></Link>
               <Link href="/pitches" className="hb-week-row"><span>Projects raising</span><b className="gold">{counts.raising || 0}</b></Link>
               <Link href="/locations" className="hb-week-row"><span>{counts.newPlaces ? 'New places' : 'Places to shoot'}</span><b className="mint">{counts.newPlaces || counts.places || 0}</b></Link>
               <Link href="/productions" className="hb-week-row"><span>Shooting</span><b className="sky">{counts.shooting || 0}</b></Link>

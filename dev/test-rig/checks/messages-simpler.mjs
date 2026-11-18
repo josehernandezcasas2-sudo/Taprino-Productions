@@ -418,7 +418,7 @@ await runCheck('messages-simpler', async () => {
       await pg.fill('.dm2-to input', `zzqx${RUN}`);
       await pg.waitForFunction(() => /Nobody by that name/.test((document.querySelector('.dm2-new-line') || {}).textContent || ''), null, { timeout: 15000 }).catch(() => {});
       ok('nobody: “Nobody by that name or @handle.”', (await pg.$eval('.dm2-new-line', (e) => e.textContent.trim())) === 'Nobody by that name or @handle.');
-      ok('Find people on Crew Call at the bottom', (await pg.$eval('.dm2-new-crew', (e) => e.getAttribute('href'))) === '/crew');
+      ok('Find people on Crew Call at the bottom', (await pg.$eval('.dm2-new-crew', (e) => e.getAttribute('href'))) === '/crew?tab=people');
       ok('nothing off the side with it open', (await overflowPx(pg)) <= 0);
       await pg.fill('.dm2-to input', `@delph${RUN}`);
       await pg.waitForSelector('.dm2-person');
@@ -466,7 +466,7 @@ await runCheck('messages-simpler', async () => {
       await goto(pg, '/messages');
       await shot(pg, 'empty-390');
       const empty = await pg.$eval('.dm2-empty', (e) => ({ h: e.querySelector('h2').textContent.trim(), p: e.querySelector('p').textContent.trim(), links: [...e.querySelectorAll('a, button')].map((x) => ({ t: x.textContent.trim(), href: x.getAttribute('href') })) }));
-      ok('the empty card: “No messages yet”, the line, the two ways', empty.h === 'No messages yet' && /^Conversations start from a working card/.test(empty.p) && empty.links[0].t === 'Find people on Crew Call' && empty.links[0].href === '/crew' && empty.links[1].t === 'Write to someone you know', empty);
+      ok('the empty card: “No messages yet”, the line, the two ways', empty.h === 'No messages yet' && /^Conversations start from a working card/.test(empty.p) && empty.links[0].t === 'Find people on Crew Call' && empty.links[0].href === '/crew?tab=people' && empty.links[1].t === 'Write to someone you know', empty);
       ok('…no search or chips with nothing to filter', !(await pg.$('.dm2-search')) && !(await pg.$('.dm2-chip')));
       await pg.locator('.dm2-empty button').tap();
       await pg.waitForSelector('.dm2-new');

@@ -363,7 +363,7 @@ export default function MessagesPage({ mainGenres, isSignedIn, isSubscriber, ema
                   <span className="dm2-empty-icon" aria-hidden="true"><Icon name="chat" size={32} stroke={1.8} /></span>
                   <h2>{MESSAGE_WORDS.emptyTitle}</h2>
                   <p>{MESSAGE_WORDS.emptyLine}</p>
-                  <Link href="/crew" className="dm2-pill primary">{MESSAGE_WORDS.findPeople}</Link>
+                  <Link href="/crew?tab=people" className="dm2-pill primary">{MESSAGE_WORDS.findPeople}</Link>
                   <button type="button" className="dm2-pill quiet" onClick={() => setNewOpen(true)}>{MESSAGE_WORDS.writeTo}</button>
                 </div>
               ) : (
@@ -854,7 +854,7 @@ function NewMessage({ onClose }) {
           {typing && ready && people === null && <div className="dm2-new-line">{MESSAGE_WORDS.searching}</div>}
           {typing && ready && people !== null && (found.error ? <div className="dm2-new-line">{found.error}</div> : people.length === 0 ? <div className="dm2-new-line">{MESSAGE_WORDS.nobody}</div> : <PeopleGroup people={people} />)}
         </div>
-        <Link href="/crew" className="dm2-new-crew" onClick={onClose}>{MESSAGE_WORDS.findPeople} <span aria-hidden="true">→</span></Link>
+        <Link href="/crew?tab=people" className="dm2-new-crew" onClick={onClose}>{MESSAGE_WORDS.findPeople} <span aria-hidden="true">→</span></Link>
       </div>
     </div>
   );

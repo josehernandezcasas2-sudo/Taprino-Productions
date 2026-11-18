@@ -1,31 +1,44 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import SignInHere from '../../components/SignInHere';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import PlaceSearch from '../../components/crew/PlaceSearch';
-import { Avatar, Availability, RoleChips, rateLabel, flagClass, flagLabel } from '../../components/crew/CrewBits';
+import CrewFilters from '../../components/crew/CrewFilters';
+import {
+  CallRowItem, PersonRowItem, CastRowItem, GearRowItem, EmptyList, FreeStrip, Nudge,
+  IdCardIcon, PlusIcon, SearchIcon, PinIcon, CloseIcon
+} from '../../components/crew/CrewDirectory';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import { getOwnCard, searchCards } from '../../lib/crewCards';
-import { getTrackRecords } from '../../lib/crewCalls';
-import TierChip from '../../components/crew/TierChip';
-import { CREW_ROLES, GEAR_CATEGORIES, WITHIN_CHOICES, UNION_STATUS } from '../../lib/crewOptions';
-import { CastCard } from '../../components/crew/CastingBits';
+import { getOwnCard, searchCards, searchGear } from '../../lib/crewCards';
+import { listCalls, getTrackRecords } from '../../lib/crewCalls';
+import { getRoleContext } from '../../lib/roles';
+import { hasCapability } from '../../lib/capabilities';
+import { GEAR_CATEGORIES } from '../../lib/crewOptions';
+import {
+  CREW_TABS, TAB_LABELS, CREW_WORDS, tabFromQuery, tabHref, filtersFromQuery, emptyFilters,
+  searchPlaceholder, placeChip, filterCount, filtersLabel, clearedFilters, apiPathFor,
+  withPlace, urgentBadgePath, urgentChip, productionChip, menuChip, REMOVE_FILTER_HINT
+} from '../../lib/crewDirectoryRules';
 import { SITE } from '../../lib/siteConfig';
 
-// Crew Call — the Connect side's network (mockup signed off 2026-10-09).
-// Find people by role, gear and distance; browse the gear itself; keep
-// your own working card. Location-based: a signed-in viewer with a place
-// on their card starts out searching near it; anyone can type a place
-// or use their location. Calls and messages come in later steps.
-const DEFAULT_WITHIN = 50;
+// Crew Call, simpler (Jose, 2026-11-18, the canvas
+// https://claude.ai/artifact/NAcrMSstXHTCP2HuysLCjp: "calls should be its
+// own tab for now, make it the first page", then "I like both Bs"; the
+// build agreement is mockups/crew-call-simpler-contract.md). One page with
+// four tabs — Calls (first, the bare /crew), People, Cast, Gear — a title
+// row with the card and + Post a call, the search, one row of chips and
+// the list. The words, rows and API queries are lib/crewDirectoryRules.js
+// (the app's mobile/src/lib/crewDirectoryRules.js is the same file); the
+// rows are components/crew/CrewDirectory.js, Filters is
+// components/crew/CrewFilters.js, styles are the .ccx-* block.
 
-export async function getServerSideProps({ req, res }) {
-  // Rates show to signed-in viewers only and the default "near" is the
-  // viewer's own place, so this never sits in a shared cache.
+export async function getServerSideProps({ req, res, query }) {
+  // Rates show to signed-in viewers only and the default place is the
+  // viewer's own, so this never sits in a shared cache.
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
 
@@ -34,15 +47,15 @@ export async function getServerSideProps({ req, res }) {
     try { own = await getOwnCard(account.userId); } catch (err) { console.error('crew own card:', err.message); }
   }
   const near = own && own.place ? { label: own.place.label, lat: own.place.lat, lng: own.place.lng } : null;
+  const tab = tabFromQuery(query || {});
+  const filters = filtersFromQuery(query || {}, near);
 
-  let initial = { people: [], total: 0 };
+  // The first answer, for the tab the page opens on only, with the same
+  // filters /api/crew/calls or /api/crew/people would apply.
+  let initial = null;
   let loadError = false;
   try {
-    initial = await searchCards(
-      { lat: near ? near.lat : undefined, lng: near ? near.lng : undefined, withinMiles: near ? DEFAULT_WITHIN : 0 },
-      { showRates: account.isSignedIn, viewerId: account.userId || null }
-    );
-    initial = { ...initial, people: await withRecords(initial.people) };
+    initial = await firstAnswer(tab, filters, { req, account });
   } catch (err) {
     console.error('crew directory:', err.message);
     loadError = true;
@@ -58,234 +71,467 @@ export async function getServerSideProps({ req, res }) {
       isCreator: account.isCreator,
       near,
       hasCard: Boolean(own),
-      initial,
-      loadError
+      availableNowUntil: own && own.availableNowUntil ? own.availableNowUntil : null,
+      tab,
+      filters,
+      // Next leaves undefined out of props; JSON drops it the same way.
+      initial: initial ? JSON.parse(JSON.stringify(initial)) : null,
+      loadError,
+      // A fresh server render (a real navigation to /crew?…) starts the
+      // page over; a tab switch is a shallow replace and keeps it.
+      serverKey: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     }
   };
 }
 
-// The track-record tier for each person on the page (also done by
-// /api/crew/people for the client refetch).
-async function withRecords(people) {
-  const records = await getTrackRecords(people.map((p) => p.userId)).catch(() => ({}));
-  return people.map((p) => ({ ...p, ...(records[p.userId] ? { tier: records[p.userId].tier, done: records[p.userId].done, jobs: records[p.userId].jobs, titles: records[p.userId].titles } : {}) }));
+const num = (v) => (v === '' || v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v));
+
+async function firstAnswer(tab, f, { req, account }) {
+  const viewerId = account.userId || null;
+  const point = f.near ? { lat: f.near.lat, lng: f.near.lng, withinMiles: f.within } : {};
+  if (tab === 'calls') {
+    // One production's calls: a production that isn't public lists them
+    // only for its owner, its crew and the team (as the API route).
+    let isTeam = false;
+    if (f.production && viewerId) {
+      const rc = await getRoleContext(req).catch(() => null);
+      isTeam = Boolean(rc && (rc.isAdmin || hasCapability(rc, 'handle_flags')));
+    }
+    return listCalls({
+      q: f.q || '',
+      role: f.callRole || null,
+      payTypes: f.pay,
+      remoteOnly: f.remote,
+      ...point,
+      matches: f.matches,
+      production: f.production || null,
+      urgentOnly: f.urgent,
+      kind: f.kind || null
+    }, { viewerId, isAdmin: isTeam });
+  }
+  if (tab === 'gear') return searchGear({ q: f.q || '', gearCategory: f.gear || null, ...point }, { viewerId });
+  const cast = tab === 'cast';
+  const result = await searchCards({
+    q: f.q || '',
+    roles: cast ? [] : f.roles,
+    gearCategory: cast ? null : f.gear || null,
+    ...point,
+    openOnly: f.open,
+    freeNow: f.free,
+    verifiedOnly: f.verified,
+    cast,
+    ageMin: cast ? num(f.ageMin) : null,
+    ageMax: cast ? num(f.ageMax) : null,
+    union: cast ? f.union || null : null
+  }, { showRates: account.isSignedIn, viewerId });
+  // The track-record tier next to each name (as /api/crew/people).
+  const records = await getTrackRecords(result.people.map((p) => p.userId)).catch(() => ({}));
+  return {
+    ...result,
+    people: result.people.map((p) => {
+      const r = records[p.userId];
+      return r ? { ...p, tier: r.tier, tierLabel: r.tierLabel, done: r.done, jobs: r.jobs, titles: r.titles } : p;
+    })
+  };
 }
 
-const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} miles`);
-
-export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, near: initialNear, hasCard, initial, loadError }) {
-  const [tab, setTab] = useState(() => { const t = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null; return t === 'gear' || t === 'cast' ? t : 'people'; });
-  const [ageMin, setAgeMin] = useState('');
-  const [ageMax, setAgeMax] = useState('');
-  const [union, setUnion] = useState('');
-  const [cast, setCast] = useState(null);
-  const [q, setQ] = useState('');
-  const [roles, setRoles] = useState([]);
-  const [gearCat, setGearCat] = useState('');
-  const [near, setNear] = useState(initialNear);
-  const [within, setWithin] = useState(initialNear ? DEFAULT_WITHIN : 0);
-  const [openOnly, setOpenOnly] = useState(false);
-  const [freeNow, setFreeNow] = useState(false);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [people, setPeople] = useState(initial);
-  const [gear, setGear] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const first = useRef(true);
-  const reqId = useRef(0);
-
-  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || freeNow || verifiedOnly || (near && within) || ageMin || ageMax || union);
-
+// From 900px the page is the laptop layout (the switch on the title row,
+// cards in a grid, Filters as a panel under the chips).
+function useWide() {
+  const [wide, setWide] = useState(false);
   useEffect(() => {
-    // The first people list came with the page.
-    if (first.current) { first.current = false; return; }
-    const id = ++reqId.current;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (q.trim()) params.set('q', q.trim());
-      if (roles.length) params.set('roles', roles.join(','));
-      if (gearCat) params.set('gear', gearCat);
-      if (near) { params.set('lat', String(near.lat)); params.set('lng', String(near.lng)); params.set('within', String(within)); }
-      if (openOnly) params.set('open', '1');
-      if (freeNow) params.set('free', '1');
-      if (verifiedOnly) params.set('verified', '1');
-      if (tab === 'gear') params.set('view', 'gear');
-      if (tab === 'cast') { params.set('cast', '1'); if (ageMin) params.set('ageMin', ageMin); if (ageMax) params.set('ageMax', ageMax); if (union) params.set('union', union); }
-      try {
-        const res = await fetch(`/api/crew/people?${params.toString()}`);
-        const data = await res.json();
-        if (id !== reqId.current) return;
-        if (!res.ok) throw new Error(data.error || 'Could not load Crew Call.');
-        if (tab === 'gear') setGear(data); else if (tab === 'cast') setCast(data); else setPeople(data);
-        setError(null);
-      } catch (err) {
-        if (id === reqId.current) setError(err.message);
-      } finally {
-        if (id === reqId.current) setLoading(false);
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mq = window.matchMedia('(min-width: 900px)');
+    const set = () => setWide(mq.matches);
+    set();
+    if (mq.addEventListener) mq.addEventListener('change', set); else mq.addListener(set);
+    return () => { if (mq.removeEventListener) mq.removeEventListener('change', set); else mq.removeListener(set); };
+  }, []);
+  return wide;
+}
+
+export default function CrewCallPage(props) {
+  return <CrewCall key={props.serverKey} {...props} />;
+}
+
+function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, hasCard, availableNowUntil, tab: firstTab, filters: firstFilters, initial, loadError }) {
+  const router = useRouter();
+  const wide = useWide();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => { setHydrated(true); }, []);
+
+  const [tab, setTab] = useState(firstTab);
+  // Filters belong to each tab (with its own search text); only the place
+  // (near + within) is shared, so "Camera" on Gear never filters People.
+  // The opening tab starts from the address (?free=1, ?urgent=1 …).
+  const [byTab, setByTab] = useState(() => {
+    const o = {};
+    for (const t of CREW_TABS) o[t] = t === firstTab ? { ...firstFilters, q: '' } : withPlace(emptyFilters(), firstFilters.near, firstFilters.within);
+    return o;
+  });
+  // Each tab keeps its last answer too.
+  const [answers, setAnswers] = useState(() => ({ [firstTab]: initial }));
+  const [errors, setErrors] = useState(() => ({ [firstTab]: loadError ? CREW_WORDS.couldNotLoad : null }));
+  const [loading, setLoading] = useState({});
+  // The red badge: urgent calls near the viewer's place, whatever the Calls
+  // tab's search and filters are (one quiet read of urgentBadgePath).
+  const firstBadge = urgentBadgePath(firstFilters.near, firstFilters.within);
+  const firstIsBadge = firstTab === 'calls' && Boolean(initial) && apiPathFor('calls', firstFilters) === firstBadge;
+  const [urgentCount, setUrgentCount] = useState(() => (firstIsBadge ? initial.urgentCount || 0 : 0));
+  const [panel, setPanel] = useState(null); // { section, opener }
+  const panelNow = useRef(null);
+  panelNow.current = panel;
+  const byTabRef = useRef(byTab);
+  byTabRef.current = byTab;
+  const [freeUntil, setFreeUntil] = useState(availableNowUntil);
+  const [freeBusy, setFreeBusy] = useState(false);
+  const [freeChoosing, setFreeChoosing] = useState(false);
+  const [freeError, setFreeError] = useState(null);
+
+  const tabFilters = byTab[tab];
+  const path = apiPathFor(tab, tabFilters);
+  const badgePath = urgentBadgePath(tabFilters.near, tabFilters.within);
+  const badgeRef = useRef(badgePath);
+  badgeRef.current = badgePath;
+  const answer = answers[tab] || null;
+  const total = answer ? answer.total : null;
+
+  // A filter change drops the older links' query (?free=1, ?urgent=1,
+  // ?production=…) from the address, so a reload shows what is on screen.
+  const keepAddress = useCallback((t) => {
+    const want = tabHref(t);
+    if (router.asPath !== want) router.replace(want, undefined, { shallow: true, scroll: false });
+  }, [router]);
+
+  // A change on this tab; a new place goes to every tab (withPlace).
+  const change = useCallback((patch) => {
+    setByTab((prev) => {
+      const next = { ...prev, [tab]: { ...prev[tab], ...patch } };
+      if ('near' in patch || 'within' in patch) {
+        const { near, within } = next[tab];
+        for (const t of CREW_TABS) next[t] = withPlace(next[t], near, within);
       }
-    }, 250);
+      return next;
+    });
+    keepAddress(tab);
+  }, [keepAddress, tab]);
+  const setQ = (v) => setByTab((prev) => ({ ...prev, [tab]: { ...prev[tab], q: v } }));
+
+  // Each tab's list: the server's first answer, then a read 250 ms after
+  // the last change (or on switching back to a tab: it draws at once from
+  // the last answer and re-reads quietly). Newest answer wins per tab.
+  const seq = useRef({ calls: 0, people: 0, cast: 0, gear: 0 });
+  const firstRun = useRef(true);
+  const lastTab = useRef(firstTab);
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      if (answers[tab] && !errors[tab]) return undefined;
+    }
+    // A tab switch reads at once; typing and filters wait 250 ms.
+    const switched = lastTab.current !== tab;
+    lastTab.current = tab;
+    const t = tab;
+    const id = ++seq.current[t];
+    // The list dims at once, so a chip that is already lit never sits over
+    // the answer to the one before it.
+    setLoading((l) => ({ ...l, [t]: true }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(path, { credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({}));
+        if (id !== seq.current[t]) return;
+        if (!res.ok) throw new Error(data.error || CREW_WORDS.couldNotLoad);
+        setAnswers((a) => ({ ...a, [t]: data }));
+        setErrors((e) => ({ ...e, [t]: null }));
+        // Calls with nothing but the place is the badge's own read.
+        if (t === 'calls' && path === badgeRef.current) setUrgentCount(data.urgentCount || 0);
+      } catch (err) {
+        if (id === seq.current[t]) setErrors((e) => ({ ...e, [t]: CREW_WORDS.couldNotLoad }));
+      } finally {
+        if (id === seq.current[t]) setLoading((l) => ({ ...l, [t]: false }));
+      }
+    }, switched ? 0 : 250);
     return () => clearTimeout(timer);
-  }, [tab, q, roles, gearCat, near, within, openOnly, freeNow, verifiedOnly, ageMin, ageMax, union]);
+    // `answers`/`errors` are read only on the first run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, path]);
 
-  function toggleRole(r) {
-    setRoles((list) => (list.includes(r) ? list.filter((x) => x !== r) : [...list, r]));
-  }
-  function clearFilters() {
-    setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setFreeNow(false); setVerifiedOnly(false); setAgeMin(''); setAgeMax(''); setUnion('');
-    if (!initialNear) setNear(null);
-  }
-  function changeNear(p) {
-    setNear(p);
-    if (p && within === 0) setWithin(DEFAULT_WITHIN);
+  // The badge's quiet read: on load (unless the page came with it) and
+  // whenever the place changes. When it is what Calls would read anyway,
+  // it is kept as Calls' answer too.
+  const badgeRun = useRef(false);
+  useEffect(() => {
+    const first = !badgeRun.current;
+    badgeRun.current = true;
+    if (first && firstIsBadge) return undefined;
+    let live = true;
+    const timer = setTimeout(() => {
+      fetch(badgePath, { credentials: 'same-origin' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!live || !d) return;
+          setUrgentCount(d.urgentCount || 0);
+          if (seq.current.calls === 0 && apiPathFor('calls', byTabRef.current.calls) === badgePath) setAnswers((a) => (a.calls ? a : { ...a, calls: d }));
+        })
+        .catch(() => {});
+    }, first ? 0 : 250);
+    return () => { live = false; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [badgePath]);
+
+  function switchTab(next) {
+    if (next === tab) return;
+    setTab(next);
+    setPanel(null);
+    setFreeChoosing(false);
+    router.replace(tabHref(next), undefined, { shallow: true, scroll: false });
   }
 
-  const sortNote = near ? `nearest to ${near.label}` : 'newest first';
+  function onTabKey(e) {
+    const i = CREW_TABS.indexOf(tab);
+    let next = null;
+    if (e.key === 'ArrowRight') next = CREW_TABS[(i + 1) % CREW_TABS.length];
+    else if (e.key === 'ArrowLeft') next = CREW_TABS[(i - 1 + CREW_TABS.length) % CREW_TABS.length];
+    else if (e.key === 'Home') next = CREW_TABS[0];
+    else if (e.key === 'End') next = CREW_TABS[CREW_TABS.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    switchTab(next);
+    const btn = document.getElementById(`ccx-tab-${next}`);
+    if (btn) btn.focus();
+  }
+
+  // Filters: a chip opens it at its section; the same chip again closes it.
+  function openFilters(section, e) {
+    const opener = e && e.currentTarget ? e.currentTarget : null;
+    if (panel && panel.opener === opener) { closeFilters(true); return; }
+    setPanel({ section, opener });
+  }
+  const closeFilters = useCallback((restore) => {
+    const p = panelNow.current;
+    setPanel(null);
+    if (p && restore && p.opener && typeof p.opener.focus === 'function') {
+      const el = p.opener;
+      setTimeout(() => el.focus({ preventScroll: true }), 0);
+    }
+  }, []);
+  // Clear all: this tab's filters and its search; the place stays.
+  function clearAll() {
+    setByTab((prev) => ({ ...prev, [tab]: clearedFilters(tab, prev[tab]) }));
+    keepAddress(tab);
+  }
+
+  async function setFree(hours) {
+    setFreeBusy(true);
+    setFreeError(null);
+    try {
+      const res = await fetch('/api/crew/available-now', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ hours }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || CREW_WORDS.couldNotLoad);
+      setFreeUntil(data.availableNowUntil || null);
+      setFreeChoosing(false);
+    } catch (err) {
+      setFreeError(err.message);
+    } finally {
+      setFreeBusy(false);
+    }
+  }
+
+  const place = placeChip(tabFilters.near, tabFilters.within);
+  const count = filterCount(tab, tabFilters);
+  const filtered = count > 0 || Boolean(String(tabFilters.q || '').trim()) || Boolean(tabFilters.near && tabFilters.within);
+  const list = answer ? (tab === 'gear' ? answer.items : tab === 'calls' ? answer.calls : answer.people) || [] : null;
+  const error = errors[tab];
+  const busy = Boolean(loading[tab]);
+  const firstCall = answers.calls && answers.calls.calls && answers.calls.calls[0];
+  const productionLabel = byTab.calls.production ? productionChip(firstCall ? firstCall.productionTitle : '') : null;
+
+  const PlaceChip = (
+    <button type="button" className={`ccx-chip${place.on ? ' on' : ''}`} aria-haspopup="dialog" onClick={(e) => openFilters('near', e)}>
+      <PinIcon />{place.label}
+    </button>
+  );
+  const FiltersChip = (
+    <button type="button" className={`ccx-chip${count ? ' on' : ''}`} aria-haspopup="dialog" onClick={(e) => openFilters(null, e)}>
+      {filtersLabel(tab, tabFilters)}
+    </button>
+  );
+  const opens = (label, section, on) => (
+    <button type="button" className={`ccx-chip${on ? ' on' : ''}`} aria-haspopup="dialog" onClick={(e) => openFilters(section, e)}>
+      {menuChip(label)}
+    </button>
+  );
+  const toggle = (label, key, cls = '') => (
+    <button type="button" className={`ccx-chip ${cls}`} aria-pressed={Boolean(tabFilters[key])} onClick={() => change({ [key]: !tabFilters[key] })}>
+      {label}
+    </button>
+  );
+
+  let chips;
+  if (tab === 'calls') {
+    chips = (
+      <>
+        {PlaceChip}
+        {toggle(urgentChip(urgentCount), 'urgent', 'urgent')}
+        {hasCard && toggle(CREW_WORDS.matches, 'matches')}
+        {opens(CREW_WORDS.pay, 'pay', tabFilters.pay.length > 0)}
+        {productionLabel && (
+          <span className="ccx-chip on ccx-prodchip">
+            <span className="ccx-prodchip-text">{productionLabel}</span>
+            <button type="button" aria-label={REMOVE_FILTER_HINT} title={REMOVE_FILTER_HINT} onClick={() => change({ production: '' })}><CloseIcon size={12} /></button>
+          </span>
+        )}
+        {FiltersChip}
+      </>
+    );
+  } else if (tab === 'people') {
+    chips = (
+      <>
+        {PlaceChip}
+        {opens(CREW_WORDS.role, 'role', tabFilters.roles.length > 0)}
+        {toggle(CREW_WORDS.freeNow, 'free')}
+        {toggle(CREW_WORDS.openToWork, 'open')}
+        {FiltersChip}
+      </>
+    );
+  } else if (tab === 'cast') {
+    chips = (
+      <>
+        {PlaceChip}
+        {opens(CREW_WORDS.playingAge, 'age', Boolean(tabFilters.ageMin || tabFilters.ageMax))}
+        {opens(CREW_WORDS.union, 'union', Boolean(tabFilters.union))}
+        {toggle(CREW_WORDS.freeNow, 'free')}
+        {FiltersChip}
+      </>
+    );
+  } else {
+    chips = (
+      <>
+        {PlaceChip}
+        <span className="ccx-chip-rule" aria-hidden="true" />
+        <span className="ccx-cats" role="group" aria-label={CREW_WORDS.category}>
+          <button type="button" className="ccx-chip" aria-pressed={!tabFilters.gear} onClick={() => change({ gear: '' })}>{CREW_WORDS.allGear}</button>
+          {GEAR_CATEGORIES.map((c) => (
+            <button key={c} type="button" className="ccx-chip" aria-pressed={tabFilters.gear === c} onClick={() => change({ gear: c })}>{c}</button>
+          ))}
+        </span>
+      </>
+    );
+  }
+
+  const cardLabel = hasCard ? CREW_WORDS.yourCard : CREW_WORDS.setUpCard;
+  const cardInner = (
+    <>
+      <IdCardIcon size={20} />
+      <span className="ccx-act-label">{cardLabel}</span>
+      {isSignedIn && !hasCard && <span className="ccx-act-dot" aria-hidden="true" />}
+    </>
+  );
+  const postInner = (<><PlusIcon size={20} /><span className="ccx-act-label">{CREW_WORDS.postCall}</span></>);
+
+  let side = null;
+  if (tab === 'calls') {
+    if (isSignedIn && hasCard) {
+      side = <FreeStrip until={freeUntil} hydrated={hydrated} busy={freeBusy} choosing={freeChoosing} onChoose={() => setFreeChoosing(true)} onSet={setFree} error={freeError} />;
+    } else {
+      side = <Nudge signedIn={isSignedIn} />;
+    }
+  }
+
+  let rows = null;
+  if (list && list.length) {
+    if (tab === 'calls') rows = list.map((c) => <CallRowItem key={c.id} c={c} />);
+    else if (tab === 'people') rows = list.map((p) => <PersonRowItem key={p.userId} p={p} signedIn={isSignedIn} hydrated={hydrated} />);
+    else if (tab === 'cast') rows = list.map((p) => <CastRowItem key={p.userId} p={p} signedIn={isSignedIn} hydrated={hydrated} />);
+    else rows = list.map((g) => <GearRowItem key={g.id} g={g} signedIn={isSignedIn} />);
+  }
 
   return (
     <>
       <Head>
-        <title>Crew Call — {SITE.name}</title>
-        <meta name="description" content={`Find the people and the gear for your next shoot on ${SITE.name}: crew by role, gear by category, all near you.`} />
+        <title>{`Crew Call — ${SITE.name}`}</title>
+        <meta name="description" content={`Crew calls, people, performers and gear for your next shoot on ${SITE.name}, all near you.`} />
       </Head>
       <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
-      <main id="main-content" className="stage stage-single crew-page">
-        <div className="crew-head">
-          <div>
-            <span className="crew-eyebrow">Connect</span>
-            <h1>Crew Call</h1>
-            <p>Find the people and the gear for the next shoot. Everyone with an account gets a working card — what you do, what you have, where you are.</p>
+      <main id="main-content" className="ccx">
+        <div className="ccx-top">
+          <h1 className="ccx-title">{CREW_WORDS.title}</h1>
+          <div className="ccx-tabs" role="tablist" aria-label={CREW_WORDS.tabsLabel} onKeyDown={onTabKey}>
+            {CREW_TABS.map((t) => (
+              <button
+                key={t}
+                id={`ccx-tab-${t}`}
+                type="button"
+                role="tab"
+                className="ccx-tab"
+                aria-selected={tab === t}
+                aria-controls="ccx-panel"
+                tabIndex={tab === t ? 0 : -1}
+                aria-label={t === 'calls' && urgentCount ? `${TAB_LABELS.calls}, ${urgentCount} urgent` : undefined}
+                onClick={() => switchTab(t)}
+              >
+                {TAB_LABELS[t]}
+                {t === 'calls' && urgentCount > 0 && <span className="ccx-badge" aria-hidden="true">{urgentCount}</span>}
+              </button>
+            ))}
           </div>
-          {isSignedIn ? (
-            <Link href="/crew/card" className="crew-btn primary">{hasCard ? 'Your card' : '+ Set up your card'}</Link>
-          ) : (
-            <SignInHere><button type="button" className="crew-btn primary">Sign in to make your card</button></SignInHere>
+          <div className="ccx-acts">
+            {isSignedIn
+              ? <Link href="/crew/card" className={`ccx-act card${hasCard ? '' : ' setup'}`} aria-label={cardLabel}>{cardInner}</Link>
+              : <SignInHere><button type="button" className="ccx-act card" aria-label={cardLabel}>{cardInner}</button></SignInHere>}
+            {isSignedIn
+              ? <Link href="/crew/calls/new" className="ccx-act post" aria-label={CREW_WORDS.postCall}>{postInner}</Link>
+              : <SignInHere><button type="button" className="ccx-act post" aria-label={CREW_WORDS.postCall}>{postInner}</button></SignInHere>}
+          </div>
+        </div>
+
+        <div className="ccx-tools">
+          <label className="ccx-search">
+            <SearchIcon />
+            <input
+              type="search"
+              value={tabFilters.q || ''}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={searchPlaceholder(tab, total)}
+              aria-label={`Search ${TAB_LABELS[tab].toLowerCase()}`}
+              autoComplete="off"
+            />
+            {tabFilters.q && <button type="button" className="ccx-search-clear" onClick={() => setQ('')} aria-label="Clear the search"><CloseIcon size={12} /></button>}
+          </label>
+          <div className="ccx-chips">{chips}</div>
+          {panel && (
+            <CrewFilters
+              tab={tab}
+              f={tabFilters}
+              hasCard={hasCard}
+              total={total}
+              section={panel.section}
+              wide={wide}
+              opener={panel.opener}
+              onChange={change}
+              onClear={clearAll}
+              onClose={closeFilters}
+            />
           )}
         </div>
 
-        <div className="crew-subnav" role="tablist">
-          <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}>Find people{people.total ? ` · ${people.total}` : ''}</button>
-          <button type="button" role="tab" aria-selected={tab === 'cast'} onClick={() => setTab('cast')}>Cast{cast && cast.total ? ` · ${cast.total}` : ''}</button>
-          <button type="button" role="tab" aria-selected={tab === 'gear'} onClick={() => setTab('gear')}>Gear{gear && gear.total ? ` · ${gear.total}` : ''}</button>
-          <Link href="/crew/calls" className="crew-tab">Calls</Link>
-        </div>
-
-        <div className="crew-find">
-          <aside className="crew-filters">
-            <input
-              type="search"
-              className="crew-input"
-              placeholder={tab === 'gear' ? 'Camera, light, lens, van…' : tab === 'cast' ? 'Name, skill, city…' : 'Name, role, gear, city…'}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              aria-label={tab === 'gear' ? 'Search gear' : 'Search people'}
-            />
-            <div className="crew-panel crew-filter-panel">
-              {tab === 'people' && (
-                <div className="crew-field">
-                  <span>Role</span>
-                  <div className="crew-chips crew-filterchips crew-rolebox">
-                    {CREW_ROLES.map((r) => (
-                      <button key={r} type="button" aria-pressed={roles.includes(r)} onClick={() => toggleRole(r)}>{r}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {tab === 'cast' && (
-                <>
-                  <div className="crew-field"><span>Playing age</span>
-                    <div className="crew-row2">
-                      <input type="number" className="crew-input" min="0" max="110" placeholder="from" value={ageMin} onChange={(e) => setAgeMin(e.target.value)} aria-label="Playing age from" />
-                      <input type="number" className="crew-input" min="0" max="110" placeholder="to" value={ageMax} onChange={(e) => setAgeMax(e.target.value)} aria-label="Playing age to" />
-                    </div>
-                  </div>
-                  <label className="crew-field"><span>Union</span>
-                    <select className="crew-select" value={union} onChange={(e) => setUnion(e.target.value)}>
-                      <option value="">Any</option>
-                      {Object.entries(UNION_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </label>
-                </>
-              )}
-              {tab !== 'cast' && <label className="crew-field">
-                <span>{tab === 'gear' ? 'Category' : 'Has gear'}</span>
-                <select className="crew-select" value={gearCat} onChange={(e) => setGearCat(e.target.value)}>
-                  <option value="">{tab === 'gear' ? 'All gear' : 'Any gear'}</option>
-                  {GEAR_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </label>}
-              <div className="crew-field">
-                <span>Near</span>
-                <PlaceSearch value={near} onChange={changeNear} placeholder="City, or use your location" compact />
-                {near && (
-                  <select className="crew-select" value={within} onChange={(e) => setWithin(Number(e.target.value))} aria-label="Distance">
-                    {WITHIN_CHOICES.map((n) => <option key={n} value={n}>{withinLabel(n)}</option>)}
-                  </select>
-                )}
-              </div>
-              {tab !== 'gear' && (
-                <div className="crew-chips">
-                  <button type="button" className={`crew-btn sm${openOnly ? ' on' : ''}`} onClick={() => setOpenOnly((v) => !v)} aria-pressed={openOnly}>● Open to work</button>
-                  <button type="button" className={`crew-btn sm${freeNow ? ' on' : ''}`} onClick={() => setFreeNow((v) => !v)} aria-pressed={freeNow} title="Said they can jump in today">⚡ Free right now</button>
-                  <button type="button" className={`crew-btn sm${verifiedOnly ? ' on' : ''}`} onClick={() => setVerifiedOnly((v) => !v)} aria-pressed={verifiedOnly}>✓ Verified creators</button>
-                </div>
-              )}
-              {hasFilters && <button type="button" className="crew-btn sm ghost" onClick={clearFilters}>Clear filters</button>}
-            </div>
-            <div className="crew-panel crew-muted">
-              Gear here is a <b>“just have it”</b> deal — no money moves through the site. The ✓ creator badge comes from an approved creator application.
-            </div>
-          </aside>
-
-          <div className="crew-results">
-            {error && <div className="crew-empty">{error}</div>}
-            {loadError && !error && <div className="crew-empty">Crew Call couldn’t load just now. Try again in a moment.</div>}
-
-            {tab === 'people' ? (
+        <div id="ccx-panel" role="tabpanel" aria-labelledby={`ccx-tab-${tab}`} className={`ccx-body ccx-body-${tab}${side ? ' has-side' : ''}`}>
+          {side && <div className="ccx-side">{side}</div>}
+          <div className="ccx-main" aria-busy={busy}>
+            {error && !list && <div className="ccx-note error" role="alert">{error}</div>}
+            {!list && !error && <div className="ccx-loading">{CREW_WORDS.loading}</div>}
+            {list && list.length === 0 && (error
+              ? <div className="ccx-note error" role="alert">{error}</div>
+              : <EmptyList tab={tab} filtered={filtered} signedIn={isSignedIn} hasCard={hasCard} />)}
+            {list && list.length > 0 && (
               <>
-                <div className="crew-rhead">
-                  <span className="crew-mono">{people.total} {people.total === 1 ? 'person' : 'people'}{roles.length ? ` · ${roles.join(', ')}` : ''}{loading ? ' · updating…' : ''}</span>
-                  <span className="crew-mono">{sortNote}</span>
-                </div>
-                {people.people.length === 0 && !error && (
-                  <div className="crew-panel crew-empty">
-                    {hasFilters
-                      ? 'Nobody matches yet. Widen the distance or clear a filter.'
-                      : isSignedIn
-                        ? <>No cards yet — be the first. <Link href="/crew/card">Set up your working card</Link> and you’ll show up here.</>
-                        : 'No cards yet. Sign in to set up yours and be the first on the board.'}
-                  </div>
-                )}
-                {people.people.map((p) => <PersonCard key={p.userId} p={p} signedIn={isSignedIn} />)}
-              </>
-            ) : tab === 'cast' ? (
-              <>
-                <div className="crew-rhead">
-                  <span className="crew-mono">{cast ? `${cast.total} ${cast.total === 1 ? 'performer' : 'performers'}` : 'Loading…'}{loading ? ' · updating…' : ''}</span>
-                  <span className="crew-mono">{sortNote}</span>
-                </div>
-                {cast && cast.people.length === 0 && !error && (
-                  <div className="crew-panel crew-empty">{hasFilters ? 'Nobody matches yet. Widen the age range or clear a filter.' : isSignedIn ? <>No performers listed yet. Turn on <b>Performer</b> on <Link href="/crew/card">your card</Link> and you’ll be first.</> : 'No performers listed yet. Sign in and turn on Performer on your card.'}</div>
-                )}
-                {cast && cast.people.length > 0 && <div className="cast-grid">{cast.people.map((p) => <CastCard key={p.userId} p={p} signedIn={isSignedIn} MessageLink={MessageLink} />)}</div>}
-              </>
-            ) : (
-              <>
-                <div className="crew-rhead">
-                  <span className="crew-mono">{gear ? `${gear.total} ${gear.total === 1 ? 'item' : 'items'}` : 'Loading…'}{loading ? ' · updating…' : ''}</span>
-                  <span className="crew-mono">{sortNote}</span>
-                </div>
-                {gear && gear.items.length === 0 && !error && (
-                  <div className="crew-panel crew-empty">{hasFilters ? 'No gear matches. Try another category or widen the distance.' : 'No gear listed yet. Add yours on your working card.'}</div>
-                )}
-                {gear && gear.items.length > 0 && (
-                  <div className="crew-gear-grid">
-                    {gear.items.map((g) => <GearItem key={g.id} g={g} signedIn={isSignedIn} />)}
-                  </div>
-                )}
+                {error && <div className="ccx-note error" role="alert">{error}</div>}
+                <div className={`ccx-list ccx-list-${tab}${busy ? ' updating' : ''}`}>{rows}</div>
               </>
             )}
+            {busy && <span className="ccx-sr" role="status">{CREW_WORDS.updating}</span>}
           </div>
         </div>
       </main>
@@ -293,63 +539,5 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
       <Footer />
       <MobileTabBar />
     </>
-  );
-}
-
-function PersonCard({ p, signedIn }) {
-  const gearTop = p.gear.slice(0, 3).map((g) => g.name).join(' · ');
-  const where = [p.place, p.miles != null ? `${p.miles} mi` : null].filter(Boolean).join(' · ');
-  return (
-    <article className="crew-panel crew-person">
-      <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} zoom={p.avatarZoom} />
-      <div style={{ minWidth: 0 }}>
-        <div className="crew-pname">
-          <Link href={p.profilePath}>{p.displayName}</Link>
-          {p.verified && <span className="crew-ver">✓ creator</span>}
-          {p.tier && <TierChip person={p} />}
-          {p.freeNow && <span className="crew-chip urgent">⚡ free right now</span>}
-          {p.handle && <span className="crew-handle">@{p.handle}</span>}
-        </div>
-        <div className="crew-pmeta">
-          <Availability card={p} />
-          {where && <span>{where}{p.travelMiles ? ` · travels ${p.travelMiles} mi` : ''}</span>}
-          {p.remoteOk && <span>Remote OK</span>}
-          <span>{rateLabel(p)}</span>
-          <span>{p.creditCount} {p.creditCount === 1 ? 'credit' : 'credits'} on Studio Tapa</span>
-        </div>
-        <RoleChips roles={p.roles} />
-        {gearTop && <p className="crew-gearline"><b>Gear</b> {gearTop}{p.gear.length > 3 ? ` +${p.gear.length - 3}` : ''}</p>}
-        {p.bio && <p className="crew-muted crew-bio">{p.bio}</p>}
-      </div>
-      <div className="crew-pacts">
-        <Link href={p.profilePath} className="crew-btn sm">View profile</Link>
-        <MessageLink signedIn={signedIn} userId={p.userId} kind="card" label={`${p.displayName}’s card`} className="crew-btn sm primary">Message</MessageLink>
-      </div>
-    </article>
-  );
-}
-
-// "Message" / "Ask about it": opens (or starts) the conversation with the
-// person, with what it's about attached. Signed out → the sign-in modal.
-function MessageLink({ signedIn, userId, kind, label, className, children }) {
-  if (!signedIn) return <SignInHere><button type="button" className={className}>{children}</button></SignInHere>;
-  return <Link href={`/messages?to=${encodeURIComponent(userId)}&kind=${kind}&label=${encodeURIComponent(label)}`} className={className}>{children}</Link>;
-}
-
-function GearItem({ g, signedIn }) {
-  const o = g.owner;
-  return (
-    <article className="crew-panel crew-gitem">
-      <div className="crew-gitem-top"><b>{g.name}</b><span className={`crew-chip ${flagClass(g.flag)}`}>{flagLabel(g.flag)}</span></div>
-      <span className="crew-mono">{g.category}</span>
-      <div className="crew-owner">
-        <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} position={o.avatarPosition} zoom={o.avatarZoom} size="sm" />
-        <span>{o.displayName}{o.miles != null ? ` · ${o.miles} mi` : o.place ? ` · ${o.place}` : ''}{o.verified ? ' · ✓' : ''}</span>
-      </div>
-      <div className="crew-actions">
-        <MessageLink signedIn={signedIn} userId={o.userId} kind="gear" label={g.name} className="crew-btn sm primary">Ask about it</MessageLink>
-        <Link href={o.profilePath} className="crew-btn sm">View profile</Link>
-      </div>
-    </article>
   );
 }

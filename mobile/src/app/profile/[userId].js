@@ -334,7 +334,7 @@ export default function PublicProfile() {
                 creditedWork={creditedWork}
                 isOwn={isOwnProfile}
                 onEdit={() => router.push('/crew/card')}
-                onFind={() => router.push('/crew')}
+                onFind={() => router.push('/crew?tab=people')}
                 onOpenWork={(w) => router.push(workHref(w))}
                 performerFacts={<PerformerFacts card={crewCard} />}
               />

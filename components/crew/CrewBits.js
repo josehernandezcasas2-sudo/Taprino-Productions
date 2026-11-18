@@ -116,7 +116,7 @@ export function CrewCardView({ card, creditedWork = [], isOwn = false }) {
       </div>
       <div className="crew-actions">
         {isOwn && <Link href="/crew/card" className="crew-btn sm">Edit card</Link>}
-        <Link href="/crew" className="crew-btn sm ghost">Find people on Crew Call →</Link>
+        <Link href="/crew?tab=people" className="crew-btn sm ghost">Find people on Crew Call →</Link>
       </div>
     </div>
   );

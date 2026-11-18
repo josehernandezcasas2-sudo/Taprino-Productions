@@ -64,7 +64,7 @@ export default function Inbox() {
 
   function toCrewCall() {
     setComposing(false);
-    router.push('/crew');
+    router.push('/crew?tab=people');
   }
 
   const header = (
@@ -106,7 +106,7 @@ export default function Inbox() {
       </View>
     );
   } else if (!hasAny) {
-    foot = <View style={st.pad}><InboxEmpty onCrewCall={() => router.push('/crew')} onWrite={() => setComposing(true)} /></View>;
+    foot = <View style={st.pad}><InboxEmpty onCrewCall={() => router.push('/crew?tab=people')} onWrite={() => setComposing(true)} /></View>;
   } else if (!shown.length) {
     foot = <Text style={st.none}>{emptyFilterLine(filter, query)}</Text>;
   }
