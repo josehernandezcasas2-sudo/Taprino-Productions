@@ -37,7 +37,7 @@ export default function TapeScreen() {
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
       <View style={{ padding: 16, gap: 10, flex: 1 }}>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/crew/calls'))} hitSlop={8}><Text style={crew.mono}>‹ Back to the call</Text></Pressable>
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/crew'))} hitSlop={8}><Text style={crew.mono}>‹ Back to the call</Text></Pressable>
         <Text style={crew.eyebrow}>Self-tape</Text>
         {error ? <Text style={crew.error}>{error}</Text> : null}
         {!src && !error ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : null}

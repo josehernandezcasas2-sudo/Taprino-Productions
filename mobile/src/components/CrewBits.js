@@ -20,6 +20,10 @@ function colorFor(id) {
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
 const initialsOf = (name) => String(name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
+// The same colour and letters an avatar without a photo gets, for a frame
+// that isn't round (the Cast tab's 54×68 box, 2026-11-18).
+export const avatarColor = (userId, name) => colorFor(userId || name);
+export const avatarInitials = initialsOf;
 
 // `position` is the person's saved focal point (user_profiles.avatar_position),
 // so the crop matches their profile and the account screen.
@@ -91,8 +95,12 @@ export function Avail({ card }) {
 }
 
 // A place box: type a city and pick a suggestion, or "Near me". `value`
-// is { label, lat, lng, ... } or null.
-export function PlaceBox({ value, onChange, placeholder = 'City or neighborhood' }) {
+// is { label, lat, lng, ... } or null. `look` (Crew Call's Filters sheet,
+// 2026-11-18) draws it another way without changing what it does:
+// { field, input, leading, button, locateIcon, clearIcon, locateLabel } —
+// the field around the input with an icon in front, the input's style,
+// and an icon button for "Use my location" / clearing the place.
+export function PlaceBox({ value, onChange, placeholder = 'City or neighborhood', look = null }) {
   const [text, setText] = useState(value ? value.label : '');
   const [places, setPlaces] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -135,22 +143,26 @@ export function PlaceBox({ value, onChange, placeholder = 'City or neighborhood'
     }
   }
 
+  const input = (
+    <TextInput
+      style={look ? look.input : [crew.input, { flex: 1 }]}
+      value={text}
+      onChangeText={typed}
+      placeholder={placeholder}
+      placeholderTextColor={colors.inkFaint}
+      accessibilityLabel={look ? placeholder : undefined}
+      autoCapitalize="words"
+      autoCorrect={false}
+    />
+  );
   return (
     <View style={{ gap: 6 }}>
       <View style={crew.row}>
-        <TextInput
-          style={[crew.input, { flex: 1 }]}
-          value={text}
-          onChangeText={typed}
-          placeholder={placeholder}
-          placeholderTextColor={colors.inkFaint}
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
+        {look ? <View style={look.field}>{look.leading}{input}</View> : input}
         {value ? (
-          <Pressable style={crew.btnSm} onPress={() => { onChange(null); setText(''); }} accessibilityLabel="Clear place"><Text style={crew.btnSmText}>✕</Text></Pressable>
+          <Pressable style={look ? look.button : crew.btnSm} onPress={() => { onChange(null); setText(''); }} accessibilityRole="button" accessibilityLabel="Clear place">{look ? look.clearIcon : <Text style={crew.btnSmText}>✕</Text>}</Pressable>
         ) : (
-          <Pressable style={crew.btnSm} onPress={locate} disabled={busy}>{busy ? <ActivityIndicator color={colors.ink} size="small" /> : <Text style={crew.btnSmText}>◎ Near me</Text>}</Pressable>
+          <Pressable style={look ? look.button : crew.btnSm} onPress={locate} disabled={busy} accessibilityRole="button" accessibilityLabel={look ? look.locateLabel : undefined}>{busy ? <ActivityIndicator color={colors.ink} size="small" /> : look ? look.locateIcon : <Text style={crew.btnSmText}>◎ Near me</Text>}</Pressable>
         )}
       </View>
       {places.length > 0 ? (

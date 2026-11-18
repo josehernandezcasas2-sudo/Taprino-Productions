@@ -77,7 +77,7 @@ export default function ProductionsScreen() {
         <Text style={crew.lead}>The shoots happening on Studio Tapa. Crew calls, location bookings and the call sheet live here — and when it’s released, everyone who worked it gets the credit.</Text>
         <View style={[crew.row, { marginBottom: 14, flexWrap: 'wrap' }]}>
           <Pressable style={[crew.btn, crew.btnPrimary]} onPress={() => router.push(signedIn ? '/productions/new' : '/account')}><Text style={[crew.btnText, crew.btnPrimaryText]}>{signedIn ? '+ Start a production' : 'Sign in to start one'}</Text></Pressable>
-          <Pressable style={crew.btn} onPress={() => router.push('/crew/calls')}><Text style={crew.btnText}>Calls</Text></Pressable>
+          <Pressable style={crew.btn} onPress={() => router.push('/crew')}><Text style={crew.btnText}>Calls</Text></Pressable>
           <Pressable style={crew.btn} onPress={() => router.push('/locations')}><Text style={crew.btnText}>Locations</Text></Pressable>
         </View>
 

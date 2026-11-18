@@ -74,7 +74,7 @@ export default function PostCall() {
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView contentContainerStyle={crew.stage} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => router.push('/crew/calls')} hitSlop={8}><Text style={crew.mono}>‹ Calls</Text></Pressable>
+        <Pressable onPress={() => router.push('/crew')} hitSlop={8}><Text style={crew.mono}>‹ Calls</Text></Pressable>
         <Text style={[crew.eyebrow, { marginTop: 10 }]}>Crew Call</Text>
         <Text style={crew.h1}>Post a call</Text>
 

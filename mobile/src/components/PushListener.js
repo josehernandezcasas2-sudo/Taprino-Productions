@@ -54,7 +54,11 @@ const ALIASES = {
   '/type/movie': '/watch/movies',
   '/type/vertical': '/watch/vertical',
   '/vertical/browse': '/watch/vertical',
-  '/podcasts': '/watch/podcasts'
+  '/podcasts': '/watch/podcasts',
+  // The calls board is Crew Call's first tab (Crew Call, simpler,
+  // 2026-11-18): /crew/calls with no id opens /crew, keeping its query
+  // (SCREEN_KEEP below); a call's own /crew/calls/<id> is unchanged.
+  '/crew/calls': '/crew'
 };
 // Who gets paid (the series revamp, slice 3b; lib/payees.js) sends:
 //   /creator#get-paid           → /creator/dashboard (payee_invite,
@@ -145,7 +149,12 @@ const PODCAST_KEEP = { preview: /^1$/ };
 const SCREEN_KEEP = {
   '/creator/submit': { draft: /^[A-Za-z0-9_-]{1,80}$/, type: /^[a-z]{1,20}$/, series: /^[A-Za-z0-9_-]{1,160}$/, season: /^\d{1,4}$/, number: /^\d{1,5}$/ },
   '/account/my-work': { status: /^(pending|approved|rejected)$/, attention: /^1$/, tab: /^(all|needs|review|live|declined)$/ },
-  '/creator/dashboard': { submitted: /^[\s\S]{1,300}$/, id: /^[A-Za-z0-9_-]{1,160}$/, show: /^[A-Za-z0-9_-]{1,160}$/ }
+  '/creator/dashboard': { submitted: /^[\s\S]{1,300}$/, id: /^[A-Za-z0-9_-]{1,160}$/, show: /^[A-Za-z0-9_-]{1,160}$/ },
+  // Crew Call opens on the tab its address names, and the older links
+  // keep their filter (lib/crewDirectoryRules.js tabFromQuery /
+  // filtersFromQuery): ?free=1 People with Free now on, ?urgent=1,
+  // ?production=<id> and ?kind= on Calls.
+  '/crew': { tab: /^(calls|people|cast|gear)$/, free: /^1$/, urgent: /^1$/, production: /^[0-9a-f-]{36}$/i, kind: /^(crew|cast)$/ }
 };
 
 function keptQuery(href, keep = PUBLIC_KEEP) {

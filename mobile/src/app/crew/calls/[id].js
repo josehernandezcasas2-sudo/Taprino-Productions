@@ -128,7 +128,7 @@ export default function CallScreen() {
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView contentContainerStyle={crew.stage} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/crew/calls'))} hitSlop={8}><Text style={crew.mono}>‹ Calls</Text></Pressable>
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/crew'))} hitSlop={8}><Text style={crew.mono}>‹ Calls</Text></Pressable>
         {state.loading ? <ActivityIndicator color={colors.brass} style={{ marginTop: 32 }} /> : null}
         {state.error ? <Text style={crew.error}>{state.error}</Text> : null}
         {call ? (

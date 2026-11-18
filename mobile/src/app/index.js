@@ -327,7 +327,7 @@ export default function Home() {
 
           <View style={styles.deskCard}>
             <Text style={styles.deskLabel}>THIS WEEK{nearSuffix.toUpperCase()}</Text>
-            <WeekRow label="Open calls" n={counts.openCalls} color={colors.brass} onPress={() => router.push('/crew/calls')} />
+            <WeekRow label="Open calls" n={counts.openCalls} color={colors.brass} onPress={() => router.push('/crew')} />
             <WeekRow label="Projects raising" n={counts.raising} color={colors.olive} onPress={() => router.push('/pitches')} />
             <WeekRow label={counts.newPlaces ? 'New places' : 'Places to shoot'} n={counts.newPlaces || counts.places} color={colors.mint} onPress={() => router.push('/locations')} />
             <WeekRow label="Shooting" n={counts.shooting} color={colors.sky} onPress={() => router.push('/productions')} />

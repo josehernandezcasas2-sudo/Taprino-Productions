@@ -1,241 +1,326 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
-import { apiGet, freshToken } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
+import { colors, fonts } from '../../lib/theme';
+import {
+  CREW_TABS, CREW_WORDS, DEFAULT_WITHIN, REMOVE_FILTER_HINT, apiPathFor, clearedFilters, emptyFilters, emptyLine, filterCount,
+  filtersFromQuery, filtersLabel, freeStrip, menuChip, placeChip, productionChip, searchPlaceholder, tabFromQuery, urgentBadgePath,
+  urgentChip, withPlace
+} from '../../lib/crewDirectoryRules';
 import TopNav from '../../components/TopNav';
-import { crew, Chip, PlaceBox, PersonCard, GearCard, WITHIN_CHOICES, DEFAULT_WITHIN } from '../../components/CrewBits';
-import { CastCard, UNION } from '../../components/CastingBits';
+import { crew } from '../../components/CrewBits';
+import { SearchField } from '../../components/messages/MessageBits';
+import { ChipRail, EmptyList, FreeStrip, Nudge, Pill, RailRule, TabSwitch, TitleRow } from '../../components/crew/CrewDirectoryBits';
+import { CallRow, CastRow, GearRow, PersonRow } from '../../components/crew/CrewRows';
+import CrewFilters from '../../components/crew/CrewFilters';
 
-// Crew Call (pages/crew/index.js on the web): find people by role, gear
-// and distance, browse the gear, keep your own card. Fed by
-// /api/crew/people; a signed-in viewer with a place on their card starts
-// out searching near it, anyone can pick a place or use their location.
-const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} mi`);
+// Crew Call (Crew Call, simpler, 2026-11-18; pages/crew/index.js on the
+// website, mockups/crew-call-simpler-contract.md): one screen with four
+// tabs — Calls (where it opens), People, Cast, Gear — the search, one row
+// of chips, the Filters sheet, and the list. Every word, row line and API
+// query comes from lib/crewDirectoryRules.js.
+//
+// The tab is the address (?tab=; the older ?free=1 opens People with Free
+// now on, ?urgent= / ?production= / ?kind= open Calls with that filter).
+// Each tab keeps its own search, its own filters and its last answer:
+// switching back draws at once and reads again quietly. The place is
+// shared by the four tabs (withPlace carries it into each tab's filters);
+// a signed-in viewer with a place on their card starts out near it. The
+// red count on Calls is the urgent calls near that place, whatever the
+// Calls tab's search and filters are (urgentBadgePath, read quietly).
+
+// The vocabularies (/api/crew/options), kept for the app's life.
+let OPTIONS = null;
+const EMPTY_OPTIONS = { roles: [], gearCategories: [], castRoles: [], unionStatus: {} };
+
+const listOf = (tab, answer) => {
+  if (!answer) return null;
+  if (tab === 'calls') return answer.calls || [];
+  if (tab === 'gear') return answer.items || [];
+  return answer.people || [];
+};
 
 export default function CrewCall() {
   const router = useRouter();
-  const { isLoaded, isSignedIn, getToken } = useAuth();
-  const tokenRef = useRef(null);
-  const reqId = useRef(0);
-
-  const [options, setOptions] = useState({ roles: [], gearCategories: [] });
-  const [hasCard, setHasCard] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [tab, setTab] = useState('people');
-  const [q, setQ] = useState('');
-  const [roles, setRoles] = useState([]);
-  const [gearCat, setGearCat] = useState('');
-  const [near, setNear] = useState(null);
-  const [within, setWithin] = useState(DEFAULT_WITHIN);
-  const [openOnly, setOpenOnly] = useState(false);
-  // `?free=1` (the home screen's "Everyone free now" link, like the
-  // website's /crew?free=1) opens the directory on the free-right-now filter.
   const params = useLocalSearchParams();
-  const [freeNow, setFreeNow] = useState(params.free === '1');
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [people, setPeople] = useState(null);
-  const [gear, setGear] = useState(null);
-  const [cast, setCast] = useState(null);
-  const [ageMin, setAgeMin] = useState('');
-  const [ageMax, setAgeMax] = useState('');
-  const [union, setUnion] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const signedIn = Boolean(isLoaded && isSignedIn);
+  const tab = tabFromQuery(params);
 
-  // On every focus: the vocabularies, and (signed in) the own card so
-  // the default "near" is where they're based and the button reads right.
+  const [options, setOptions] = useState(OPTIONS || EMPTY_OPTIONS);
+  // undefined = not known yet, null = no card.
+  const [card, setCard] = useState(undefined);
+  const [ready, setReady] = useState(false);
+  const [focusKey, setFocusKey] = useState(0);
+  // Each tab's own filters (its search text in `q`); an older link's
+  // filters go to the tab it opens.
+  const [byTab, setByTab] = useState(() => {
+    const first = tabFromQuery(params);
+    const fromLink = filtersFromQuery(params);
+    return Object.fromEntries(CREW_TABS.map((t) => [t, t === first ? fromLink : emptyFilters()]));
+  });
+  const [place, setPlace] = useState({ near: null, within: 0 });
+  const placeTouched = useRef(false);
+  const [answers, setAnswers] = useState({});
+  const [errors, setErrors] = useState({});
+  const [urgentCount, setUrgentCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sheet, setSheet] = useState(null);
+  const [free, setFree] = useState({ busy: false, error: null });
+  const openers = useRef({});
+  const opener = useRef(null);
+  const seq = useRef(0);
+  const latest = useRef({});
+
+  const f = useMemo(() => withPlace(byTab[tab], place.near, place.within), [byTab, tab, place]);
+  const path = apiPathFor(tab, f);
+
+  // The viewer's own card: whether to show the strip or the nudge, the
+  // dot on the card button, and the place they start out near.
+  const loadCard = useCallback(async () => {
+    if (!signedIn) { setCard(null); return; }
+    try {
+      const d = await apiGet('/api/crew/card', await freshToken(getToken));
+      const own = d.card || null;
+      setCard(own);
+      if (own && own.place && !placeTouched.current) {
+        setPlace((p) => (p.near ? p : { near: own.place, within: p.within || DEFAULT_WITHIN }));
+      }
+    } catch {
+      // Not known: the calls answer's hasCard stands in.
+    }
+  }, [signedIn, getToken]);
+
   useFocusEffect(useCallback(() => {
     let alive = true;
     (async () => {
-      tokenRef.current = isLoaded && isSignedIn
-        ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))])
-        : null;
-      try { const o = await apiGet('/api/crew/options'); if (alive) setOptions(o); } catch (err) { /* chips just stay empty */ }
-      if (tokenRef.current) {
-        try {
-          const d = await apiGet('/api/crew/card', tokenRef.current);
-          if (alive) {
-            setHasCard(Boolean(d.card));
-            if (d.card && d.card.place) setNear((n) => n || d.card.place);
-          }
-        } catch (err) { /* no card yet */ }
+      if (!OPTIONS) {
+        try { OPTIONS = { ...EMPTY_OPTIONS, ...(await apiGet('/api/crew/options')) }; if (alive) setOptions(OPTIONS); } catch { /* the chips stay empty */ }
       }
-      if (alive) setRefreshKey((k) => k + 1);
+      if (!isLoaded) return;
+      await loadCard();
+      if (!alive) return;
+      setReady(true);
+      setFocusKey((k) => k + 1);
     })();
     return () => { alive = false; };
-  }, [isLoaded, isSignedIn]));
+  }, [isLoaded, loadCard]));
+
+  // One tab's answer; the newest question wins.
+  const read = useCallback(async (t, p) => {
+    const id = ++seq.current;
+    latest.current[t] = id;
+    try {
+      const data = await apiGet(p, signedIn ? await freshToken(getToken) : null);
+      if (latest.current[t] !== id) return;
+      setAnswers((a) => ({ ...a, [t]: data }));
+      setErrors((e) => ({ ...e, [t]: false }));
+    } catch {
+      if (latest.current[t] === id) setErrors((e) => ({ ...e, [t]: true }));
+    }
+  }, [signedIn, getToken]);
 
   useEffect(() => {
-    if (refreshKey === 0) return undefined;
-    const id = ++reqId.current;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      const params = [];
-      if (q.trim()) params.push(`q=${encodeURIComponent(q.trim())}`);
-      if (roles.length) params.push(`roles=${encodeURIComponent(roles.join(','))}`);
-      if (gearCat) params.push(`gear=${encodeURIComponent(gearCat)}`);
-      if (near) params.push(`lat=${near.lat}`, `lng=${near.lng}`, `within=${within}`);
-      if (openOnly) params.push('open=1');
-      if (freeNow) params.push('free=1');
-      if (verifiedOnly) params.push('verified=1');
-      if (tab === 'gear') params.push('view=gear');
-      if (tab === 'cast') { params.push('cast=1'); if (ageMin) params.push(`ageMin=${ageMin}`); if (ageMax) params.push(`ageMax=${ageMax}`); if (union) params.push(`union=${union}`); }
-      try {
-        // Fresh each search (a token from when the screen opened has expired
-        // a minute later, and day rates quietly disappear).
-        const data = await apiGet(`/api/crew/people?${params.join('&')}`, tokenRef.current ? await freshToken(getToken) : null);
-        if (id !== reqId.current) return;
-        if (tab === 'gear') setGear(data); else if (tab === 'cast') setCast(data); else setPeople(data);
-        setError(null);
-      } catch (err) {
-        if (id === reqId.current) setError(err.message);
-      } finally {
-        if (id === reqId.current) setLoading(false);
-      }
-    }, 250);
+    if (!ready) return undefined;
+    const timer = setTimeout(() => { read(tab, path); }, 250);
     return () => clearTimeout(timer);
-  }, [refreshKey, tab, q, roles, gearCat, near, within, openOnly, freeNow, verifiedOnly, ageMin, ageMax, union]);
+  }, [ready, tab, path, focusKey, read]);
 
-  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || freeNow || verifiedOnly || ageMin || ageMax || union);
-  // "Message" / "Ask about it": the conversation screen, with what it's
-  // about attached; signed out goes to the Account tab to sign in.
-  const message = (userId, kind, label) => {
-    if (!isSignedIn) { router.push('/account'); return; }
-    router.push({ pathname: '/messages/new', params: { to: userId, kind, label } });
+  // The red count on Calls: the urgent calls near the place, read quietly
+  // on focus and whenever the place changes (never the filtered list).
+  const badgePath = urgentBadgePath(place.near, place.within);
+  useEffect(() => {
+    if (!ready) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        const d = await apiGet(badgePath, signedIn ? await freshToken(getToken) : null);
+        if (alive) setUrgentCount(Number(d.urgentCount) || 0);
+      } catch { /* the count stays as it was */ }
+    })();
+    return () => { alive = false; };
+  }, [ready, badgePath, focusKey, signedIn, getToken]);
+  const hasCard = card !== undefined ? Boolean(card) : answers.calls ? Boolean(answers.calls.hasCard) : undefined;
+
+  const answer = answers[tab] || null;
+  const list = listOf(tab, answer);
+  const total = answer ? answer.total : null;
+
+  function patchTab(patch) {
+    setByTab((b) => ({ ...b, [tab]: { ...b[tab], ...patch } }));
+  }
+  function setPlaceFrom(near, within) {
+    placeTouched.current = true;
+    setPlace({ near: near || null, within: near ? within : 0 });
+  }
+  function toggle(key) {
+    patchTab({ [key]: !byTab[tab][key] });
+  }
+  function switchTab(t) {
+    if (t === tab) return;
+    router.setParams({ tab: t });
+  }
+
+  function openFilters(at) {
+    opener.current = openers.current[at] || openers.current.filters || null;
+    setSheet({ at });
+  }
+  function closeFilters() {
+    setSheet(null);
+    // Back to the chip that opened it, for a screen reader.
+    const el = opener.current;
+    if (el && typeof AccessibilityInfo.sendAccessibilityEvent === 'function') {
+      setTimeout(() => { try { AccessibilityInfo.sendAccessibilityEvent(el, 'focus'); } catch { /* not on this platform */ } }, 350);
+    }
+  }
+  const keep = (name) => (el) => { openers.current[name] = el; };
+
+  async function setFreeFor(hours) {
+    setFree({ busy: true, error: null });
+    try {
+      const d = await apiPost('/api/crew/available-now', { hours }, await freshToken(getToken));
+      setCard((c) => (c ? { ...c, availableNowUntil: d.availableNowUntil || null } : c));
+      setFree({ busy: false, error: null });
+      return true;
+    } catch (err) {
+      setFree({ busy: false, error: err.message });
+      return false;
+    }
+  }
+
+  async function onRefresh() {
+    setRefreshing(true);
+    await Promise.all([loadCard(), read(tab, path)]);
+    setRefreshing(false);
+  }
+
+  // "Message" / "Ask": the conversation, with what it's about; signed out
+  // goes to the Account card to sign in.
+  function message(to, kind, label) {
+    if (!signedIn) { router.push('/account'); return; }
+    router.push({ pathname: '/messages/new', params: { to, kind, label } });
+  }
+
+  // ---- the chips ----
+  const pc = placeChip(place.near, place.within);
+  const placePill = <Pill key="place" ref={keep('near')} icon="pin" label={pc.label} on={pc.on} onPress={() => openFilters('near')} />;
+  const filtersPill = <Pill key="filters" ref={keep('filters')} label={filtersLabel(tab, f)} on={filterCount(tab, f) > 0} onPress={() => openFilters('filters')} />;
+  let chips;
+  if (tab === 'calls') {
+    const forTitle = answer && answer.calls && answer.calls[0] ? answer.calls[0].productionTitle : null;
+    chips = [
+      f.production ? <Pill key="production" label={productionChip(forTitle)} on after="close" onPress={() => patchTab({ production: '' })} accessibilityHint={REMOVE_FILTER_HINT} /> : null,
+      placePill,
+      <Pill key="urgent" tone="urgent" toggle label={urgentChip(urgentCount)} on={f.urgent} onPress={() => toggle('urgent')} />,
+      hasCard ? <Pill key="matches" toggle label={CREW_WORDS.matches} on={f.matches} onPress={() => toggle('matches')} /> : null,
+      <Pill key="pay" ref={keep('pay')} label={menuChip(CREW_WORDS.pay)} on={f.pay.length > 0} onPress={() => openFilters('pay')} />,
+      filtersPill
+    ];
+  } else if (tab === 'people') {
+    chips = [
+      placePill,
+      <Pill key="role" ref={keep('role')} label={menuChip(CREW_WORDS.role)} on={f.roles.length > 0} onPress={() => openFilters('role')} />,
+      <Pill key="free" toggle label={CREW_WORDS.freeNow} on={f.free} onPress={() => toggle('free')} />,
+      <Pill key="open" toggle label={CREW_WORDS.openToWork} on={f.open} onPress={() => toggle('open')} />,
+      filtersPill
+    ];
+  } else if (tab === 'cast') {
+    chips = [
+      placePill,
+      <Pill key="age" ref={keep('age')} label={menuChip(CREW_WORDS.playingAge)} on={Boolean(f.ageMin || f.ageMax)} onPress={() => openFilters('age')} />,
+      <Pill key="union" ref={keep('union')} label={menuChip(CREW_WORDS.union)} on={Boolean(f.union)} onPress={() => openFilters('union')} />,
+      <Pill key="free" toggle label={CREW_WORDS.freeNow} on={f.free} onPress={() => toggle('free')} />,
+      filtersPill
+    ];
+  } else {
+    chips = [
+      placePill,
+      <RailRule key="rule" />,
+      <Pill key="all" toggle label={CREW_WORDS.allGear} on={!f.gear} onPress={() => patchTab({ gear: '' })} />,
+      ...(options.gearCategories || []).map((c) => <Pill key={c} toggle label={c} on={f.gear === c} onPress={() => patchTab({ gear: f.gear === c ? '' : c })} />)
+    ];
+  }
+
+  // ---- the strip or the nudge (Calls only) ----
+  let callsTop = null;
+  if (tab === 'calls' && isLoaded) {
+    if (!signedIn) callsTop = <Nudge signedIn={false} onPress={() => router.push('/account')} />;
+    else if (hasCard === true) callsTop = <FreeStrip strip={freeStrip(card ? card.availableNowUntil : null)} busy={free.busy} error={free.error} onSet={setFreeFor} />;
+    else if (hasCard === false) callsTop = <Nudge signedIn onPress={() => router.push('/crew/card')} />;
+  }
+
+  const header = (
+    <View style={st.head}>
+      <TitleRow
+        hasCard={hasCard}
+        signedIn={signedIn}
+        onCard={() => router.push(signedIn ? '/crew/card' : '/account')}
+        onPost={() => router.push(signedIn ? '/crew/calls/new' : '/account')}
+      />
+      <TabSwitch tab={tab} onChange={switchTab} urgentCount={urgentCount} />
+      <SearchField value={byTab[tab].q} onChangeText={(v) => patchTab({ q: v })} placeholder={searchPlaceholder(tab, total)} />
+      <ChipRail>{chips}</ChipRail>
+      {callsTop}
+    </View>
+  );
+
+  let foot = null;
+  if (errors[tab] && !answer) {
+    foot = <Text style={st.error}>{CREW_WORDS.couldNotLoad}</Text>;
+  } else if (!answer) {
+    foot = <ActivityIndicator color={colors.brass} style={{ marginTop: 28 }} accessibilityLabel={CREW_WORDS.loading} />;
+  } else if (list && list.length === 0) {
+    const filtered = filterCount(tab, f) > 0 || Boolean(String(f.q || '').trim()) || Boolean(f.near && Number(f.within) > 0);
+    foot = <EmptyList tab={tab} empty={emptyLine(tab, { filtered, signedIn, hasCard: Boolean(hasCard) })} />;
+  }
+
+  const renderItem = ({ item }) => {
+    if (tab === 'calls') return <CallRow call={item} onOpen={() => router.push(`/crew/calls/${encodeURIComponent(item.id)}`)} />;
+    if (tab === 'gear') {
+      const o = item.owner || {};
+      return <GearRow item={item} onOpen={() => o.profilePath && router.push(o.profilePath)} onAsk={() => message(o.userId, 'gear', item.name)} />;
+    }
+    const Row = tab === 'cast' ? CastRow : PersonRow;
+    return <Row person={item} onOpen={() => item.profilePath && router.push(item.profilePath)} onMessage={() => message(item.userId, 'card', `${item.displayName}’s card`)} />;
   };
-  const toggleRole = (r) => setRoles((list) => (list.includes(r) ? list.filter((x) => x !== r) : [...list, r]));
-  const sortNote = near ? `nearest to ${near.label}` : 'newest first';
-  const list = tab === 'gear' ? gear : tab === 'cast' ? cast : people;
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView contentContainerStyle={crew.stage} keyboardShouldPersistTaps="handled">
-        <Text style={crew.eyebrow}>Connect</Text>
-        <Text style={crew.h1}>Crew Call</Text>
-        <Text style={crew.lead}>Find the people and the gear for the next shoot. Everyone with an account gets a working card — what you do, what you have, where you are.</Text>
-        <Pressable style={[crew.btn, crew.btnPrimary, styles.cta]} onPress={() => router.push(isSignedIn ? '/crew/card' : '/account')}>
-          <Text style={[crew.btnText, crew.btnPrimaryText]}>{!isSignedIn ? 'Sign in to make your card' : hasCard ? 'Your card' : '+ Set up your card'}</Text>
-        </Pressable>
-
-        <View style={[crew.chips, { marginBottom: 12 }]}>
-          <Chip label={`Find people${people && people.total ? ` · ${people.total}` : ''}`} on={tab === 'people'} onPress={() => setTab('people')} />
-          <Chip label={`Cast${cast && cast.total ? ` · ${cast.total}` : ''}`} on={tab === 'cast'} onPress={() => setTab('cast')} />
-          <Chip label={`Gear${gear && gear.total ? ` · ${gear.total}` : ''}`} on={tab === 'gear'} onPress={() => setTab('gear')} />
-          <Chip label="Calls →" onPress={() => router.push('/crew/calls')} />
-        </View>
-
-        <TextInput
-          style={[crew.input, { marginBottom: 10 }]}
-          value={q}
-          onChangeText={setQ}
-          placeholder={tab === 'gear' ? 'Camera, light, lens, van…' : tab === 'cast' ? 'Name, skill, city…' : 'Name, role, gear, city…'}
-          placeholderTextColor={colors.inkFaint}
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-
-        <View style={crew.panel}>
-          {tab === 'people' ? (
-            <View>
-              <Text style={crew.label}>Role</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hrow} keyboardShouldPersistTaps="handled">
-                {options.roles.map((r) => <Chip key={r} label={r} on={roles.includes(r)} onPress={() => toggleRole(r)} />)}
-              </ScrollView>
-            </View>
-          ) : null}
-          {tab === 'cast' ? (
-            <View style={{ gap: 6 }}>
-              <Text style={crew.label}>Playing age</Text>
-              <View style={crew.row}>
-                <TextInput style={[crew.input, { flex: 1 }]} value={ageMin} onChangeText={(v) => setAgeMin(v.replace(/[^0-9]/g, ''))} placeholder="from" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
-                <TextInput style={[crew.input, { flex: 1 }]} value={ageMax} onChangeText={(v) => setAgeMax(v.replace(/[^0-9]/g, ''))} placeholder="to" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
-              </View>
-              <Text style={crew.label}>Union</Text>
-              <View style={crew.chips}>
-                <Chip label="Any" on={!union} onPress={() => setUnion('')} />
-                {Object.entries(UNION).map(([k, v]) => <Chip key={k} label={v} on={union === k} onPress={() => setUnion(union === k ? '' : k)} />)}
-              </View>
-            </View>
-          ) : null}
-          {tab !== 'cast' ? <View>
-            <Text style={crew.label}>{tab === 'gear' ? 'Category' : 'Has gear'}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hrow} keyboardShouldPersistTaps="handled">
-              <Chip label={tab === 'gear' ? 'All gear' : 'Any gear'} on={!gearCat} onPress={() => setGearCat('')} />
-              {options.gearCategories.map((c) => <Chip key={c} label={c} on={gearCat === c} onPress={() => setGearCat(c)} />)}
-            </ScrollView>
-          </View> : null}
-          <View>
-            <Text style={[crew.label, { marginBottom: 6 }]}>Near</Text>
-            <PlaceBox value={near} onChange={(p) => { setNear(p); if (p && within === 0) setWithin(DEFAULT_WITHIN); }} placeholder="City, or use your location" />
-            {near ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.hrow, { marginTop: 8 }]}>
-                {WITHIN_CHOICES.map((n) => <Chip key={n} label={withinLabel(n)} on={within === n} onPress={() => setWithin(n)} />)}
-              </ScrollView>
-            ) : null}
-          </View>
-          {tab !== 'gear' ? (
-            <View style={crew.chips}>
-              <Chip label="● Open to work" on={openOnly} onPress={() => setOpenOnly((v) => !v)} />
-              <Chip label="⚡ Free right now" on={freeNow} onPress={() => setFreeNow((v) => !v)} />
-              <Chip label="✓ Verified creators" on={verifiedOnly} onPress={() => setVerifiedOnly((v) => !v)} />
-            </View>
-          ) : null}
-          {hasFilters ? (
-            <Pressable onPress={() => { setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setFreeNow(false); setVerifiedOnly(false); setAgeMin(''); setAgeMax(''); setUnion(''); }}>
-              <Text style={[crew.mono, { color: colors.inkDim }]}>Clear filters</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.rhead}>
-          <Text style={crew.mono}>
-            {list ? (tab === 'gear' ? `${list.total} ${list.total === 1 ? 'item' : 'items'}` : tab === 'cast' ? `${list.total} ${list.total === 1 ? 'performer' : 'performers'}` : `${list.total} ${list.total === 1 ? 'person' : 'people'}`) : 'Loading…'}
-            {loading && list ? ' · updating…' : ''}
-          </Text>
-          <Text style={crew.mono}>{sortNote}</Text>
-        </View>
-
-        {error ? <Text style={crew.error}>{error}</Text> : null}
-        {!list && !error ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : null}
-
-        {tab === 'people' && people ? (
-          people.people.length === 0 && !error ? (
-            <Text style={crew.empty}>
-              {hasFilters || near ? 'Nobody matches yet. Widen the distance or clear a filter.' : isSignedIn ? 'No cards yet — be the first. Set up your working card and you’ll show up here.' : 'No cards yet. Sign in to set up yours and be the first on the board.'}
-            </Text>
-          ) : (
-            people.people.map((p) => <PersonCard key={p.userId} p={p} onOpen={() => router.push(p.profilePath)} onMessage={() => message(p.userId, 'card', `${p.displayName}’s card`)} />)
-          )
-        ) : null}
-
-        {tab === 'cast' && cast ? (
-          cast.people.length === 0 && !error ? (
-            <Text style={crew.empty}>{hasFilters || near ? 'Nobody matches yet. Widen the age range or clear a filter.' : 'No performers listed yet. Turn on Performer on your card and you’ll be first.'}</Text>
-          ) : (
-            cast.people.map((p) => <CastCard key={p.userId} p={p} onOpen={() => router.push(p.profilePath)} onMessage={() => message(p.userId, 'card', `${p.displayName}’s card`)} />)
-          )
-        ) : null}
-
-        {tab === 'gear' && gear ? (
-          gear.items.length === 0 && !error ? (
-            <Text style={crew.empty}>{hasFilters || near ? 'No gear matches. Try another category or widen the distance.' : 'No gear listed yet. Add yours on your working card.'}</Text>
-          ) : (
-            gear.items.map((g) => <GearCard key={g.id} g={g} onOpen={() => router.push(g.owner.profilePath)} onAsk={() => message(g.owner.userId, 'gear', g.name)} />)
-          )
-        ) : null}
-
-        <Text style={[crew.muted, { marginTop: 10 }]}>Gear here is a “just have it” deal — no money moves through the app. The ✓ creator badge comes from an approved creator application.</Text>
-      </ScrollView>
+      <FlatList
+        data={list || []}
+        extraData={tab}
+        keyExtractor={(item, i) => `${tab}-${item.id || item.userId || i}`}
+        renderItem={renderItem}
+        ListHeaderComponent={header}
+        ListFooterComponent={foot}
+        contentContainerStyle={st.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brass} />}
+      />
+      <CrewFilters
+        visible={Boolean(sheet)}
+        at={sheet ? sheet.at : null}
+        onClose={closeFilters}
+        tab={tab}
+        filters={f}
+        onChange={patchTab}
+        onPlace={setPlaceFrom}
+        onClear={() => patchTab(clearedFilters(tab, byTab[tab]))}
+        options={options}
+        hasCard={Boolean(hasCard)}
+        total={total}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  cta: { alignSelf: 'flex-start', marginBottom: 16 },
-  hrow: { flexDirection: 'row', gap: 6, paddingVertical: 6 },
-  rhead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 8, marginTop: 4 }
+const st = StyleSheet.create({
+  list: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingBottom: 130 },
+  head: { paddingTop: 18, paddingHorizontal: 16, paddingBottom: 6, gap: 12 },
+  error: { fontFamily: fonts.display, fontSize: 15, lineHeight: 22, color: colors.inkDim, textAlign: 'center', marginTop: 28, paddingHorizontal: 24 }
 });
