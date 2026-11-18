@@ -107,8 +107,8 @@ export default function AccountProfile() {
       const data = await apiPost('/api/account/profile', profile, token);
       setProfile((p) => ({ ...p, savedHandle: p.handle || '', avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl, avatarBase64: undefined, removeAvatar: false }));
       // Handle too, so BottomNav's "View profile" row points at the new
-      // @handle straight away.
-      updateOwnProfileCache({ handle: profile.handle || null, ...('avatarUrl' in data ? { avatarUrl: data.avatarUrl } : {}) });
+      // @handle straight away, and the name for the ☰ menu's card.
+      updateOwnProfileCache({ handle: profile.handle || null, displayName: profile.displayName || null, ...('avatarUrl' in data ? { avatarUrl: data.avatarUrl } : {}) });
       setProfileSaved(true);
       setOriginalAge(profile.age ?? null);
       setAgeChangeConfirmed(false);

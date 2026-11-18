@@ -101,8 +101,9 @@ export function ShieldIcon({ size = 20, color = '#fbe8d3' }) {
   );
 }
 
-// The account dropdown's row icons (TopNav's account panel), the same
-// paths as PlayerIcons.js on the website.
+// The account dropdown's row icons (TopNav's account panel until it moved
+// into the ☰ menu on 2026-11-18), the same paths as PlayerIcons.js on the
+// website.
 export function SettingsIcon({ size = 15, color = '#fbe8d3' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

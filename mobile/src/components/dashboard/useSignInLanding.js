@@ -13,7 +13,9 @@ import { hrefToRoute } from '../PushListener';
 //
 // Only the general ways in land anywhere:
 //   - the sign-in card on the Account screen when it was opened as the way
-//     to sign in — the top bar's "Log in / Create account" row, the bottom
+//     to sign in — the top bar's Sign in pill and the ☰ menu's Sign in /
+//     Create account (since 2026-11-18; the account panel's "Log in /
+//     Create account" row before), the bottom
 //     bar's Account → "Settings / Account" row while signed out, and the
 //     Dashboard itself sending a signed-out person there. Those open
 //     /account?signin=general, and AccountFrame lands only with that mark;

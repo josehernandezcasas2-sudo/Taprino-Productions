@@ -4,24 +4,16 @@ import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
 import { useAuth } from '../lib/stableAuth';
-import { apiGet, absoluteUrl, freshToken } from '../lib/api';
+import { apiGet } from '../lib/api';
 import { colors, fonts, inkTint, oliveTint, absoluteFill } from '../lib/theme';
 import { panelRoom } from '../lib/menuScroll';
-import {
-  SearchIcon, AccountIcon, BellIcon, MenuIcon, SettingsIcon, LockIcon, HeartIcon, ChatIcon, SparkleIcon, TargetIcon,
-  CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DashboardIcon
-} from './TabBarIcons';
-import PositionedImage from './PositionedImage';
+import { SearchIcon, BellIcon, MenuIcon, ChatIcon } from './TabBarIcons';
 import { rememberStayInStream } from '../lib/stayInStream';
 import { useNotifications } from '../lib/useUnread';
-import { useAdminRole } from '../lib/adminRole';
-import { signOutEverywhere } from '../lib/signOut';
 import { hrefToRoute } from './PushListener';
-import { DASHBOARD_PATH, seesDashboard } from '../lib/creatorDashboardRules';
 import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
-
-// lib/siteConfig.js SITE.premiumTier on the website.
-const PREMIUM_TIER = 'Tapa +';
+import { MENU_WORDS } from '../lib/siteMenuRules';
+import SiteMenu, { forgetMenuMembership } from './SiteMenu';
 
 // The mobile routes that count as the Stream half of the site — the same
 // pages lib/streamSection.js's isStreamPath() marks on the website, mapped
@@ -72,7 +64,8 @@ export function loadSettings() {
 // The signed-in viewer's own profile bits the header needs: their site
 // photo (user_profiles.avatar_url, set on the Account screen — the same one
 // the website's header, profile page, and comments show, never Clerk's
-// sign-in-provider image) and the "Here only for the stream?" preference.
+// sign-in-provider image), their name for the ☰ menu's card, and the "Here
+// only for the stream?" preference.
 let ownProfileCache = null;
 const ownProfileListeners = new Set();
 // Called by the Account screen after a save so every mounted header picks
@@ -81,12 +74,20 @@ export function updateOwnProfileCache(patch) {
   ownProfileCache = { ...(ownProfileCache || {}), ...patch };
   ownProfileListeners.forEach((fn) => fn(ownProfileCache));
 }
-// The same cache for anything outside the header (BottomNav's "View
-// profile" row). TopNav fills it; this only follows along.
+// Signed out: every follower (the bottom bar's Account photo too) forgets
+// the person at once.
+function clearOwnProfileCache() {
+  if (ownProfileCache === null) return;
+  ownProfileCache = null;
+  ownProfileListeners.forEach((fn) => fn(null));
+}
+// The same cache for anything outside the header (BottomNav's Account
+// photo and "View profile" row). TopNav fills it; this only follows along.
 export function useOwnProfile() {
   const [ownProfile, setOwnProfile] = useState(ownProfileCache);
   useEffect(() => {
     ownProfileListeners.add(setOwnProfile);
+    setOwnProfile(ownProfileCache);
     return () => { ownProfileListeners.delete(setOwnProfile); };
   }, []);
   return ownProfile;
@@ -99,66 +100,37 @@ export function ownProfileHref(ownProfile) {
   return `/profile/${ownProfile.handle || ownProfile.userId}`;
 }
 
-// The genres the browse menu lists on Stream screens (the website's
-// "Browse by genre"): /api/genres, once per app session.
-let genresCache = null;
-let genresPromise = null;
-function loadGenres() {
-  if (genresCache) return Promise.resolve(genresCache);
-  if (!genresPromise) {
-    genresPromise = apiGet('/api/genres')
-      .then((d) => { genresCache = Array.isArray(d.genres) ? d.genres : []; return genresCache; })
-      .catch(() => { genresPromise = null; return []; });
-  }
-  return genresPromise;
-}
-
-// The plan line in the account panel ("Tapa + member" / "Free account"):
-// /api/account/dashboard-info, at most once a minute, asked when the
-// panel opens so a membership bought a moment ago shows.
-let membershipCache = { at: 0, isSubscriber: false, tier: null };
-async function loadMembership(getToken) {
-  if (Date.now() - membershipCache.at < 60000) return membershipCache;
-  const token = await freshToken(getToken);
-  if (!token) return membershipCache;
-  const info = await apiGet('/api/account/dashboard-info', token).catch(() => null);
-  if (info) membershipCache = { at: Date.now(), isSubscriber: Boolean(info.isSubscriber), tier: info.tier || null };
-  return membershipCache;
-}
-
 // The branded header on every screen that's a direct bottom-nav
 // destination (detail screens keep Expo Router's back-button header).
-// It is the website's phone header (components/HeaderNav.js at ≤1180px,
-// Jose, 2026-10-28: "match the site's"): the wordmark + CONNECT / STREAM
-// kicker, then the round hamburger that opens the browse menu under
-// itself (the site's .hamburger-dropdown: Browse by type for whichever
-// half of the site this screen is on, My List, My Recs, Live TV, Shop,
-// and the genres on Stream screens), and on the right the round search
-// button, the bell with its unread count that opens the notifications
-// panel (the site's .notification-dropdown, mark read / mark all read,
-// a tap opens what the notification points at), and the account photo.
-// The photo opens the site's account dropdown (`.account-dropdown`: who
-// you are and your plan, then every account, creator and admin row the
-// website lists, and Sign Out; signed out, Log in and Become a creator). All three panels live in one transparent Modal placed just
-// under the bar, so they sit above every screen and BottomNav the way
-// the website's dropdowns do. The brand tap goes home, or straight to
-// Stream for an account with "Here only for the stream?" turned on.
+// It is the website's phone header (components/HeaderNav.js), option B of
+// 2026-11-18 (Jose: "we do B and we move what is missing to there"): the
+// ☰ first, then the wordmark + CONNECT / STREAM kicker, and on the right
+// the round search button, Messages with the unread-conversations count,
+// and the bell with its unread count that opens the notifications panel
+// (the site's .notification-dropdown, mark read / mark all read, a tap
+// opens what the notification points at). The account photo and its panel
+// left the bar: the photo is the bottom bar's Account tab, and what its
+// panel held is in the ☰ menu (components/SiteMenu.js), which slides in
+// from the left over everything and holds the whole site — signed out, a
+// "Sign in" pill sits where the photo was. The bell's panel lives in a
+// transparent Modal placed just under the bar, so it sits above every
+// screen and BottomNav the way the website's dropdowns do. The brand tap
+// goes home, or straight to Stream for an account with "Here only for the
+// stream?" turned on.
 export default function TopNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const { isSignedIn, user } = useUser();
-  const { getToken, signOut } = useAuth();
+  const { isLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState(settingsCache);
   const [ownProfile, setOwnProfile] = useState(ownProfileCache);
-  const [genres, setGenres] = useState(genresCache || []);
-  const [membership, setMembership] = useState(null);
-  const [panel, setPanel] = useState(null); // 'menu' | 'bell' | 'account' | null
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [panel, setPanel] = useState(null); // 'bell' | null
   const [anchorTop, setAnchorTop] = useState(0);
   const barRef = useRef(null);
   const { notifications, unreadCount, messagesUnread, markRead, markAllRead } = useNotifications();
-  const role = useAdminRole();
 
   useEffect(() => {
     let cancelled = false;
@@ -172,50 +144,29 @@ export default function TopNav() {
   }, []);
 
   useEffect(() => {
-    if (!isSignedIn) { ownProfileCache = null; setOwnProfile(null); membershipCache = { at: 0, isSubscriber: false, tier: null }; setMembership(null); return undefined; }
-    if (ownProfileCache) { setOwnProfile(ownProfileCache); return undefined; }
+    if (!isSignedIn) { clearOwnProfileCache(); setOwnProfile(null); forgetMenuMembership(); return undefined; }
+    if (ownProfileCache && ownProfileCache.userId) { setOwnProfile(ownProfileCache); return undefined; }
     let cancelled = false;
     (async () => {
       const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
       if (!token) return;
       const profile = await apiGet('/api/account/profile', token).catch(() => null);
       if (!cancelled && profile) {
-        updateOwnProfileCache({ userId: profile.userId || null, handle: profile.handle || null, avatarUrl: profile.avatarUrl || null, avatarPosition: profile.avatarPosition || null, avatarZoom: profile.avatarZoom || null, stayInStream: !!profile.stayInStream });
+        updateOwnProfileCache({ userId: profile.userId || null, handle: profile.handle || null, displayName: profile.displayName || null, avatarUrl: profile.avatarUrl || null, avatarPosition: profile.avatarPosition || null, avatarZoom: profile.avatarZoom || null, stayInStream: !!profile.stayInStream });
         rememberStayInStream(!!profile.stayInStream);
       }
     })();
     return () => { cancelled = true; };
-  }, [isSignedIn]);
+  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A panel closes when the screen changes (a tap in it navigates).
-  useEffect(() => { setPanel(null); }, [pathname]);
+  // A panel or the menu closes when the screen changes (a tap in it
+  // navigates).
+  useEffect(() => { setPanel(null); setMenuOpen(false); }, [pathname]);
 
   const stream = isStreamRoute(pathname);
   const kicker = stream
     ? (settings && settings.streamLabel) || 'Stream'
     : (settings && settings.connectLabel) || 'Connect';
-
-  // The genres only matter on Stream screens, and only once the menu is
-  // asked for.
-  useEffect(() => {
-    if (panel !== 'menu' || !stream) return undefined;
-    let cancelled = false;
-    loadGenres().then((g) => { if (!cancelled) setGenres(g); });
-    return () => { cancelled = true; };
-  }, [panel, stream]);
-
-  // The plan line, asked for when the account panel opens.
-  useEffect(() => {
-    if (panel !== 'account' || !isSignedIn) return undefined;
-    let cancelled = false;
-    loadMembership(getToken).then((m) => { if (!cancelled) setMembership(m); });
-    return () => { cancelled = true; };
-  }, [panel, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const email = isSignedIn && user && user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : null;
-  const avatarLetter = email ? email[0].toUpperCase() : null;
-  const profileHref = isSignedIn ? ownProfileHref(ownProfile) : null;
-  const isSubscriber = Boolean(membership && membership.isSubscriber);
 
   function openPanel(which) {
     if (panel === which) { setPanel(null); return; }
@@ -244,12 +195,7 @@ export default function TopNav() {
 
   function go(href) {
     setPanel(null);
-    router.push(href);
-  }
-
-  function doSignOut() {
-    setPanel(null);
-    signOutEverywhere(signOut, getToken).catch(() => {});
+    if (href !== pathname) router.push(href);
   }
 
   function openNotification(n) {
@@ -262,43 +208,6 @@ export default function TopNav() {
     else Linking.openURL(where.url).catch(() => {});
   }
 
-  // The website's typeLinks: the Stream list on Stream screens, the
-  // Connect list elsewhere, each entry knowing whether it is the screen
-  // we are on. Flags fail closed like the site (nothing until settings
-  // have loaded).
-  const typeLinks = stream
-    ? [
-        { href: '/stream', label: 'Home', match: pathname === '/stream' },
-        { href: '/watch/series', label: 'Series', match: pathname === '/watch/series' || pathname.startsWith('/series/') },
-        { href: '/watch/movies', label: 'Films', match: pathname === '/watch/movies' },
-        ...(settings && settings.verticalEnabled !== false ? [{ href: '/watch/vertical', label: 'Vertical', match: pathname === '/watch/vertical' }] : []),
-        ...(settings && settings.podcastsEnabled !== false ? [{ href: '/watch/podcasts', label: 'Podcasts', match: pathname === '/watch/podcasts' || pathname.startsWith('/podcasts/') }] : [])
-      ]
-    : [
-        { href: '/', label: 'Home', match: pathname === '/' },
-        { href: '/pitches/discover', label: 'Pitch Discover', match: pathname === '/pitches/discover' },
-        { href: '/crew', label: 'Crew Call', match: pathname.startsWith('/crew') },
-        { href: '/locations', label: 'Locations', match: pathname.startsWith('/locations') },
-        { href: '/productions', label: 'Productions', match: pathname.startsWith('/productions') },
-        { href: '/resources', label: 'Resources', match: pathname.startsWith('/resources') },
-        ...(isSignedIn ? [{ href: '/messages', label: 'Messages', match: pathname.startsWith('/messages'), badge: messagesUnread }] : []),
-        ...(settings && settings.verticalEnabled !== false ? [{ href: '/vertical/discover', label: 'Vertical Discover', match: pathname === '/vertical/discover' }] : []),
-        ...(settings && settings.elevatorPitchEnabled ? [{ href: '/pitches', label: 'Pitch Room', match: pathname === '/pitches' || /^\/pitches\/(?!discover$)[^/]+$/.test(pathname) }] : []),
-        { href: '/university', label: 'University', match: pathname.startsWith('/university') }
-      ];
-  const extraLinks = [
-    { href: '/account/wishlist', label: 'My List', match: pathname === '/account/wishlist' },
-    ...(isSignedIn ? [{ href: '/recs', label: 'My Recs', match: pathname === '/recs' }] : []),
-    ...(settings && settings.liveTvEnabled !== false ? [{ href: '/live', label: 'Live TV', match: pathname === '/live' || pathname.startsWith('/live/') }] : [])
-  ];
-  const shopUrl = settings && settings.shopEnabled && settings.shopUrl ? settings.shopUrl : null;
-  let currentGenre = null;
-  if (pathname.startsWith('/genre/')) {
-    try { currentGenre = decodeURIComponent(pathname.slice('/genre/'.length)); } catch (err) { currentGenre = pathname.slice('/genre/'.length); }
-  }
-  const showGenres = stream && genres.length > 0;
-
-  const menuWidth = Math.min(Math.round(windowWidth * 0.86), 340);
   const bellWidth = Math.min(300, windowWidth - 32);
   // A panel never runs off the bottom of the screen: it is its own scroll
   // area from the bar down to the home indicator (lib/menuScroll.js, the
@@ -309,17 +218,18 @@ export default function TopNav() {
   return (
     <>
       <View style={styles.bar} ref={barRef} collapsable={false}>
-        {/* The hamburger first, drawn without the circle the other
-            buttons have (the website's .nav-hamburger; Jose, 2026-10-28). */}
+        {/* The ☰ first, drawn without the circle the other buttons have
+            (the website's .nav-hamburger; Jose, 2026-10-28). It opens the
+            menu that holds the whole site (2026-11-18). */}
         <Pressable
           style={({ pressed }) => [styles.menuBtn, pressed && styles.iconBtnPressed]}
-          onPress={() => openPanel('menu')}
+          onPress={() => { setPanel(null); setMenuOpen(true); }}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel="Browse by type and genre"
-          accessibilityState={{ expanded: panel === 'menu' }}
+          accessibilityLabel={MENU_WORDS.open}
+          accessibilityState={{ expanded: menuOpen }}
         >
-          <MenuIcon size={20} color={panel === 'menu' ? colors.olive : colors.inkDim} />
+          <MenuIcon size={20} color={menuOpen ? colors.olive : colors.inkDim} />
         </Pressable>
         <Pressable style={styles.brandMark} onPress={() => router.push(ownProfile && ownProfile.stayInStream ? '/stream' : '/')} hitSlop={6}>
           {settings && settings.logoUrl ? (
@@ -332,48 +242,55 @@ export default function TopNav() {
         </Pressable>
         <View style={styles.spacer} />
         <View style={styles.actions}>
-          <CircleButton label="Search" onPress={() => router.push('/search')}>
+          <CircleButton label="Search" onPress={() => go('/search')}>
             <SearchIcon size={17} color={colors.inkDim} />
           </CircleButton>
           {isSignedIn ? (
-            <CircleButton label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`} active={panel === 'bell'} onPress={() => openPanel('bell')}>
-              <BellIcon size={17} color={panel === 'bell' ? colors.olive : colors.inkDim} />
-              {unreadCount > 0 ? (
-                <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>
-              ) : null}
-            </CircleButton>
+            <>
+              {/* Messages, between search and the bell (option B): the
+                  same unread-conversations count the bottom bar's Account
+                  dot and the Messages row use. */}
+              <CircleButton label={`Messages${messagesUnread > 0 ? ` (${messagesUnread} unread)` : ''}`} onPress={() => go('/messages')}>
+                <ChatIcon size={17} color={pathname.startsWith('/messages') ? colors.olive : colors.inkDim} />
+                {messagesUnread > 0 ? (
+                  <View style={styles.badge}><Text style={styles.badgeText}>{messagesUnread > 9 ? '9+' : messagesUnread}</Text></View>
+                ) : null}
+              </CircleButton>
+              <CircleButton label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`} active={panel === 'bell'} onPress={() => openPanel('bell')}>
+                <BellIcon size={17} color={panel === 'bell' ? colors.olive : colors.inkDim} />
+                {unreadCount > 0 ? (
+                  <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text></View>
+                ) : null}
+              </CircleButton>
+            </>
+          ) : isLoaded ? (
+            // Where the photo was: the general way in (a creator who signs
+            // in from it lands on the Dashboard, useSignInLanding.js).
+            // Nothing until Clerk has loaded, so a signed-in person never
+            // sees it flash.
+            <Pressable
+              style={({ pressed }) => [styles.signInPill, pressed && styles.signInPressed]}
+              onPress={() => go(`/account?${GENERAL_SIGN_IN}`)}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={MENU_WORDS.signIn}
+            >
+              <Text style={styles.signInText} numberOfLines={1}>{MENU_WORDS.signIn}</Text>
+            </Pressable>
           ) : null}
-          <Pressable style={styles.avatarBtn} onPress={() => openPanel('account')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account menu" accessibilityState={{ expanded: panel === 'account' }}>
-            {isSignedIn && ownProfile && ownProfile.avatarUrl ? (
-              <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} zoom={ownProfile.avatarZoom || 1} style={styles.avatarImg} />
-            ) : avatarLetter ? (
-              <Text style={styles.avatarText}>{avatarLetter}</Text>
-            ) : (
-              // Signed out (or Clerk still loading): the same person glyph the
-              // tab bar's Account tab uses — a "☺" here came out as an emoji
-              // on iOS (Jose, 2026-10-28).
-              <AccountIcon size={17} color={colors.onBrass} />
-            )}
-          </Pressable>
         </View>
       </View>
 
-      <HeaderPanel visible={panel !== null} onClose={() => setPanel(null)} top={anchorTop} side={panel === 'menu' ? 'left' : 'right'} width={panel === 'menu' ? menuWidth : bellWidth}>
-        {panel === 'menu' ? (
-          <ScrollView style={{ maxHeight: panelMaxHeight }} contentContainerStyle={styles.panelInner} keyboardShouldPersistTaps="handled">
-            <Text style={styles.panelLabel}>Browse by type</Text>
-            {typeLinks.map((l) => <MenuRow key={l.href} label={l.label} badge={l.badge} active={l.match} onPress={() => go(l.href)} />)}
-            {extraLinks.map((l) => <MenuRow key={l.href} label={l.label} active={l.match} onPress={() => go(l.href)} />)}
-            {shopUrl ? <MenuRow label="Shop" onPress={() => { setPanel(null); Linking.openURL(shopUrl).catch(() => {}); }} /> : null}
-            {showGenres ? (
-              <>
-                <View style={styles.panelDivider} />
-                <Text style={styles.panelLabel}>Browse by genre</Text>
-                {genres.map((g) => <MenuRow key={g} label={g} active={currentGenre === g} onPress={() => go(`/genre/${encodeURIComponent(g)}`)} />)}
-              </>
-            ) : null}
-          </ScrollView>
-        ) : panel === 'bell' ? (
+      <SiteMenu
+        visible={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        side={stream ? 'stream' : 'connect'}
+        settings={settings}
+        ownProfile={ownProfile}
+      />
+
+      <HeaderPanel visible={panel !== null} onClose={() => setPanel(null)} top={anchorTop} width={bellWidth}>
+        {panel === 'bell' ? (
           <View>
             <View style={styles.bellHead}>
               <Text style={styles.panelLabel}>Notifications</Text>
@@ -397,81 +314,6 @@ export default function TopNav() {
               ))}
             </ScrollView>
           </View>
-        ) : panel === 'account' ? (
-          <ScrollView style={{ maxHeight: panelMaxHeight }} contentContainerStyle={styles.panelInner} keyboardShouldPersistTaps="handled">
-            {isSignedIn ? (
-              <>
-                <Pressable
-                  style={({ pressed }) => [styles.accountHead, profileHref && pressed && styles.rowPressed]}
-                  onPress={profileHref ? () => go(profileHref) : undefined}
-                  disabled={!profileHref}
-                  accessibilityRole="button"
-                  accessibilityLabel={profileHref ? 'View public profile' : undefined}
-                >
-                  <View style={styles.accountAvatar}>
-                    {ownProfile && ownProfile.avatarUrl ? (
-                      <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} zoom={ownProfile.avatarZoom || 1} style={styles.avatarImg} />
-                    ) : avatarLetter ? (
-                      <Text style={styles.accountAvatarText}>{avatarLetter}</Text>
-                    ) : (
-                      <AccountIcon size={20} color={colors.inkDim} />
-                    )}
-                  </View>
-                  <View style={styles.accountWho}>
-                    <Text style={styles.accountEmail}>{email || 'Your account'}</Text>
-                    {membership ? <Text style={styles.accountTier}>{isSubscriber ? `${PREMIUM_TIER} member` : 'Free account'}</Text> : null}
-                  </View>
-                </Pressable>
-                <View style={styles.panelDivider} />
-                <MenuRow Icon={SettingsIcon} label="Account Settings" onPress={() => go('/account')} />
-                {profileHref ? <MenuRow Icon={AccountIcon} label="View public profile" onPress={() => go(profileHref)} /> : null}
-                {role.canAccessAdmin ? <MenuRow Icon={LockIcon} label="Admin Portal" onPress={() => go('/admin')} /> : null}
-                <MenuRow Icon={HeartIcon} label="My Wishlist" onPress={() => go('/account/wishlist')} />
-                <MenuRow Icon={AccountIcon} label="My working card" onPress={() => go('/crew/card')} />
-                <MenuRow Icon={AccountIcon} label="My locations" onPress={() => go('/locations/mine')} />
-                <MenuRow Icon={AccountIcon} label="Location requests" onPress={() => go('/locations/requests')} />
-                <MenuRow Icon={AccountIcon} label="My productions" onPress={() => go('/productions')} />
-                <MenuRow Icon={ChatIcon} label="Messages" badge={messagesUnread} onPress={() => go('/messages')} />
-                <MenuRow Icon={SparkleIcon} label="My Recs" onPress={() => go('/recs')} />
-                {settings && settings.elevatorPitchEnabled ? <MenuRow Icon={TargetIcon} label="Pitch Room" onPress={() => go('/pitches')} /> : null}
-                {/* The Membership screen does the right thing for everyone:
-                    plan picker, Manage subscription for a paying member,
-                    the free-access note for the team. */}
-                <MenuRow Icon={isSubscriber ? CardIcon : SparkleIcon} label={isSubscriber ? 'Membership' : `Join ${PREMIUM_TIER}`} onPress={() => go('/account/membership')} />
-                {/* The creator's Dashboard (2026-11-14), above the creator
-                    rows: the same people who get its tab in the bottom
-                    bar (a creator, an admin, a sub-admin). */}
-                {seesDashboard(role) ? <View style={styles.panelDivider} /> : null}
-                {seesDashboard(role) ? <MenuRow Icon={DashboardIcon} label="Dashboard" active={pathname === DASHBOARD_PATH} onPress={() => (pathname === DASHBOARD_PATH ? setPanel(null) : go(DASHBOARD_PATH))} /> : null}
-                {role.isCreator ? <MenuRow Icon={BarChartIcon} label="Your numbers" onPress={() => go('/creator/numbers')} /> : null}
-                {role.isCreator || role.isAdmin ? (
-                  <>
-                    <MenuRow Icon={CardIcon} label="Money" onPress={() => go('/creator/money')} />
-                    <View style={styles.panelDivider} />
-                    {/* Creator Studio's hub had a row here until the
-                        Dashboard (above) took its place, 2026-11-14. */}
-                    <MenuRow Icon={FolderIcon} label="Your work" onPress={() => go('/account/my-work')} />
-                  </>
-                ) : (
-                  <>
-                    <View style={styles.panelDivider} />
-                    <MenuRow Icon={ClapperboardIcon} label="Become a creator" onPress={() => go('/apply')} />
-                  </>
-                )}
-                <View style={styles.panelDivider} />
-                <MenuRow Icon={LogoutIcon} label="Sign Out" onPress={doSignOut} />
-              </>
-            ) : (
-              <>
-                <Text style={styles.panelLabel}>Account</Text>
-                {/* The general way in: a creator who signs in from here
-                    lands on the Dashboard (useSignInLanding.js). */}
-                <MenuRow Icon={ArrowRightIcon} label="Log in / Create account" onPress={() => go(`/account?${GENERAL_SIGN_IN}`)} />
-                <View style={styles.panelDivider} />
-                <MenuRow Icon={ClapperboardIcon} label="Become a creator" onPress={() => go('/apply')} />
-              </>
-            )}
-          </ScrollView>
         ) : null}
       </HeaderPanel>
     </>
@@ -495,24 +337,10 @@ function CircleButton({ label, active, onPress, children }) {
   );
 }
 
-// .dropdown-item: an optional 15px icon (the account panel's rows), the
-// label, gold when it is the screen we are on, the Messages count.
-function MenuRow({ Icon, label, badge, active, onPress }) {
-  return (
-    <Pressable style={({ pressed }) => [styles.menuRow, pressed && styles.rowPressed]} onPress={onPress} accessibilityRole="button">
-      {Icon ? <Icon size={15} color={active ? colors.olive : colors.ink} /> : null}
-      <Text style={[styles.menuRowText, active && styles.menuRowActive]}>
-        {label}{badge > 0 ? <Text style={styles.menuRowBadge}>{`  ${badge > 9 ? '9+' : badge}`}</Text> : null}
-      </Text>
-    </Pressable>
-  );
-}
-
-// One transparent Modal for both panels: a tap anywhere outside closes
+// A transparent Modal for the bell's panel: a tap anywhere outside closes
 // it, the card fades and slides in like the website's dropdowns (and
-// BottomNav's drop-up), anchored just under the bar on the side of the
-// button that opened it.
-function HeaderPanel({ visible, onClose, top, side, width, children }) {
+// BottomNav's drop-up), anchored just under the bar on the right.
+function HeaderPanel({ visible, onClose, top, width, children }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!visible) { anim.setValue(0); return; }
@@ -524,8 +352,7 @@ function HeaderPanel({ visible, onClose, top, side, width, children }) {
       <Animated.View
         style={[
           styles.panel,
-          { top, width },
-          side === 'right' ? { right: 16 } : { left: 16 },
+          { top, width, right: 16 },
           { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-6, 0] }) }] }
         ]}
       >
@@ -566,11 +393,13 @@ const styles = StyleSheet.create({
   // .notification-badge
   badge: { position: 'absolute', top: -4, right: -4, minWidth: 14, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.danger, alignItems: 'center' },
   badgeText: { fontFamily: fonts.mono, fontSize: 9.6, lineHeight: 10, color: colors.ink },
-  avatarBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImg: { width: '100%', height: '100%' },
-  avatarText: { color: colors.onBrass, fontSize: 13, fontFamily: fonts.displayBold },
+  // Signed out, where the photo was: a small brass pill, the general way
+  // in.
+  signInPill: { height: 30, paddingHorizontal: 12, borderRadius: 999, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center' },
+  signInPressed: { opacity: 0.85 },
+  signInText: { fontFamily: fonts.displayBold, fontSize: 12.5, color: colors.onBrass },
   // .dropdown: the website's panel (void-2 fill, hairline, 8px radius,
-  // deep shadow); .hamburger-dropdown is min(86vw, 340px) and scrolls.
+  // deep shadow).
   backdrop: { ...absoluteFill },
   // It comes out from under the bar (.menu-panel): no top edge of its own
   // and square top corners.
@@ -582,23 +411,9 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 34, shadowOffset: { width: 0, height: 16 }, elevation: 16,
     overflow: 'hidden'
   },
-  panelInner: { padding: 8 },
   // .dropdown-label
   panelLabel: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.inkFaint, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 5 },
-  panelDivider: { height: 1, backgroundColor: inkTint(0.1), marginVertical: 6, marginHorizontal: 3 },
-  // .dropdown-item, .dropdown-item.active-cat
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 10, borderRadius: 5 },
   rowPressed: { backgroundColor: inkTint(0.06) },
-  menuRowText: { flexShrink: 1, fontFamily: fonts.body, fontSize: 13.6, color: colors.ink },
-  menuRowActive: { color: colors.olive },
-  menuRowBadge: { fontFamily: fonts.mono, fontSize: 11, color: colors.brass },
-  // .account-dropdown-header / -avatar (38px, void fill) / -email / -tier
-  accountHead: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 6 },
-  accountAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface0, borderWidth: 1, borderColor: inkTint(0.16), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  accountAvatarText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.inkDim },
-  accountWho: { flex: 1, minWidth: 0 },
-  accountEmail: { fontFamily: fonts.body, fontSize: 13.6, lineHeight: 18, color: colors.ink },
-  accountTier: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.5, color: colors.olive, marginTop: 2 },
   // .notification-dropdown (300px, scrolls at 360px), .notification-item
   bellHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingTop: 8, paddingRight: 14 },
   markAll: { fontFamily: fonts.mono, fontSize: 10.9, color: colors.olive },

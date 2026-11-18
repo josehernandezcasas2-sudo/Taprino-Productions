@@ -28,7 +28,13 @@ const APP_ROUTES = [
   /^\/downloads$/,
   // Your numbers, one of the Dashboard's tabs (2026-11-14; the Dashboard
   // itself is in SCREEN_KEEP below).
-  /^\/creator\/numbers$/
+  /^\/creator\/numbers$/,
+  // The ☰ menu's places (2026-11-18, mobile/src/components/SiteMenu.js):
+  // the app has these screens, and these addresses used to open the
+  // website. The admin home is the app's Admin tab (every other admin page
+  // stays on the website).
+  /^\/(crew|pitches|resources|recs|about|admin)$/, /^\/live(\/[^/]+)?$/, /^\/vertical\/discover$/, /^\/genre\/[^/]+$/,
+  /^\/watch\/(series|movies|podcasts|vertical)$/
 ];
 // The website's /creator/analytics is the app's Your numbers, its
 // /creator/pitch/new the app's Submit a project. /creator was Creator
@@ -41,7 +47,14 @@ const ALIASES = {
   '/wishlist': '/account/wishlist',
   '/creator/my-work': '/account/my-work',
   '/creator/analytics': '/creator/numbers',
-  '/creator': '/creator/dashboard'
+  '/creator': '/creator/dashboard',
+  // Browse by type: the website's /type/<type> and /podcasts are the app's
+  // Watch screens (the ☰ menu's Stream tiles, 2026-11-18).
+  '/type/series': '/watch/series',
+  '/type/movie': '/watch/movies',
+  '/type/vertical': '/watch/vertical',
+  '/vertical/browse': '/watch/vertical',
+  '/podcasts': '/watch/podcasts'
 };
 // Who gets paid (the series revamp, slice 3b; lib/payees.js) sends:
 //   /creator#get-paid           → /creator/dashboard (payee_invite,

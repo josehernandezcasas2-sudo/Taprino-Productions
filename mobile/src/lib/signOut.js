@@ -3,7 +3,7 @@ import { clearAdminRoleCache } from './adminRole';
 import { clearSuspension } from './suspensionStore';
 import { afterSignOut, beforeSignOut } from './downloads';
 
-// The one way out of an account (TopNav's account panel, the Account
+// The one way out of an account (the ☰ menu's Log out, the Account
 // screen, the suspension gate). This phone's push token leaves the
 // account first — Clerk's signOut ends the session, so the server call
 // has to come before it — then the session ends and the per-account

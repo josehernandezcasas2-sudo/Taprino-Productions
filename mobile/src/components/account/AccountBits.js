@@ -138,7 +138,7 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
       // A failed re-read (the hub reads on every focus) keeps what showed.
       if (profileData) setProfile({ ...profileData, savedHandle: profileData.handle || '' });
       if (profileData) {
-        updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, avatarPosition: profileData.avatarPosition || null, avatarZoom: profileData.avatarZoom || null, stayInStream: !!profileData.stayInStream });
+        updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, displayName: profileData.displayName || null, avatarUrl: profileData.avatarUrl || null, avatarPosition: profileData.avatarPosition || null, avatarZoom: profileData.avatarZoom || null, stayInStream: !!profileData.stayInStream });
         rememberStayInStream(!!profileData.stayInStream);
       }
       if (profileData) setOriginalAge(profileData.age ?? null);

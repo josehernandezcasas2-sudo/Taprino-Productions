@@ -3,11 +3,12 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View, ScrollView, useWin
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { riseRoom } from '../lib/menuScroll';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, brassTint } from '../lib/theme';
 import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon, DashboardIcon } from './TabBarIcons';
 import { useAdminRole } from '../lib/adminRole';
 import { useUnreadMessages } from '../lib/useUnread';
 import { useOwnProfile, ownProfileHref, loadSettings } from './TopNav';
+import PositionedImage from './PositionedImage';
 import { useDownloadCount } from '../lib/useDownloads';
 import { DOWNLOAD_WORDS } from '../lib/downloadRules';
 import { DownloadGlyph } from './downloads/DownloadBits';
@@ -99,8 +100,8 @@ const GROUPS = {
     Icon: AccountIcon,
     // A function, like MobileTabBar.js's: "View profile" only exists once
     // the signed-in viewer's own profile is known (TopNav's cache).
-    // Signed out it is the way in and Become a creator, as the top bar's
-    // account panel and the website (Jose, 2026-11-17: the rows that need
+    // Signed out it is the way in and Become a creator, as the ☰ menu's
+    // sign-in card and the website (Jose, 2026-11-17: the rows that need
     // an account came off it — every one only led to the sign-in card).
     items: ({ profileHref, role }) => (!role.isSignedIn ? [
       // The bar's way to the sign-in card: a creator who signs in from it
@@ -115,8 +116,9 @@ const GROUPS = {
       // Membership, Your purchases and Artist Support are the Account
       // screen's tiles (Artist Support from Membership); My List and My Recs
       // are the Watch menu's first rows; Continue Watching is Stream's first
-      // row; My locations is Locations' "Your places" and the top bar's
-      // account panel. My Work, Your Numbers and Money are the Dashboard's
+      // row; My locations is Locations' "Your places" and the ☰ menu's Your
+      // things (components/SiteMenu.js, which took the top bar's account
+      // panel's rows on 2026-11-18). My Work, Your Numbers and Money are the Dashboard's
       // tabs (2026-11-14).
       { href: '/messages', label: 'Messages', badge: 'messages' },
       ...(!role.isCreator && !role.isAdmin ? [{ href: '/apply', label: 'Become a creator' }] : [])
@@ -166,7 +168,14 @@ export default function BottomNav() {
   // Unread conversations: a dot on the Account tab and a count on the
   // Messages row (the website's header badge).
   const unreadMessages = useUnreadMessages();
-  const profileHref = ownProfileHref(useOwnProfile());
+  const ownProfile = useOwnProfile();
+  const profileHref = ownProfileHref(ownProfile);
+  // The Account tab is the person's own photo (option B, 2026-11-18: the
+  // photo left the top bar for this tab), with its focal point and zoom
+  // like every avatar in the app: the top bar's profile copy first (it
+  // follows an edit on the Profile screen at once), else what /api/my-role
+  // answered. Signed out, or with no photo, the tab keeps its icon.
+  const accountPhoto = accountPhotoFor(role, ownProfile);
   // Downloads: the phone's own count (the index file, no request), and the
   // admin switch from the settings every screen already shares.
   const downloadCount = useDownloadCount();
@@ -309,7 +318,13 @@ export default function BottomNav() {
                   accessibilityState={isLink ? { selected: active } : undefined}
                 >
                   <View>
-                    <Icon size={20} color={tint} />
+                    {key === 'account' && accountPhoto ? (
+                      <View style={[styles.photoRing, active && styles.photoRingActive]}>
+                        <PositionedImage uri={accountPhoto.url} position={accountPhoto.position} zoom={accountPhoto.zoom || 1} style={styles.photo} />
+                      </View>
+                    ) : (
+                      <Icon size={20} color={tint} />
+                    )}
                     {key === 'account' && unreadMessages > 0 ? <View style={styles.badgeDot} /> : null}
                   </View>
                   <View style={styles.labelRow}>
@@ -339,6 +354,14 @@ export default function BottomNav() {
   );
 }
 
+function accountPhotoFor(role, ownProfile) {
+  if (!role || !role.isSignedIn) return null;
+  if (ownProfile && Object.prototype.hasOwnProperty.call(ownProfile, 'avatarUrl')) {
+    return ownProfile.avatarUrl ? { url: ownProfile.avatarUrl, position: ownProfile.avatarPosition, zoom: ownProfile.avatarZoom } : null;
+  }
+  return role.avatar && role.avatar.url ? role.avatar : null;
+}
+
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   bar: {
@@ -363,6 +386,11 @@ const styles = StyleSheet.create({
   itemSquarer: { borderRadius: SQUARE_RADIUS },
   itemActive: { backgroundColor: colors.brass },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, maxWidth: '100%' },
+  // The Account tab's photo: a small round photo in a thin orange ring
+  // (dark on the lit pill), the size of the other tabs' icons.
+  photoRing: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: brassTint(0.85), alignItems: 'center', justifyContent: 'center' },
+  photoRingActive: { borderColor: colors.onBrass },
+  photo: { width: 17, height: 17, borderRadius: 9, backgroundColor: colors.surface2 },
   badgeDot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brass, borderWidth: 1, borderColor: colors.barBackground },
   // The size and spacing here are the bar's when there is room; the render
   // sets both from tabBarFit.

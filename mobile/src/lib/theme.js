@@ -62,6 +62,10 @@ export const colors = {
 export const brassTint = (a) => `rgba(255,140,66,${a})`;
 export const oliveTint = (a) => `rgba(242,193,78,${a})`;
 export const dangerTint = (a) => `rgba(239,91,91,${a})`;
+// colors.mint's and colors.sky's (the ☰ menu's tile chips and the Connect
+// half of its switch, 2026-11-18).
+export const mintTint = (a) => `rgba(147,208,164,${a})`;
+export const skyTint = (a) => `rgba(132,153,220,${a})`;
 // colors.ok's tint (the show page's Live pills and "ready" lines).
 export const okTint = (a) => `rgba(132,205,152,${a})`;
 // colors.warn's tint (the flashing-lights chip and the warning card; the
