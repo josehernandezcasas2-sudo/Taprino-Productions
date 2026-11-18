@@ -59,6 +59,8 @@ export default async function handler(req, res) {
     // this creator's Stripe account can take charges.
     tipping: data.tipping || null,
     // The "Not for AI training" seal (lib/aiPolicyRules.js).
-    aiSeal: data.aiSeal !== false
+    aiSeal: data.aiSeal !== false,
+    // Account types (migration 126): { types, main }.
+    accountTypes: data.accountTypes || { types: [], main: null }
   });
 }

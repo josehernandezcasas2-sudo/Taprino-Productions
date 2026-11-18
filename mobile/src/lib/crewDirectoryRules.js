@@ -59,7 +59,7 @@ export const CREW_WORDS = {
   freeNowLine: 'Said they can jump in today',
   openToWork: 'Open to work',
   openToWorkLine: 'Hides people who are booked',
-  verified: 'Verified creators only',
+  verified: 'Approved creators only',
   verifiedLine: 'Approved through a creator application',
   matches: 'Matches my card',
   matchesLine: 'Calls for a role on your card, within your travel distance',

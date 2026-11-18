@@ -2,6 +2,7 @@ import { getRoleContext } from '../../lib/roles';
 import { getOwnProfile } from '../../lib/userProfiles';
 import { getSuspensionFor } from '../../lib/suspensions';
 import { applyCors } from '../../lib/cors';
+import { accountTypesFromRow } from '../../lib/accountTypes';
 
 // Self-fetched by MobileTabBar so it can gate "My Work" to creators/admins
 // without requiring every single page that renders <MobileTabBar /> to
@@ -30,6 +31,9 @@ export default async function handler(req, res) {
   // and zoom like every avatar on the site; the ☰ menu's card has the name.
   let avatar = null;
   let displayName = null;
+  // Account types (migration 126): the ☰ menu's you card shows them and
+  // lets the person switch their main; null signed out or before 126.
+  let accountTypes = null;
   if (userId) {
     const [profile, s] = await Promise.all([getOwnProfile(userId).catch(() => null), getSuspensionFor(userId)]);
     profileHref = `/profile/${(profile && profile.handle) || userId}`;
@@ -38,6 +42,8 @@ export default async function handler(req, res) {
       avatar = { url: profile.avatar_url, position: profile.avatar_position || null, zoom: profile.avatar_zoom ? Number(profile.avatar_zoom) : null };
     }
     displayName = profile && profile.display_name ? profile.display_name : null;
+    const t = accountTypesFromRow(profile);
+    accountTypes = t.available ? { types: t.types, main: t.main, asked: t.asked } : null;
   }
   return res.status(200).json({
     isSignedIn: !!userId,
@@ -49,6 +55,7 @@ export default async function handler(req, res) {
     profileHref,
     avatar,
     displayName,
+    accountTypes,
     suspended
   });
 }
