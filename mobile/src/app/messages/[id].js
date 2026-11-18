@@ -1,89 +1,160 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
 import { apiGet, apiPatch, apiPost, freshToken, pathId } from '../../lib/api';
-import { colors, fonts } from '../../lib/theme';
+import { CONTEXT_LABELS, MESSAGE_WORDS, dayGroups, firstName, pendingAbout } from '../../lib/messageRules';
+import { colors, fonts, inkTint } from '../../lib/theme';
 import { bumpUnread } from '../../lib/useUnread';
-import { Avatar, Chip } from '../../components/CrewBits';
+import { Avatar } from '../../components/CrewBits';
+import { Composer, MessageDays, PendingChip, SubjectCard, Toast, openHref } from '../../components/messages/MessageBits';
+import { MessageGlyph, MoreGlyph } from '../../components/messages/MessageIcons';
+import ThreadMenuSheet from '../../components/messages/ThreadMenuSheet';
 
-// One conversation (pages/messages/<id> on the web). /messages/new with
-// ?to=<userId>&kind=gear&label=... starts one from a card, gear or a
-// profile; the thread is created on the first message. Polls for new
-// messages every 10 seconds while open.
+// One conversation (pages/messages/<id> on the website; the simpler
+// Messages of 2026-11-18, mockups/messages-simpler-contract.md). Full
+// screen: no site header, and BottomNav hides itself on /messages/<id>.
+// Its own top row (back to the inbox, the person → their profile, ⋯), the
+// subject card with its way back, the messages by day, the composer.
+//
+// /messages/new?to=<userId>[&kind=&ref=&label=] starts one: when the inbox
+// already has a conversation with that person it opens that one, and the
+// subject waits over the composer ("Your next message is about …", with an
+// ×) to go with the next message; otherwise a new conversation, created on
+// the first message. Polls for new messages every 10 seconds while open.
 const POLL_MS = 10000;
-const MAX_CHARS = 2000;
-const REASONS = { copyright: 'Stolen or copyrighted', sexual: 'Sexual content', violence: 'Violence or graphic', hate: 'Hate or harassment', spam: 'Spam or misleading', broken: "Won't play or broken" };
-const CTX_LABEL = { gear: 'About gear', call: 'About a call', card: 'From a card', profile: 'From a profile', location: 'About a place' };
 
-function fmtTime(iso) {
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const one = (v) => (Array.isArray(v) ? v[0] : v);
+const clean = (v) => (typeof v === 'string' ? v.trim() : '');
+const knownKind = (k) => Object.prototype.hasOwnProperty.call(CONTEXT_LABELS, k);
+
+// The subject a link brought ({ kind, id, label }), or null.
+function subjectFrom(kind, ref, label) {
+  const k = clean(one(kind));
+  if (!knownKind(k)) return null;
+  const out = { kind: k, label: clean(one(label)).slice(0, 80) };
+  const id = clean(one(ref)).slice(0, 80);
+  if (id) out.id = id;
+  return out;
+}
+
+// The conversation is already about it: no chip.
+function sameSubject(a, b) {
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (a.id || b.id) return Boolean(a.id) && a.id === b.id;
+  return clean(a.label) === clean(b.label);
+}
+
+// What a full read brings, put together with what the screen has (a poll
+// or a send may have landed in between), oldest first.
+function merged(have, fresh) {
+  const byId = new Map();
+  for (const m of [...(have || []), ...(fresh || [])]) if (m && m.id) byId.set(m.id, m);
+  return [...byId.values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
 }
 
 export default function Conversation() {
   const router = useRouter();
-  const { id: rawId, to, kind, label } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const rawId = clean(one(params.id));
+  const isNew = rawId === 'new';
   const id = pathId(rawId);
+  const to = clean(one(params.to));
+  // Plain strings, so the memo (and the reads that depend on it) only
+  // change when the link does.
+  const kindParam = clean(one(params.kind));
+  const refParam = clean(one(params.ref));
+  const labelParam = clean(one(params.label));
+  const subject = useMemo(() => subjectFrom(kindParam, refParam, labelParam), [kindParam, refParam, labelParam]);
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
-  const isNew = id === 'new';
-  const scrollRef = useRef(null);
-  // The poll reads these instead of state, so a new message doesn't tear
-  // the timer down and reload the whole thread: the newest message's time
-  // (the poll's `since`), whether the first load has landed, and whether a
-  // poll is still on the wire.
-  const lastAtRef = useRef(null);
-  const loadedRef = useRef(false);
-  const pollingRef = useRef(false);
+  const insets = useSafeAreaInsets();
+
   const [state, setState] = useState({ loading: true, error: null, thread: null, messages: [] });
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState(null);
   const [note, setNote] = useState(null);
-  // The composer keeps room for the floating bottom nav, which the
-  // keyboard covers: while it's up, that room would just be a gap.
+  const [menuOpen, setMenuOpen] = useState(false);
+  // A subject brought onto a conversation that already exists: it goes
+  // with the next message, or the × drops it. Never kept anywhere else.
+  const [pending, setPending] = useState(isNew ? null : subject);
+
+  // The poll reads these instead of state, so a new message doesn't tear
+  // the timer down: the newest message's time (the poll's `since`),
+  // whether the first read has landed, and whether a poll is on the wire.
+  const lastAtRef = useRef(null);
+  const loadedRef = useRef(false);
+  const pollingRef = useRef(false);
+  const noteTimer = useRef(null);
+  const scrollRef = useRef(null);
+  // Keep the newest message in view while the person is at the bottom.
+  const stickRef = useRef(true);
+  const scrolledOnceRef = useRef(false);
+
   const [keyboardUp, setKeyboardUp] = useState(false);
   useEffect(() => {
     const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardUp(true));
     const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardUp(false));
-    return () => { show.remove(); hide.remove(); };
+    return () => { show.remove(); hide.remove(); clearTimeout(noteTimer.current); };
   }, []);
-
-  // A fresh token for every request (poll, send, mute, block, report): one
-  // kept from when the thread opened expires after about a minute.
-  const token = () => freshToken(getToken);
 
   useEffect(() => {
     const m = state.messages;
     lastAtRef.current = m.length ? m[m.length - 1].createdAt : null;
   }, [state.messages]);
 
+  // A fresh token for every request (poll, send, mute, block, report): one
+  // kept from when the conversation opened expires after about a minute.
+  const token = useCallback(() => freshToken(getToken), [getToken]);
+
   const load = useCallback(async () => {
     if (!signedIn) { setState((s) => ({ ...s, loading: false })); return; }
     try {
       const t = await token();
       if (isNew) {
-        // The person's name/photo for the header; the thread doesn't exist yet.
-        const data = await apiGet(`/api/profile?userId=${encodeURIComponent(String(to || ''))}`, t);
-        const p = data.profile;
-        setState({ loading: false, error: null, thread: { id: null, other: { userId: p.userId, displayName: p.displayName, handle: p.handle, avatarUrl: p.avatarUrl, avatarPosition: p.avatarPosition || null, avatarZoom: p.avatarZoom || null }, context: kind && label ? { kind: String(kind), label: String(label) } : null, muted: false, iBlocked: false, blockedMe: false }, messages: [] });
+        if (!to) { setState({ loading: false, error: MESSAGE_WORDS.notHere, thread: null, messages: [] }); return; }
+        // A conversation with them already? Open it; the subject comes
+        // along as the next message's.
+        const inbox = await apiGet('/api/messages', t);
+        const found = (Array.isArray(inbox.threads) ? inbox.threads : []).find((x) => x && x.other && x.other.userId === to);
+        if (found) {
+          const about = subject ? { kind: subject.kind, ...(subject.id ? { ref: subject.id } : {}), ...(subject.label ? { label: subject.label } : {}) } : {};
+          router.replace({ pathname: '/messages/[id]', params: { id: found.id, ...about } });
+          return;
+        }
+        // A new conversation: the person's name and photo for the top row.
+        const data = await apiGet(`/api/profile?userId=${encodeURIComponent(to)}`, t);
+        const p = data.profile || {};
+        setState({
+          loading: false,
+          error: null,
+          thread: {
+            id: null,
+            other: { userId: p.userId || to, displayName: p.displayName || '', handle: p.handle || null, avatarUrl: p.avatarUrl || null, avatarPosition: p.avatarPosition || null, avatarZoom: p.avatarZoom || null, profilePath: `/profile/${p.handle || p.userId || to}` },
+            context: subject,
+            muted: false,
+            iBlocked: false,
+            blockedMe: false
+          },
+          messages: []
+        });
       } else {
         const data = await apiGet(`/api/messages/${id}`, t);
-        setState({ loading: false, error: null, thread: data.thread, messages: data.messages });
+        setState((s) => ({ loading: false, error: null, thread: data.thread, messages: merged(s.thread && s.thread.id === data.thread.id ? s.messages : [], data.messages) }));
         loadedRef.current = true;
         bumpUnread(getToken);
       }
     } catch (err) {
-      setState((s) => ({ ...s, loading: false, error: err.message }));
+      const line = err.status === 404 ? MESSAGE_WORDS.notHere : err.message;
+      // A failed refresh keeps the conversation on screen.
+      setState((s) => ({ ...s, loading: false, error: s.thread ? null : line }));
     }
-  }, [signedIn, id, to, kind, label]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [signedIn, isNew, id, to, subject, token, getToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load once per focus, then poll for anything newer than the last
-  // message we have. Only focus/sign-in/thread changes restart this.
+  // Read once per focus, then ask for anything newer than the last
+  // message. Only focus, sign-in and a change of conversation restart it.
   useFocusEffect(useCallback(() => {
     loadedRef.current = false;
     load();
@@ -94,37 +165,55 @@ export default function Conversation() {
       try {
         const last = lastAtRef.current;
         const data = await apiGet(`/api/messages/${id}${last ? `?since=${encodeURIComponent(last)}` : ''}`, await token());
-        if (data.messages && data.messages.length) {
-          setState((s) => ({ ...s, messages: [...s.messages, ...data.messages.filter((m) => !s.messages.some((x) => x.id === m.id))] }));
-        }
+        if (data.messages && data.messages.length) setState((s) => ({ ...s, messages: merged(s.messages, data.messages) }));
       } catch (err) { /* next tick */ } finally {
         pollingRef.current = false;
       }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [load, id, isNew, signedIn])); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [load, id, isNew, signedIn, token]));
 
-  useEffect(() => {
-    if (scrollRef.current) setTimeout(() => scrollRef.current && scrollRef.current.scrollToEnd({ animated: true }), 50);
-  }, [state.messages.length]);
+  function flash(text) {
+    clearTimeout(noteTimer.current);
+    setNote(text);
+    noteTimer.current = setTimeout(() => setNote(null), 2600);
+  }
+
+  const thread = state.thread;
+  const other = (thread && thread.other) || {};
+  const name = other.displayName || '';
+  const first = firstName(name);
+  const blocked = Boolean(thread && (thread.iBlocked || thread.blockedMe));
+  const pendingLine = pending && thread && thread.id && !sameSubject(pending, thread.context) ? pendingAbout(pending) : null;
+  const groups = useMemo(() => dayGroups(state.messages, userId), [state.messages, userId]);
 
   async function send() {
     const body = draft.trim();
-    if (!body || busy || !state.thread) return;
+    if (!body || busy || !thread) return;
     setBusy(true);
     setSendError(null);
     try {
       const t = await token();
-      if (state.thread.id) {
-        const data = await apiPost(`/api/messages/${state.thread.id}`, { body }, t);
-        // A poll that was already on the wire can bring this same message
-        // back first, so only add it if it isn't there yet.
-        setState((s) => (s.messages.some((x) => x.id === data.message.id) ? s : { ...s, messages: [...s.messages, data.message] }));
+      if (thread.id) {
+        const about = pendingLine ? pending : null;
+        const data = await apiPost(`/api/messages/${pathId(thread.id)}`, about ? { body, context: about } : { body }, t);
+        stickRef.current = true;
+        // A poll already on the wire can bring this same message back first.
+        setState((s) => ({ ...s, messages: merged(s.messages, [data.message]) }));
+        setDraft('');
+        if (about) {
+          setPending(null);
+          // The conversation is about that now: read its card again.
+          try {
+            const fresh = await apiGet(`/api/messages/${pathId(thread.id)}`, await token());
+            setState((s) => ({ ...s, thread: fresh.thread, messages: merged(s.messages, fresh.messages) }));
+          } catch (err) { /* the next open shows it */ }
+        }
       } else {
-        const data = await apiPost('/api/messages', { toUserId: state.thread.other.userId, body, context: state.thread.context }, t);
-        router.replace(`/messages/${data.threadId}`);
+        const data = await apiPost('/api/messages', { toUserId: other.userId, body, ...(thread.context ? { context: thread.context } : {}) }, t);
+        setDraft('');
+        router.replace(`/messages/${pathId(data.threadId)}`);
       }
-      setDraft('');
     } catch (err) {
       setSendError(err.message);
     } finally {
@@ -132,166 +221,147 @@ export default function Conversation() {
     }
   }
 
-  function flash(text) {
-    setNote(text);
-    setTimeout(() => setNote(null), 2600);
+  // The ⋯ sheet's actions: each throws on failure so the sheet can say so.
+  async function setMuted(muted) {
+    await apiPatch(`/api/messages/${pathId(thread.id)}`, { muted }, await token());
+    setState((s) => ({ ...s, thread: { ...s.thread, muted } }));
+    flash(muted ? MESSAGE_WORDS.mutedToast : MESSAGE_WORDS.unmutedToast);
+  }
+  async function setBlocked(blockedNow) {
+    await apiPost('/api/messages/block', { userId: other.userId, blocked: blockedNow }, await token());
+    setState((s) => ({ ...s, thread: { ...s.thread, iBlocked: blockedNow } }));
+    flash(blockedNow ? MESSAGE_WORDS.blockedToast : MESSAGE_WORDS.unblockedToast);
+  }
+  async function report(reason) {
+    await apiPost('/api/messages/report', { threadId: thread.id, reason }, await token());
+    flash(MESSAGE_WORDS.reportedToast);
+  }
+  async function unblockHere() {
+    try { await setBlocked(false); } catch (err) { flash(err.message); }
   }
 
-  async function toggleMute() {
-    const muted = !state.thread.muted;
-    try {
-      await apiPatch(`/api/messages/${state.thread.id}`, { muted }, await token());
-      setState((s) => ({ ...s, thread: { ...s.thread, muted } }));
-      flash(muted ? 'Muted. No emails or badge for this conversation.' : 'Unmuted.');
-    } catch (err) { flash(err.message); }
+  const viewProfile = () => openHref(router, other.profilePath || `/profile/${other.handle || other.userId}`);
+  const goBack = () => router.dismissTo('/messages');
+
+  function onScroll(e) {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    stickRef.current = contentSize.height - (contentOffset.y + layoutMeasurement.height) < 80;
+  }
+  function toEnd() {
+    if (!stickRef.current || !scrollRef.current) return;
+    scrollRef.current.scrollToEnd({ animated: scrolledOnceRef.current });
+    // The first read lands at the bottom at once; later ones glide there.
+    if (state.messages.length) scrolledOnceRef.current = true;
   }
 
-  async function toggleBlock() {
-    const blocked = !state.thread.iBlocked;
-    const go = async () => {
-      try {
-        await apiPost('/api/messages/block', { userId: state.thread.other.userId, blocked }, await token());
-        setState((s) => ({ ...s, thread: { ...s.thread, iBlocked: blocked } }));
-        flash(blocked ? 'Blocked.' : 'Unblocked.');
-      } catch (err) { flash(err.message); }
-    };
-    if (!blocked) return go();
-    Alert.alert(`Block ${state.thread.other.displayName}?`, 'They can’t message you and won’t see your card. You can undo this here.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Block', style: 'destructive', onPress: go }
-    ]);
-  }
-
-  function report() {
-    Alert.alert('Report this conversation', 'The last messages go to Studio Tapa with it.', [
-      ...Object.entries(REASONS).map(([k, v]) => ({
-        text: v,
-        onPress: async () => {
-          try {
-            await apiPost('/api/messages/report', { threadId: state.thread.id, reason: k }, await token());
-            flash('Reported to Studio Tapa.');
-          } catch (err) { flash(err.message); }
-        }
-      })),
-      { text: 'Cancel', style: 'cancel' }
-    ]);
-  }
-
-  function menu() {
-    const t = state.thread;
-    const buttons = [];
-    if (t.id) buttons.push({ text: t.muted ? 'Unmute' : 'Mute', onPress: toggleMute });
-    buttons.push({ text: t.iBlocked ? 'Unblock' : 'Block', style: 'destructive', onPress: toggleBlock });
-    if (t.id) buttons.push({ text: 'Report', style: 'destructive', onPress: report });
-    buttons.push({ text: 'Cancel', style: 'cancel' });
-    Alert.alert(t.other.displayName, null, buttons);
-  }
-
-  const t = state.thread;
-  const blockedEither = t && (t.iBlocked || t.blockedMe);
+  const padBottom = keyboardUp ? 8 : 8 + insets.bottom;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
-        <View style={styles.head}>
-          <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/messages'))} hitSlop={10} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
-          {t ? (
-            <>
-              <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} zoom={t.other.avatarZoom || 1} size={34} />
-              <Pressable style={{ flex: 1, minWidth: 0 }} onPress={() => router.push(`/profile/${t.other.handle || t.other.userId}`)}>
-                <Text style={styles.name} numberOfLines={1}>{t.other.displayName}</Text>
-                {t.other.handle ? <Text style={styles.handle}>@{t.other.handle}</Text> : null}
-              </Pressable>
-              <Pressable onPress={menu} hitSlop={10} style={styles.more} accessibilityLabel="More"><Text style={styles.moreText}>⋯</Text></Pressable>
-            </>
-          ) : <Text style={styles.name}>Messages</Text>}
+    <View style={st.screen}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+        <View style={[st.head, { paddingTop: insets.top + 6, paddingLeft: 8 + insets.left, paddingRight: 8 + insets.right }]}>
+          <Pressable onPress={goBack} style={st.round} accessibilityRole="button" accessibilityLabel={MESSAGE_WORDS.back} hitSlop={4}>
+            <MessageGlyph name="back" size={22} strokeWidth={2.2} color={colors.ink} />
+          </Pressable>
+          {thread ? (
+            <Pressable style={st.who} onPress={viewProfile} accessibilityRole="link" accessibilityLabel={`${name}. ${MESSAGE_WORDS.viewProfile}`}>
+              <Avatar userId={other.userId} name={name} src={other.avatarUrl} position={other.avatarPosition} zoom={other.avatarZoom || 1} size={38} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={st.name} numberOfLines={1}>{name}</Text>
+                <Text style={st.handle} numberOfLines={1}>{[other.handle ? `@${other.handle}` : null, MESSAGE_WORDS.viewProfile].filter(Boolean).join(' · ')}</Text>
+              </View>
+            </Pressable>
+          ) : (
+            <View style={st.who}><Text style={st.name}>{MESSAGE_WORDS.title}</Text></View>
+          )}
+          {thread ? (
+            <Pressable onPress={() => setMenuOpen(true)} style={st.round} accessibilityRole="button" accessibilityLabel={MESSAGE_WORDS.more} hitSlop={4}>
+              <MoreGlyph size={22} color={colors.ink} />
+            </Pressable>
+          ) : <View style={st.round} />}
         </View>
 
-        {!signedIn ? (
-          <View style={{ padding: 16 }}>
-            <Text style={styles.muted}>Sign in to see your messages.</Text>
-            <Pressable style={styles.btn} onPress={() => router.push('/account')}><Text style={styles.btnText}>Sign in</Text></Pressable>
-          </View>
-        ) : null}
-        {state.loading && signedIn ? <ActivityIndicator color={colors.brass} style={{ marginTop: 32 }} /> : null}
-        {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
+        {thread ? <SubjectCard context={thread.context} other={other} onOpen={(href) => openHref(router, href)} style={{ marginLeft: 12 + insets.left, marginRight: 12 + insets.right }} /> : null}
 
-        {t ? (
-          <>
-            {t.context ? (
-              <View style={styles.ctx}>
-                <Chip label={CTX_LABEL[t.context.kind] || 'About'} tone={t.context.kind === 'gear' ? 'gear' : 'role'} />
-                <Text style={styles.ctxLabel} numberOfLines={1}>{t.context.label}</Text>
+        <View style={{ flex: 1 }}>
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={[st.msgs, { paddingLeft: 12 + insets.left, paddingRight: 12 + insets.right }]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            onScroll={onScroll}
+            scrollEventThrottle={100}
+            onContentSizeChange={toEnd}
+            onLayout={toEnd}
+          >
+            {!isLoaded || (signedIn && state.loading) ? <ActivityIndicator color={colors.brass} style={{ marginTop: 32 }} /> : null}
+            {isLoaded && !signedIn ? (
+              <View style={st.signIn}>
+                <Text style={st.hello}>{MESSAGE_WORDS.signIn}</Text>
+                <Pressable style={st.signInBtn} onPress={() => router.push('/account')} accessibilityRole="button"><Text style={st.signInText}>Sign in</Text></Pressable>
               </View>
             ) : null}
-            <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={styles.msgs} keyboardShouldPersistTaps="handled">
-              {state.messages.length === 0 ? (
-                <Text style={styles.muted}>Say hello to {t.other.displayName.split(' ')[0]}.{t.context && !t.id ? ` They’ll see it’s about ${t.context.label}.` : ''}</Text>
-              ) : null}
-              {state.messages.map((m) => {
-                const mine = m.senderId === userId;
-                return (
-                  <View key={m.id} style={[styles.msg, mine ? styles.msgMe : styles.msgThem]}>
-                    <Text style={styles.msgText}>{m.body}</Text>
-                    <Text style={styles.msgTime}>{fmtTime(m.createdAt)}</Text>
-                  </View>
-                );
-              })}
-            </ScrollView>
-            {note ? <Text style={styles.note}>{note}</Text> : null}
-            {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
-            {blockedEither ? (
-              <View style={[styles.composer, keyboardUp && styles.composerKeyboard]}>
-                <Text style={[styles.muted, { flex: 1 }]}>{t.iBlocked ? `You blocked ${t.other.displayName}.` : 'This person isn’t taking messages right now.'}</Text>
-                {t.iBlocked ? <Pressable style={styles.btn} onPress={toggleBlock}><Text style={styles.btnText}>Unblock</Text></Pressable> : null}
-              </View>
-            ) : (
-              <View style={[styles.composer, keyboardUp && styles.composerKeyboard]}>
-                <TextInput
-                  style={styles.input}
-                  value={draft}
-                  onChangeText={setDraft}
-                  placeholder="Write a message…"
-                  placeholderTextColor={colors.inkFaint}
-                  maxLength={MAX_CHARS}
-                  multiline
-                />
-                <Pressable style={[styles.btn, styles.btnPrimary, (!draft.trim() || busy) && { opacity: 0.5 }]} onPress={send} disabled={!draft.trim() || busy}>
-                  <Text style={[styles.btnText, { color: colors.onBrass }]}>{busy ? '…' : 'Send'}</Text>
-                </Pressable>
-              </View>
-            )}
-          </>
-        ) : null}
+            {state.error ? <Text style={st.error}>{state.error}</Text> : null}
+            {thread && !state.loading && state.messages.length === 0 ? <Text style={st.hello}>{MESSAGE_WORDS.sayHello(first)}</Text> : null}
+            <MessageDays groups={groups} />
+          </ScrollView>
+          <Toast text={note} />
+        </View>
+
+        {sendError ? <Text style={[st.sendError, { marginLeft: 12 + insets.left, marginRight: 12 + insets.right }]}>{sendError}</Text> : null}
+        {thread && !blocked && pendingLine ? <PendingChip context={pending} line={pendingLine} onDrop={() => setPending(null)} style={{ marginLeft: 12 + insets.left, marginRight: 12 + insets.right }} /> : null}
+        {thread ? (blocked ? (
+          <View style={[st.blocked, { paddingBottom: padBottom + 4, paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>
+            <Text style={st.blockedText}>{thread.iBlocked ? MESSAGE_WORDS.youBlocked(name) : MESSAGE_WORDS.theyBlocked}</Text>
+            {thread.iBlocked ? (
+              <Pressable style={st.unblock} onPress={unblockHere} accessibilityRole="button"><Text style={st.unblockText}>{MESSAGE_WORDS.unblock}</Text></Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <Composer
+            value={draft}
+            onChangeText={(v) => { setDraft(v); if (sendError) setSendError(null); }}
+            onSend={send}
+            busy={busy}
+            placeholder={MESSAGE_WORDS.placeholder(first)}
+            padBottom={padBottom}
+            padLeft={insets.left}
+            padRight={insets.right}
+          />
+        )) : null}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+
+      <ThreadMenuSheet
+        visible={menuOpen && Boolean(thread)}
+        onClose={() => setMenuOpen(false)}
+        thread={thread}
+        onViewProfile={viewProfile}
+        onOpen={(href) => openHref(router, href)}
+        onMute={setMuted}
+        onBlock={setBlocked}
+        onReport={report}
+      />
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
-  head: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.hairline, backgroundColor: colors.surface1 },
-  back: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  backText: { color: colors.ink, fontSize: 26, lineHeight: 28, marginTop: -2 },
-  name: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
-  handle: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkFaint },
-  more: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
-  moreText: { color: colors.ink, fontSize: 18, lineHeight: 20 },
-  ctx: { flexDirection: 'row', alignItems: 'center', gap: 8, margin: 12, marginBottom: 0, backgroundColor: colors.surface2, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 },
-  ctxLabel: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.ink, flex: 1 },
-  msgs: { padding: 12, gap: 6, paddingBottom: 16 },
-  msg: { maxWidth: '78%', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14 },
-  msgThem: { alignSelf: 'flex-start', backgroundColor: colors.surface2, borderBottomLeftRadius: 4 },
-  msgMe: { alignSelf: 'flex-end', backgroundColor: 'rgba(255,140,66,0.18)', borderBottomRightRadius: 4 },
-  msgText: { fontFamily: fonts.body, fontSize: 14.5, color: colors.ink, lineHeight: 20 },
-  msgTime: { fontFamily: fonts.mono, fontSize: 9.5, color: colors.inkFaint, marginTop: 3 },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: colors.hairline, backgroundColor: colors.surface1, paddingBottom: 90 },
-  composerKeyboard: { paddingBottom: 12 },
-  input: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, color: colors.ink, borderRadius: 18, paddingVertical: 9, paddingHorizontal: 14, fontFamily: fonts.body, fontSize: 14.5, maxHeight: 120 },
-  btn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 18, paddingVertical: 10, paddingHorizontal: 16 },
-  btnPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
-  btnText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.ink },
-  muted: { fontFamily: fonts.body, fontSize: 13.5, color: colors.inkFaint, lineHeight: 19 },
-  note: { fontFamily: fonts.mono, fontSize: 11, color: colors.ok, paddingHorizontal: 12, paddingBottom: 4 },
-  error: { fontFamily: fonts.body, fontSize: 13.5, color: colors.danger, paddingHorizontal: 12, paddingBottom: 4 }
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingBottom: 10, backgroundColor: colors.surface1, borderBottomWidth: 1, borderBottomColor: inkTint(0.1) },
+  round: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  who: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 44 },
+  name: { fontFamily: fonts.displayBold, fontSize: 16, color: colors.ink },
+  handle: { fontFamily: fonts.display, fontSize: 12, color: colors.inkFaint },
+  msgs: { flexGrow: 1, justifyContent: 'flex-end', paddingTop: 14, paddingBottom: 8, gap: 6 },
+  hello: { alignSelf: 'center', textAlign: 'center', fontFamily: fonts.body, fontSize: 15, lineHeight: 22, color: colors.inkDim, marginVertical: 16, paddingHorizontal: 12 },
+  signIn: { alignItems: 'center', gap: 4 },
+  signInBtn: { minHeight: 44, paddingHorizontal: 20, borderRadius: 999, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center' },
+  signInText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.onBrass },
+  error: { fontFamily: fonts.display, fontSize: 14, color: colors.danger, textAlign: 'center', marginVertical: 16 },
+  sendError: { fontFamily: fonts.display, fontSize: 13.5, color: colors.danger, marginBottom: 6 },
+  blocked: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 12, backgroundColor: colors.surface0, borderTopWidth: 1, borderTopColor: inkTint(0.08) },
+  blockedText: { flex: 1, fontFamily: fonts.display, fontSize: 14, color: colors.inkDim },
+  unblock: { minHeight: 40, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.2), alignItems: 'center', justifyContent: 'center' },
+  unblockText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink }
 });

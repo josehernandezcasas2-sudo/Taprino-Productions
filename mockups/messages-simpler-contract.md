@@ -200,3 +200,63 @@ page errors); `check:refs`, `lint`, `test-message-rules.mjs`,
 `test-sign-in-here.mjs`, `menu-rows.mjs` (24). **Not verified**: a real
 phone's keyboard against the visual-viewport sizing, iOS Safari, Clerk's real
 sign-in box (the rig doesn't load it), `next build`.
+
+### As built — app (2026-11-18)
+
+**Files.** `mobile/src/app/messages/index.js` (the inbox), `mobile/src/app/messages/[id].js`
+(a conversation, and `new`), `mobile/src/components/messages/` — `MessageBits.js` (the
+row, chips, search, New message button, empty card, person row, subject card, the
+messages by day, the pending chip, the composer, the toast, `openHref` and
+`startConversation`), `MessageIcons.js` (the boards' glyphs; `contextTint` = call brass,
+gear gold, place mint, production sky, card/profile/direct dim), `MessageSheet.js` (the
+bottom-sheet Modal: every orientation, its own inset provider, the keyboard padding the
+window, a centred 560pt column from 600pt wide), `NewMessageSheet.js`,
+`ThreadMenuSheet.js` (with the app's copy of `REPORT_REASONS`). `BottomNav.js` returns
+null on `/^\/messages\/[^/]+/`. The production screen has **Message** on each crew row
+for the owner (not their own) and **Message the producer** beside "Take me off this" for
+crew; both go through `startConversation` → `/messages/new` with `kind=production`,
+`ref`, `label` = the title. The place screen's Ask about a date sends `ref: l.id`.
+`lib/messageRules.js` untouched; every word, label, time and grouping comes from it.
+
+**Differs from the agreement, or adds to it.**
+- `/messages/new` looks for the conversation itself (one `GET /api/messages`) and
+  `router.replace`s to `/messages/<threadId>` with kind/ref/label, so every caller
+  (production, place, card, gear, profile) gets the same path; New message in the inbox
+  uses the inbox's own list and opens the conversation directly.
+- No pending chip when the conversation is already about that subject (same kind and
+  id, or same label without an id) — "Message the producer" on a production the thread
+  is already about shows no "Your next message is about Night Bus".
+- The app has no server-side resolve before the first send: a refused production
+  subject shows its 403 line under the messages (the chip and the draft stay).
+- After a send carrying a subject the conversation is read again so the subject card
+  shows the server's title.
+- ⋯ reads "Block Dee" / "Unblock Dee" (the board's), built from `MESSAGE_WORDS.block` +
+  `firstName`; the confirm and the report reasons are steps inside the same sheet.
+- The subject card's link reads `contextLink().label + ' ›'` ("Open the call ›"), under
+  the label on a phone under 370pt wide.
+- Back is `router.dismissTo('/messages')` (the inbox, as its label says); Android's back
+  button still returns to wherever the conversation was opened from.
+- **The keyboard**: `KeyboardAvoidingView behavior="padding"` on Android too (it was
+  iOS only). Expo's SDK 58 keyboard guide: an Expo app is edge-to-edge on Android, the
+  window no longer resizes, and a view without a behavior stays under the keyboard.
+- Words not in the rules: the sign-in button ("Sign in or create an account" / "Sign
+  in", as before), "Try again" after a failed first read, the production screen's
+  "Message" / "Message the producer".
+
+**Verified.** `check:refs`, `lint`, `test-message-rules.mjs`, `expo export` for iOS and
+Android; a react-native-web harness of the real screen files against fixtures in the
+routes' shapes (scratchpad `msg-harness/check.mjs`, 77 checks at 390, 320 and 844×390:
+the rows and their words, tints and zoomed photo, All / Unread and the search, the bar
+shown on the inbox and hidden on a conversation, the top row, subject card and its link,
+days and run times, brass bubbles, the 16pt composer, the count, a send, Mute / Block
+(confirm) / Unblock / Report (no reason, then spam), the 10 s poll, back to the inbox,
+New message's lists, one-letter hint, debounce with one request at a time and the newest
+answer winning, the @handle search, nobody, Escape, an existing person → their
+conversation, a new person → compose → first send → replace, Crew Call; `/messages/new`
+with a subject on an existing conversation → the chip, the send carrying
+`{ kind, label, id }`, the card updating, × dropping it, a refused production subject;
+the production screen as owner and as crew; signed out; empty; sideways sheet widths).
+**Only a phone can show**: the keyboard on both platforms (Android's padding inside the
+edge-to-edge Modal too), the multi-line box growing to six lines, the sheet slide over
+the native stack, VoiceOver/TalkBack on the sheets, a Modal turning with the phone, and
+the photo's focal point on a real image.

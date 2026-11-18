@@ -258,8 +258,10 @@ export default function BottomNav() {
   // video, its own close button) — matches pages/vertical/discover.js,
   // which likewise renders no MobileTabBar. Pitch Discover, by contrast,
   // keeps the tab bar on the website (pages/pitches/discover.js does
-  // render MobileTabBar), so it stays visible here too.
-  if (pathname === '/vertical/discover' || pathname === '/snippets/discover') return null;
+  // render MobileTabBar), so it stays visible here too. A conversation
+  // (/messages/<id>, /messages/new) is full screen too (the simpler
+  // Messages, 2026-11-18): its composer sits where the bar would be.
+  if (pathname === '/vertical/discover' || pathname === '/snippets/discover' || /^\/messages\/[^/]+/.test(pathname)) return null;
 
   return (
     <>

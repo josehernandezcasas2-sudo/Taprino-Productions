@@ -9,6 +9,7 @@ import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
 import { crew, Chip, Avatar, TierChip, CallCard } from '../../../components/CrewBits';
 import { StatusPill, DayForm, OWNER_STATUSES, STATUS, fmtRange, prod } from '../../../components/ProductionBits';
+import { startConversation } from '../../../components/messages/MessageBits';
 
 // One production (pages/productions/<id> on the web): what it is, who's
 // on it, the shoot days, the open calls, the release. The owner runs it
@@ -64,6 +65,14 @@ export default function ProductionScreen() {
   const inside = Boolean(data && (data.isOwner || data.isMember));
   const byDept = {};
   if (data) for (const m of data.members) (byDept[m.department] = byDept[m.department] || []).push(m);
+  // Messages from the production (2026-11-18): the people on it write to
+  // each other about it — the owner to anyone on the crew list, someone on
+  // the crew to the producer. The conversation says it is about this
+  // production and links back here (lib/messageContext.js checks both
+  // are on it).
+  const canMessage = (m) => Boolean(signedIn && data && data.isOwner && !m.mine && m.person && m.person.userId && m.person.userId !== userId);
+  const canMessageProducer = Boolean(signedIn && data && !data.isOwner && data.isMember && p && p.owner && p.owner.userId && p.owner.userId !== userId);
+  const messageAbout = (to) => startConversation(router, { to, kind: 'production', ref: p.id, label: p.title });
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
@@ -132,10 +141,11 @@ export default function ProductionScreen() {
                           {m.mine ? <Chip label="you" tone="role" /> : null}
                         </View>
                       </View>
-                      {data.canEdit ? (
+                      {data.canEdit || canMessage(m) ? (
                         <View style={{ gap: 4 }}>
-                          {!m.worked && !m.mine && data.canConfirm ? <Pressable style={[crew.btnSm, { backgroundColor: colors.brass, borderColor: colors.brass }]} disabled={busy} onPress={() => act((t) => apiPatch(`/api/productions/${id}/members`, { memberId: m.id, worked: true }, t), '✓ Confirmed.')}><Text style={[crew.btnSmText, { color: colors.onBrass }]}>Worked it</Text></Pressable> : null}
-                          <Pressable style={crew.btnSm} disabled={busy} onPress={() => Alert.alert('Remove from the crew list?', m.person.displayName, [{ text: 'Keep' }, { text: 'Remove', style: 'destructive', onPress: () => act((t) => apiDelete(`/api/productions/${id}/members`, { memberId: m.id }, t)) }])}><Text style={crew.btnSmText}>Remove</Text></Pressable>
+                          {canMessage(m) ? <Pressable style={crew.btnSm} onPress={() => messageAbout(m.person.userId)} accessibilityRole="button" accessibilityLabel={`Message ${m.person.displayName}`}><Text style={crew.btnSmText}>Message</Text></Pressable> : null}
+                          {data.canEdit && !m.worked && !m.mine && data.canConfirm ? <Pressable style={[crew.btnSm, { backgroundColor: colors.brass, borderColor: colors.brass }]} disabled={busy} onPress={() => act((t) => apiPatch(`/api/productions/${id}/members`, { memberId: m.id, worked: true }, t), '✓ Confirmed.')}><Text style={[crew.btnSmText, { color: colors.onBrass }]}>Worked it</Text></Pressable> : null}
+                          {data.canEdit ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => Alert.alert('Remove from the crew list?', m.person.displayName, [{ text: 'Keep' }, { text: 'Remove', style: 'destructive', onPress: () => act((t) => apiDelete(`/api/productions/${id}/members`, { memberId: m.id }, t)) }])}><Text style={crew.btnSmText}>Remove</Text></Pressable> : null}
                         </View>
                       ) : null}
                     </View>
@@ -146,7 +156,12 @@ export default function ProductionScreen() {
               {data.canEdit ? (adding
                 ? <AddMember id={id} busy={busy} onDone={(r) => { setAdding(false); if (r && r.production) setState((s) => ({ ...s, data: r })); }} act={act} />
                 : <Pressable style={[crew.btn, { alignSelf: 'flex-start' }]} onPress={() => setAdding(true)}><Text style={crew.btnText}>+ Add someone</Text></Pressable>) : null}
-              {!data.canEdit && data.isMember ? <Pressable style={[crew.btn, crew.btnGhost, { alignSelf: 'flex-start' }]} disabled={busy} onPress={() => Alert.alert('Take yourself off this production?', 'Your credit on it goes too.', [{ text: 'Stay' }, { text: 'Take me off', style: 'destructive', onPress: () => act((t) => apiPost(`/api/productions/${id}/members`, { op: 'leave' }, t)) }])}><Text style={[crew.btnText, { color: colors.inkDim }]}>Take me off this</Text></Pressable> : null}
+              {canMessageProducer || (!data.canEdit && data.isMember) ? (
+                <View style={[crew.row, { flexWrap: 'wrap' }]}>
+                  {canMessageProducer ? <Pressable style={crew.btn} onPress={() => messageAbout(p.owner.userId)} accessibilityRole="button"><Text style={crew.btnText}>Message the producer</Text></Pressable> : null}
+                  {!data.canEdit && data.isMember ? <Pressable style={[crew.btn, crew.btnGhost]} disabled={busy} onPress={() => Alert.alert('Take yourself off this production?', 'Your credit on it goes too.', [{ text: 'Stay' }, { text: 'Take me off', style: 'destructive', onPress: () => act((t) => apiPost(`/api/productions/${id}/members`, { op: 'leave' }, t)) }])}><Text style={[crew.btnText, { color: colors.inkDim }]}>Take me off this</Text></Pressable> : null}
+                </View>
+              ) : null}
             </View>
 
             {/* ---- shoot days ---- */}

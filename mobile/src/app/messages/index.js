@@ -1,45 +1,45 @@
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
-import { apiGet } from '../../lib/api';
+import { apiGet, freshToken } from '../../lib/api';
+import { MESSAGE_WORDS, emptyFilterLine, filterThreads } from '../../lib/messageRules';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
-import { crew, Avatar } from '../../components/CrewBits';
+import { crew } from '../../components/CrewBits';
+import { FilterChips, InboxEmpty, NewMessageButton, SearchField, ThreadRow, startConversation } from '../../components/messages/MessageBits';
+import NewMessageSheet from '../../components/messages/NewMessageSheet';
 
-// Messages inbox (pages/messages on the web): every conversation, newest
-// first, with who it's with and a dot when there's something new. Tap
-// to open. Refreshes on focus and every 30 seconds.
+// The Messages inbox (pages/messages on the website; the simpler Messages
+// of 2026-11-18, mockups/messages-simpler-contract.md): the title with the
+// round New message button, the search box, All / Unread, then one flat
+// row per conversation — who, when, the last line and what it is about.
+// Every word and time comes from lib/messageRules.js. Reads on focus and
+// every 30 seconds; pull to refresh.
 const POLL_MS = 30000;
-
-function fmtTime(iso) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  if (now - d < 6 * 86400000) return d.toLocaleDateString('en-US', { weekday: 'short' });
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 export default function Inbox() {
   const router = useRouter();
-  const { isLoaded, isSignedIn, getToken } = useAuth();
-  const [state, setState] = useState({ loading: true, error: null, threads: null, viewerId: null });
-  const [refreshing, setRefreshing] = useState(false);
+  const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
+  const [state, setState] = useState({ loading: true, error: null, threads: null });
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [composing, setComposing] = useState(false);
   const timer = useRef(null);
 
   const load = useCallback(async () => {
-    if (!signedIn) { setState((s) => ({ ...s, loading: false })); return; }
+    if (!signedIn) { setState({ loading: false, error: null, threads: null }); return; }
     try {
-      const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
-      const data = await apiGet('/api/messages', token);
-      setState({ loading: false, error: null, threads: data.threads, viewerId: null });
+      const data = await apiGet('/api/messages', await freshToken(getToken));
+      setState({ loading: false, error: null, threads: Array.isArray(data.threads) ? data.threads : [] });
     } catch (err) {
+      // A failed poll keeps the list it has; only a first read says so.
       setState((s) => ({ ...s, loading: false, error: s.threads ? null : err.message }));
     }
-  }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [signedIn, getToken]);
 
   useFocusEffect(useCallback(() => {
     load();
@@ -53,59 +53,90 @@ export default function Inbox() {
     setRefreshing(false);
   }
 
-  const threads = state.threads || [];
+  const threads = useMemo(() => state.threads || [], [state.threads]);
+  const shown = useMemo(() => filterThreads(threads, { filter, query }), [threads, filter, query]);
+  const hasAny = threads.length > 0;
+
+  function pick(person) {
+    setComposing(false);
+    startConversation(router, { to: person.userId, threads });
+  }
+
+  function toCrewCall() {
+    setComposing(false);
+    router.push('/crew');
+  }
+
+  const header = (
+    <View style={st.head}>
+      <View style={st.titleRow}>
+        <Text style={st.title} accessibilityRole="header">{MESSAGE_WORDS.title}</Text>
+        {signedIn ? <NewMessageButton onPress={() => setComposing(true)} /> : null}
+      </View>
+      {signedIn && hasAny ? (
+        <>
+          <SearchField value={query} onChangeText={setQuery} placeholder={MESSAGE_WORDS.search} />
+          <FilterChips filter={filter} threads={threads} onChange={setFilter} />
+        </>
+      ) : null}
+    </View>
+  );
+
+  let foot = null;
+  if (!isLoaded) {
+    foot = <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} />;
+  } else if (!signedIn) {
+    foot = (
+      <View style={[crew.panel, st.pad]}>
+        <Text style={crew.muted}>{MESSAGE_WORDS.signIn}</Text>
+        <Pressable style={[crew.btn, crew.btnPrimary, { alignSelf: 'flex-start' }]} onPress={() => router.push('/account')} accessibilityRole="button">
+          <Text style={[crew.btnText, crew.btnPrimaryText]}>Sign in or create an account</Text>
+        </Pressable>
+      </View>
+    );
+  } else if (state.loading) {
+    foot = <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} />;
+  } else if (state.error) {
+    foot = (
+      <View style={st.pad}>
+        <Text style={crew.error}>{state.error}</Text>
+        <Pressable style={[crew.btn, { alignSelf: 'flex-start', marginTop: 10 }]} onPress={() => { setState((s) => ({ ...s, loading: true })); load(); }} accessibilityRole="button">
+          <Text style={crew.btnText}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  } else if (!hasAny) {
+    foot = <View style={st.pad}><InboxEmpty onCrewCall={() => router.push('/crew')} onWrite={() => setComposing(true)} /></View>;
+  } else if (!shown.length) {
+    foot = <Text style={st.none}>{emptyFilterLine(filter, query)}</Text>;
+  }
+
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView contentContainerStyle={crew.stage} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brass} />}>
-        <Text style={crew.eyebrow}>Connect</Text>
-        <Text style={crew.h1}>Messages</Text>
-        <Text style={crew.lead}>Every conversation starts from a card, a piece of gear or a call, so you always know why someone wrote.</Text>
-
-        {!signedIn ? (
-          <View style={crew.panel}>
-            <Text style={crew.muted}>Sign in to see your messages. Anyone with an account can write to anyone on Crew Call.</Text>
-            <Pressable style={[crew.btn, crew.btnPrimary, { alignSelf: 'flex-start' }]} onPress={() => router.push('/account')}>
-              <Text style={[crew.btnText, crew.btnPrimaryText]}>Sign in or create an account</Text>
-            </Pressable>
-          </View>
-        ) : null}
-        {signedIn && state.loading ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : null}
-        {state.error ? <Text style={crew.error}>{state.error}</Text> : null}
-        {signedIn && !state.loading && !state.error && threads.length === 0 ? (
-          <Text style={crew.empty}>No conversations yet. Say hello to someone on Crew Call.</Text>
-        ) : null}
-
-        {threads.map((t) => (
-          <Pressable key={t.id} style={styles.thread} onPress={() => router.push(`/messages/${t.id}`)}>
-            <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} zoom={t.other.avatarZoom || 1} size={40} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.name} numberOfLines={1}>{t.other.displayName}{t.muted ? <Text style={styles.mutedTag}> · muted</Text> : null}</Text>
-              <Text style={[styles.preview, t.unread && styles.previewUnread]} numberOfLines={1}>{t.lastSenderId && t.lastSenderId !== t.other.userId ? 'You: ' : ''}{t.preview || 'New conversation'}</Text>
-            </View>
-            <View style={styles.right}>
-              <Text style={crew.mono}>{fmtTime(t.lastMessageAt)}</Text>
-              {t.unread ? <View style={styles.dot} /> : null}
-            </View>
-          </Pressable>
-        ))}
-
-        {signedIn ? (
-          <Pressable style={[crew.btn, { alignSelf: 'flex-start', marginTop: 12 }]} onPress={() => router.push('/crew')}>
-            <Text style={crew.btnText}>Find people on Crew Call →</Text>
-          </Pressable>
-        ) : null}
-      </ScrollView>
+      <FlatList
+        data={signedIn && !state.loading && !state.error ? shown : []}
+        keyExtractor={(t) => t.id}
+        renderItem={({ item }) => <ThreadRow thread={item} viewerId={userId} onPress={() => router.push(`/messages/${item.id}`)} />}
+        ListHeaderComponent={header}
+        ListFooterComponent={foot}
+        contentContainerStyle={st.list}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={signedIn ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brass} /> : undefined}
+      />
+      {signedIn ? (
+        <NewMessageSheet visible={composing} onClose={() => setComposing(false)} onPick={pick} onCrewCall={toCrewCall} getToken={getToken} />
+      ) : null}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  thread: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface2, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, marginBottom: 6 },
-  name: { fontFamily: fonts.displaySemi, fontSize: 14.5, color: colors.ink },
-  mutedTag: { fontFamily: fonts.mono, fontSize: 10, color: colors.inkFaint },
-  preview: { fontFamily: fonts.body, fontSize: 13, color: colors.inkDim, marginTop: 2 },
-  previewUnread: { color: colors.ink },
-  right: { alignItems: 'flex-end', gap: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brass }
+const st = StyleSheet.create({
+  list: { paddingBottom: 130 },
+  head: { paddingTop: 18, paddingHorizontal: 16, paddingBottom: 4, gap: 12 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
+  title: { fontFamily: fonts.bodyBold, fontSize: 28, color: colors.ink },
+  pad: { marginHorizontal: 16, marginTop: 12 },
+  none: { fontFamily: fonts.display, fontSize: 14.5, color: colors.inkFaint, textAlign: 'center', marginTop: 28, paddingHorizontal: 16 }
 });
