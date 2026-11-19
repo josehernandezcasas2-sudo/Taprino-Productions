@@ -20,6 +20,16 @@
 //   - who runs it: the producer changes the status, the details, the crew
 //     and the days and posts a call for it; not visibility, archiving, the
 //     release, a producer's row or the owner's row; a stranger is refused;
+//     (review, 2026-11-19) a producer can't post a call for a producer, a
+//     booking on an older one adds nobody, a producer taken off the list
+//     adds nobody through their open calls, the owner's call for a producer
+//     still makes one, "Producer's assistant" runs nothing; a producer
+//     attaches a place only through their own booking or one made for this
+//     production (never the owner's booking for something else, with one
+//     line for both refusals), a day keeps the booking it has; the
+//     dashboard of a held production opens to a full admin only; a full
+//     admin bringing back a removed production whose pitch has another
+//     gets 409; the crew rows' Message is for the people on it;
 //   - the dashboard's facts and what the rules make of them (the numbers,
 //     Needs you), for the owner, the producer, an admin; a stranger and
 //     signed out are refused and sent to the production page;
@@ -48,7 +58,8 @@ const PENDING = uuid();
 const PITCH2 = uuid();
 const STRANGER_PITCH = uuid();
 const LOC = uuid();
-const REQ = { asked: uuid(), countered: uuid() };
+const LOC2 = uuid();
+const REQ = { asked: uuid(), countered: uuid(), other: uuid(), forProd: uuid() };
 const CALL = { grip: uuid(), boom: uuid(), sound: uuid(), pa: uuid() };
 const RESP = { g1: uuid(), g2: uuid(), boom: uuid(), sound: uuid() };
 const TITLE = `Night Bus ${RUN}`;
@@ -226,6 +237,97 @@ await runCheck('productions-dashboard', async () => {
     ok('nor does a crew member who isn’t a producer (403)', r.status === 403, r.text);
     sql(`update public.productions set status = 'prep' where id = ${q(PROD)}`);
 
+    section('producers are the owner’s to make, through a call too (review, 2026-11-19)');
+    const memberOf = (userId) => rows(`select id, role from public.production_members where production_id = ${q(PROD)} and user_id = ${q(userId)}`);
+    r = await post('/api/crew/calls', P, { title: `Producer posted by the producer ${RUN}`, role: 'Producer', payType: 'unpaid', startsOn: pacific(17), endsOn: pacific(20), remote: true, production: PROD });
+    ok('the producer posting a call for a producer under it: 403, the owner’s line', r.status === 403 && r.json && r.json.error === 'Only the owner adds or removes a producer.', r.text.slice(0, 200));
+    // A call for a producer posted before that rule: booking through it puts nobody on the list.
+    const OLD_CALL = uuid();
+    const OLD_RESP = uuid();
+    insert('crew_calls', { id: OLD_CALL, poster_id: P.id, title: `Older producer call ${RUN}`, role: 'Producer', pay_type: 'unpaid', starts_on: pacific(17), ends_on: pacific(20), remote: true, production_id: PROD, production_title: TITLE });
+    insert('crew_responses', { id: OLD_RESP, call_id: OLD_CALL, user_id: X.id, message: 'Me', status: 'sent' });
+    r = await post(`/api/crew/calls/${OLD_CALL}/book`, P, { responseId: OLD_RESP, action: 'book' });
+    ok('…a booking on such a call goes through as a booking', r.status === 200, r.text.slice(0, 200));
+    ok('…but puts nobody on the crew list', memberOf(X.id).length === 0, memberOf(X.id));
+    r = await call(`/api/productions/${PROD}/dashboard`, { who: X });
+    ok('…so they don’t run it (403)', r.status === 403, r.status);
+    sql(`delete from public.crew_calls where id = ${q(OLD_CALL)}`);
+    // The owner's own call for a producer still makes one.
+    const Y = await newUser('pdy', { displayName: `Yan Producer ${RUN}`, handle: `pdy${RUN}` });
+    people.push(Y);
+    r = await post('/api/crew/calls', O, { title: `Producer wanted ${RUN}`, role: 'Producer', payType: 'unpaid', startsOn: pacific(17), endsOn: pacific(20), remote: true, production: PROD });
+    const OWN_CALL = r.json && (r.json.call ? r.json.call.id : r.json.id);
+    ok('the owner posts a call for a producer: yes', r.status === 201 && Boolean(OWN_CALL), r.text.slice(0, 200));
+    const OWN_RESP = uuid();
+    insert('crew_responses', { id: OWN_RESP, call_id: OWN_CALL, user_id: Y.id, message: 'Me', status: 'sent' });
+    r = await post(`/api/crew/calls/${OWN_CALL}/book`, O, { responseId: OWN_RESP, action: 'book' });
+    ok('…booking through it puts them on the list as a producer', r.status === 200 && memberOf(Y.id).length === 1 && memberOf(Y.id)[0].role === 'Producer', memberOf(Y.id));
+    r = await call(`/api/productions/${PROD}/dashboard`, { who: Y });
+    ok('…who runs it (200)', r.status === 200, r.status);
+    sql(`delete from public.production_members where production_id = ${q(PROD)} and user_id = ${q(Y.id)}`);
+    sql(`delete from public.crew_calls where id = ${q(OWN_CALL)}`);
+    // A producer taken off the list: their open calls add nobody.
+    const GAFFER_RESP = uuid();
+    insert('crew_responses', { id: GAFFER_RESP, call_id: extraCall, user_id: X.id, message: 'Me', status: 'sent' });
+    const pRow = memberOf(P.id)[0];
+    r = await post(`/api/productions/${PROD}/members`, O, { memberId: pRow && pRow.id }, 'DELETE');
+    ok('the owner takes the producer off', r.status === 200 && memberOf(P.id).length === 0, r.text.slice(0, 200));
+    r = await post(`/api/crew/calls/${extraCall}/book`, P, { responseId: GAFFER_RESP, action: 'book' });
+    ok('…their open call still books', r.status === 200, r.text.slice(0, 200));
+    ok('…but adds nobody to the production', memberOf(X.id).length === 0, memberOf(X.id));
+    sql(`delete from public.crew_responses where id = ${q(GAFFER_RESP)}`);
+    // Whole producer titles only.
+    r = await post(`/api/productions/${PROD}/members`, O, { userId: X.id, role: 'Producer’s assistant' });
+    ok('the owner adds a "Producer’s assistant"', r.status === 201, r.text.slice(0, 200));
+    r = await call(`/api/productions/${PROD}/dashboard`, { who: X });
+    ok('…who doesn’t run it (403)', r.status === 403, r.status);
+    sql(`delete from public.production_members where production_id = ${q(PROD)} and user_id = ${q(X.id)}`);
+    r = await post(`/api/productions/${PROD}/members`, O, { userId: P.id, role: 'Producer' });
+    ok('the owner adds the producer back', r.status === 201 && memberOf(P.id).length === 1, r.text.slice(0, 200));
+
+    section('a producer attaches a place only through a booking for this production (review, 2026-11-19)');
+    insert('locations', { id: LOC2, host_id: USERS.mara, title: `Rooftop ${RUN}`, kind: 'studio', status: 'listed', verified: true, day_cents: 50000, cleaning_cents: 0, cancellation: 'moderate', city: 'Los Angeles' });
+    // The owner's paid booking there, for something else.
+    insert('location_requests', reqRow(REQ.other, 'paid', { location_id: LOC2, starts_on: pacific(26), ends_on: pacific(26), production_id: null, production_title: null }));
+    const dayOn = (d) => rows(`select id, location_id, location_request_id, call_time::text as call_time from public.production_days where production_id = ${q(PROD)} and shoot_on = ${q(d)}`);
+    const notThis = await post(`/api/productions/${PROD}/days`, P, { shootOn: pacific(26), callTime: '08:00', locationId: LOC2 }, 'PUT');
+    ok('the owner’s booking for something else: refused', notThis.status === 400 && dayOn(pacific(26)).length === 0, notThis.text);
+    const nobody = await post(`/api/productions/${PROD}/days`, P, { shootOn: pacific(26), callTime: '08:00', locationId: uuid() }, 'PUT');
+    ok('…with the same line as a place nobody booked', nobody.status === notThis.status && nobody.json && notThis.json && nobody.json.error === notThis.json.error, [notThis.json, nobody.json]);
+    r = await post(`/api/productions/${PROD}/days`, O, { shootOn: pacific(26), callTime: '08:00', locationId: LOC2 }, 'PUT');
+    const ownDay = dayOn(pacific(26))[0];
+    ok('the owner attaches their own booking', r.status === 200 && ownDay && ownDay.location_request_id === REQ.other, ownDay || r.text.slice(0, 200));
+    r = await post(`/api/productions/${PROD}/days`, P, { dayId: ownDay && ownDay.id, shootOn: pacific(26), callTime: '09:00', locationId: LOC2 }, 'PUT');
+    const edited = dayOn(pacific(26))[0];
+    ok('…the producer edits that day’s times, its booking kept', r.status === 200 && edited && edited.location_request_id === REQ.other && /^09:00/.test(edited.call_time || ''), edited || r.text.slice(0, 200));
+    // A booking the owner made for this production: the producer may use it.
+    insert('location_requests', reqRow(REQ.forProd, 'paid', { location_id: LOC2, starts_on: pacific(27), ends_on: pacific(27) }));
+    r = await post(`/api/productions/${PROD}/days`, P, { shootOn: pacific(27), callTime: '08:00', locationId: LOC2 }, 'PUT');
+    const prodDay = dayOn(pacific(27))[0];
+    ok('a booking the owner made for this production: yes', r.status === 200 && prodDay && prodDay.location_request_id === REQ.forProd, prodDay || r.text.slice(0, 200));
+    sql(`delete from public.production_days where production_id = ${q(PROD)} and shoot_on in (${q(pacific(26))}, ${q(pacific(27))})`);
+    sql(`delete from public.location_requests where id in (${q(REQ.other)}, ${q(REQ.forProd)})`);
+    ok('…the call sheet is as it was (three days)', rows(`select id from public.production_days where production_id = ${q(PROD)}`).length === 3);
+
+    section('a held production’s dashboard, and the crew rows’ Message (review, 2026-11-19)');
+    sql(`update public.productions set moderation_hold = true where id = ${q(PROD)}`);
+    r = await call(`/api/productions/${PROD}/dashboard`, { who: O });
+    ok('on hold: the owner is sent to the production page (403)', r.status === 403 && r.json.code === 'not-manager' && r.json.productionHref === `/productions/${PROD}`, r.text);
+    r = await call(`/api/productions/${PROD}/dashboard`, { who: P });
+    ok('…so is the producer', r.status === 403 && r.json.code === 'not-manager', r.status);
+    r = await page(`/productions/${PROD}/dashboard`, O);
+    ok('…the page redirects to the production page', r.status === 307 && (r.headers.get('location') || '').endsWith(`/productions/${PROD}`), `${r.status} ${r.headers.get('location')}`);
+    r = await page(`/productions/${PROD}`, O);
+    ok('…which shows the owner the hold and no Dashboard link', r.status === 200 && r.text.includes('on hold — under review') && !r.text.includes(`/productions/${PROD}/dashboard`), r.status);
+    r = await call(`/api/productions/${PROD}/dashboard`, { who: ADMIN });
+    ok('…a full admin still opens it', r.status === 200, r.status);
+    ok('…where the crew rows have no Message for an admin who isn’t on it', r.json && r.json.facts && r.json.facts.viewer.onCrew === false && productionDashboard(r.json.facts).crew.groups.every((g) => g.people.every((x) => x.actions.message === null)));
+    sql(`update public.productions set moderation_hold = false where id = ${q(PROD)}`);
+    r = await page(`/productions/${PROD}`, O);
+    ok('the production page: Message on the crew rows for the owner', r.status === 200 && r.text.includes('/messages?to='), r.status);
+    r = await page(`/productions/${PROD}`, ADMIN);
+    ok('…none for a full admin who isn’t on it', r.status === 200 && !r.text.includes('/messages?to='), r.status);
+
     section('the pitch page and /api/pitch-detail');
     r = await page(`/pitches/${PITCH}`);
     ok('signed out: the pill, the card and the production link', r.status === 200 && r.text.includes('pitch-prod-pill') && /Shooting [A-Z][a-z]{2} \d+ – (\d+|[A-Z][a-z]{2} \d+) in Echo Park/.test(r.text) && r.text.includes(`href="/productions/${PROD}"`), r.status);
@@ -241,8 +343,12 @@ await runCheck('productions-dashboard', async () => {
     sql(`update public.productions set visibility = 'crew' where id = ${q(PROD)}`);
     r = await call(`/api/pitch-detail?id=${PITCH}`, { who: X, bearer: true });
     ok('a crew-only production: hidden from a stranger', r.status === 200 && r.json.production === null && !r.json.crewCalls.some((c) => c.title === `Grips for a night exterior ${RUN}`), r.json && r.json.production);
+    ok('…its id too (no productionLink)', r.json.productionLink === null, r.json.productionLink);
+    r = await page(`/pitches/${PITCH}`, X);
+    ok('…and the pitch page’s data names it nowhere', r.status === 200 && !r.text.includes(PROD), r.status);
     r = await call(`/api/pitch-detail?id=${PITCH}`, { who: C, bearer: true });
     ok('…shown to its crew', r.json.production && r.json.production.id === PROD);
+    ok('…with its link, not to manage', r.json.productionLink && r.json.productionLink.id === PROD && r.json.productionLink.canManage === false, r.json.productionLink);
     sql(`update public.productions set visibility = 'public' where id = ${q(PROD)}`);
 
     section('Your productions and Running now');
@@ -426,14 +532,26 @@ await runCheck('productions-dashboard', async () => {
         await ctx.close();
       }
     }
+
+    section('bringing back a removed production whose pitch has another (review, 2026-11-19)');
+    sql(`update public.productions set status = 'removed', moderation_hold = true where id = ${q(PROD)}`);
+    r = await post(`/api/pitches/${PITCH}/production`, O, { title: `${TITLE} again`, kind: 'short' });
+    const PROD3 = r.json && r.json.production && r.json.production.id;
+    ok('with the first removed, the pitch takes a new production', r.status === 201 && Boolean(PROD3), r.text.slice(0, 200));
+    r = await post(`/api/productions/${PROD}`, ADMIN, { status: 'prep' }, 'PATCH');
+    ok('a full admin bringing the first back: 409 with the line and the one it has', r.status === 409 && r.json.error === 'This pitch already has a production.' && r.json.code === 'exists' && r.json.productionId === PROD3, r.text);
+    ok('…and nothing changed', rows(`select status from public.productions where id = ${q(PROD)}`)[0].status === 'removed');
+    if (PROD3) sql(`delete from public.productions where id = ${q(PROD3)}`);
+    r = await post(`/api/productions/${PROD}`, ADMIN, { status: 'prep' }, 'PATCH');
+    ok('once the other is gone, it comes back', r.status === 200 && rows(`select status from public.productions where id = ${q(PROD)}`)[0].status === 'prep', r.text.slice(0, 200));
   } finally {
     await b.close().catch(() => {});
     const prods = [PROD, PROD2].filter(Boolean);
     const pitchIds = [PITCH, PENDING, PITCH2, STRANGER_PITCH];
     const ids = people.map((p) => q(p.id)).join(', ');
     try {
-      sql(`delete from public.location_requests where id in (${q(REQ.asked)}, ${q(REQ.countered)})`);
-      sql(`delete from public.locations where id = ${q(LOC)}`);
+      sql(`delete from public.location_requests where id in (${q(REQ.asked)}, ${q(REQ.countered)}, ${q(REQ.other)}, ${q(REQ.forProd)})`);
+      sql(`delete from public.locations where id in (${q(LOC)}, ${q(LOC2)})`);
       sql(`delete from public.crew_payments where call_id in (select id from public.crew_calls where poster_id in (${ids}))`);
       sql(`delete from public.crew_calls where poster_id in (${ids})`);
       if (prods.length) sql(`delete from public.productions where id in (${prods.map(q).join(', ')})`);

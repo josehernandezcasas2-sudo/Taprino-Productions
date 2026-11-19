@@ -196,7 +196,10 @@ export default function ProductionPage(props) {
                     </div>
                     {canEdit && (
                       <div className="cc-resp-acts">
-                        {m.person.userId && m.person.userId !== viewerId && <Link href={messageHref(m.person.userId, p.id)} className="crew-btn sm">Message</Link>}
+                        {/* Only someone on the production: a message with it as the
+                            subject goes between the people on it (lib/messageContext.js),
+                            so a full admin who isn't on it gets no button. */}
+                        {(isOwner || isMember) && m.person.userId && m.person.userId !== viewerId && <Link href={messageHref(m.person.userId, p.id)} className="crew-btn sm">Message</Link>}
                         {!m.worked && !m.mine && canConfirm && <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => api(`/api/productions/${p.id}/members`, { memberId: m.id, worked: true }, 'PATCH')}>Worked it</button>}
                         {m.worked && isAdmin && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => api(`/api/productions/${p.id}/members`, { memberId: m.id, worked: false }, 'PATCH')}>Undo</button>}
                         {(canOwn || (m.person.userId !== p.owner.userId && !isProducerRole(m.role))) && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm(`Remove ${m.person.displayName} from the crew list?`)) api(`/api/productions/${p.id}/members`, { memberId: m.id }, 'DELETE'); }}>Remove</button>}

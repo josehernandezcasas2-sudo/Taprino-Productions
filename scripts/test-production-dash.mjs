@@ -43,6 +43,13 @@ t('who runs it: the owner, a listed producer, a full admin', () => {
   assert.deepEqual(R.managerIds(p), ['u_owner', 'u_pro', 'u_exec', 'u_line', 'u_co']);
   assert.equal(R.isProducerRole('Gaffer'), false);
   assert.equal(R.isProducerRole(null), false);
+  // Whole producer titles only, in any case (review, 2026-11-19).
+  for (const role of ['Producer', 'Executive producer', 'Line producer', 'Co-producer', 'Co-Producer', 'Associate producer', 'Supervising producer', 'EXECUTIVE PRODUCER', '  line   producer ', 'producer']) assert.equal(R.isProducerRole(role), true, role);
+  for (const role of ['Producer’s assistant', "Producer's assistant", 'Assistant to the producer', 'Producer assistant', 'Post producer coordinator', 'Production coordinator', 'Producers', 'Not a producer', 'Executive producer’s driver']) assert.equal(R.isProducerRole(role), false, role);
+  const assistant = { ownerId: 'u_owner', members: [{ userId: 'u_asst', role: 'Producer’s assistant' }, { userId: 'u_to', role: 'Assistant to the producer' }] };
+  assert.equal(R.canManageProduction(assistant, 'u_asst'), false);
+  assert.equal(R.canManageProduction(assistant, 'u_to'), false);
+  assert.deepEqual(R.managerIds(assistant), ['u_owner']);
 });
 
 t('statuses: a producer moves prep–released, the owner archives too, archived is locked for a producer', () => {
@@ -197,6 +204,16 @@ t('the whole dashboard: head, sections, release', () => {
   assert.equal(asProducer.funding.line, '$3,240 of $5,000 · 12 days left · $3,078 to Mara after the 5% cut');
   assert.equal(asProducer.release.button, null);
   assert.equal(asProducer.release.note, 'The owner runs distribution and screeners.');
+  // Message a crew member: the people on the production only (a message about
+  // it goes between them, lib/messageContext.js) — the owner, a listed
+  // producer, someone on the crew list; a full admin who isn't on it gets none.
+  const msg = (view) => view.crew.groups[0].people[0].actions.message;
+  assert.ok(/^\/messages\?to=/.test(msg(v)));
+  assert.ok(/^\/messages\?to=/.test(msg(asProducer)));
+  const asAdmin = R.productionDashboard(facts({ viewer: { ...facts().viewer, userId: 'u_admin', isOwner: false, isProducer: false, isAdmin: true, canOwn: true, onCrew: false } }));
+  assert.equal(msg(asAdmin), null);
+  const asAdminOnCrew = R.productionDashboard(facts({ viewer: { ...facts().viewer, userId: 'u_admin', isOwner: false, isProducer: false, isAdmin: true, canOwn: true, onCrew: true } }));
+  assert.ok(/^\/messages\?to=/.test(msg(asAdminOnCrew)));
   const day = (label) => v.days.rows.find((d) => d.label === label);
   assert.equal(day('Day 2').place.text, 'No place yet');
   assert.equal(day('Day 2').place.tone, 'warn');

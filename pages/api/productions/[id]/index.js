@@ -23,6 +23,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, PATCH, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
+    // A 409 for a pitch that has another production names it (lib/productions.js).
+    if (err.status === 409 && err.extra && err.extra.code === 'exists') return res.status(409).json({ error: err.message, code: 'exists', productionId: err.extra.productionId || null });
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('productions/[id]:', err.message);
     return res.status(500).json({ error: 'Could not load that production right now.' });

@@ -10,7 +10,7 @@ import {
   chargeReversalReason, membershipLineKey, membershipPaidCents, paymentPromisesLines,
   YEARLY_MONTHS, addCalendarMonths, yearlyMonthDue, yearlyScheduleStart, yearlyRunning, yearlyMonthDueNow, afterYearlyMonth, yearlyMonthNote,
   yearlySharesAhead, invoiceBilling, invoiceLineInterval,
-  yearlyStartsCredited, monthlyStopsYear, YEARLY_MONTH1_COVERED, YEARLY_SWITCHED_TO_MONTHLY
+  yearlyStartsCredited, monthlyStopsYear, YEARLY_MONTH1_COVERED, YEARLY_SWITCHED_TO_MONTHLY, yearlySwitchStop
 } from '../lib/creatorShareRules.js';
 import { stableLineId, withMembershipLineIds } from '../lib/ledgerIds.js';
 import { claimLines, CLAIM_CHUNK } from '../lib/payoutClaims.js';
@@ -431,6 +431,26 @@ test('yearly: yearly → monthly — only a monthly invoice that credits a month
   assert.equal(monthlyStopsYear({ yearly: false, prorationOnly: true, creditsMonth: false }), false);
   assert.equal(monthlyStopsYear({ yearly: true, prorationOnly: false, creditsMonth: true }), false);
   assert.equal(monthlyStopsYear(), false);
+});
+
+test('yearly: a switch to monthly stops the year and never rubs out the month-1 mark', () => {
+  const at = '2026-11-25T10:00:00.000Z';
+  // A year that credited its own month 1: stopped, with the switch as its reason.
+  const plain = { status: 'split', basis: 'picks', share_cents: 200, bonus_cents: 0, months: 12, reverse_reason: null };
+  assert.deepEqual(yearlySwitchStop(plain, at), { stopped_at: at, next_month_at: null, reverse_reason: YEARLY_SWITCHED_TO_MONTHLY });
+  assert.equal(paymentPromisesLines({ ...plain, ...yearlySwitchStop(plain, at) }), true);
+  // A year whose month 1 the monthly plan paid (review, 2026-11-19): it keeps
+  // its mark, so it still promises no month-1 lines — a repeat delivery of
+  // its invoice and the daily catch-up never write that month a second time.
+  const covered = { ...plain, reverse_reason: YEARLY_MONTH1_COVERED };
+  const stop = yearlySwitchStop(covered, at);
+  assert.deepEqual(stop, { stopped_at: at, next_month_at: null });
+  assert.equal({ ...covered, ...stop }.reverse_reason, YEARLY_MONTH1_COVERED);
+  assert.equal(paymentPromisesLines({ ...covered, ...stop }), false);
+  // Stopped is what stops it: nothing more is credited either way.
+  assert.equal(yearlyRunning({ ...covered, ...stop, months_credited: 1, paid_at: '2026-11-01T00:00:00.000Z' }), false);
+  assert.equal(yearlyRunning({ ...plain, ...yearlySwitchStop(plain, at), months_credited: 1, paid_at: '2026-11-01T00:00:00.000Z' }), false);
+  assert.deepEqual(yearlySwitchStop(null, at), { stopped_at: at, next_month_at: null, reverse_reason: YEARLY_SWITCHED_TO_MONTHLY });
 });
 
 test('fitShareToPayment: a paid month only, and never more than was paid', () => {

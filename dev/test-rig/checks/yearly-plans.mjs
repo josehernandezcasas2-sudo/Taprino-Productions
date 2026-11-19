@@ -10,7 +10,10 @@
 //     Studio money keeps the 11 months ahead back from the sweep;
 //   the daily cron credits month 2 to the member's new pick, never twice
 //     (two runs at once, and a run the next minute), catches up a payment it
-//     fell behind on, and the twelfth month ends the schedule;
+//     fell behind on, and the twelfth month ends the schedule; a run stopped
+//     between a month's lines and its counter neither loses the month nor
+//     credits it twice, and one stopped after taking a month (its lease)
+//     credits it once the lease runs out (review, 2026-11-19);
 //   a full refund stops the months and reverses the credits; a partial one
 //     stops the months only; a dispute stops and reverses, a won dispute gives
 //     the credits back and doesn't restart the months; an invoice of
@@ -19,7 +22,9 @@
 //     credited without lines (the monthly payment paid that month; a repeat
 //     delivery and the daily catch-up leave it so) and the cron credits month
 //     2; yearly → monthly: the $0 switch invoice leaves the year running, the
-//     first monthly invoice that credits a month stops it first;
+//     first monthly invoice that credits a month stops it first; and back to
+//     monthly before month 2, the year keeps its month-1 mark (review,
+//     2026-11-19), so its month 1 is never written a second time;
 //   the Artist Support note on a yearly plan; the picker's Monthly / Yearly
 //     switch at 390 and 1280 (a yearly Checkout from it, a tier with no yearly
 //     price greyed), the member's plan row "· yearly";
@@ -30,6 +35,7 @@
 //   node dev/test-rig/checks/yearly-plans.mjs [--simulate-pre127] [--skip-greyed]
 // (--skip-greyed leaves out the greyed tier, which waits up to five minutes
 // for the page's own plans cache to read Stripe again.)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, session, newUser, removeUser, browser, goto, overflowPx, stripeHook, stripeApi, forgetInvoiceEvents, hasColumn } from './lib.mjs';
@@ -203,6 +209,30 @@ async function cronMonths(m, p) {
   row = paymentOf(m.id)[0];
   lines = ledgerOf(p.id);
   ok('three months credited in one run (4, 5 and 6), month 7 next', row.months_credited === 6 && near(row.next_month_at, monthsAt(row.paid_at, 6)) && [4, 5, 6].every((k) => lines.filter((l) => l.note === `Yearly plan · month ${k} of 12`).length === 1), { credited: row.months_credited, next: row.next_month_at, notes: lines.map((l) => l.note) });
+
+  section('A run stopped between a month’s lines and its counter: the next one moves the counter, never credits the month twice');
+  // Month 7's lines went in — to Mara, the pick of that run's moment — and
+  // the run stopped before months_credited moved (a function killed there).
+  // The member picks Dee now: a second split of month 7 would go to Dee.
+  const m7 = crypto.randomUUID();
+  sql(`insert into public.creator_ledger (id, creator_id, lane, kind, cents, moves_money, member_id, payment_id, basis, note) values (${q(m7)}, ${q(USERS.mara)}, 'earnings', 'member_share', 200, true, ${q(m.id)}, ${q(p.id)}, 'picks', 'Yearly plan · month 7 of 12')`);
+  makeDue(p.id);
+  r = await cron();
+  row = paymentOf(m.id)[0];
+  lines = ledgerOf(p.id).filter((l) => l.note === 'Yearly plan · month 7 of 12');
+  ok('the month isn’t lost: months_credited 7, month 8 next', r.status === 200 && row.months_credited === 7 && near(row.next_month_at, monthsAt(row.paid_at, 7)), { credited: row.months_credited, next: row.next_month_at });
+  ok('…and not credited twice: the one month-7 line already in, none for Dee', lines.length === 1 && lines[0].id === m7 && lines[0].creator_id === USERS.mara, lines);
+
+  section('A run stopped after taking a month (its lease) and before its lines: credited once the lease runs out');
+  // The lease of a run that died: next_month_at pushed ahead, the counter as it was.
+  sql(`update public.member_payments set next_month_at = now() + interval '20 minutes' where id = ${q(p.id)}`);
+  r = await cron();
+  ok('while the lease runs, nothing is credited', r.status === 200 && paymentOf(m.id)[0].months_credited === 7 && ledgerOf(p.id).filter((l) => l.note === 'Yearly plan · month 8 of 12').length === 0, paymentOf(m.id)[0]);
+  makeDue(p.id);
+  r = await cron();
+  row = paymentOf(m.id)[0];
+  lines = ledgerOf(p.id).filter((l) => l.note === 'Yearly plan · month 8 of 12');
+  ok('once it has run out: month 8 credited once (to Dee), months_credited 8, month 9 on its own date', row.months_credited === 8 && lines.length === 1 && lines[0].creator_id === USERS.dee && near(row.next_month_at, monthsAt(row.paid_at, 8)), { credited: row.months_credited, next: row.next_month_at, lines });
 
   section('The twelfth month ends the schedule');
   sql(`update public.member_payments set months_credited = 11, next_month_at = now() - interval '1 minute' where id = ${q(p.id)}`);
@@ -394,6 +424,30 @@ async function switches() {
   const ref = await stripeApi('/refunds', { method: 'POST', params: { charge: yr.stripe_charge_id } });
   const rev = await waitFor(() => { const x = paymentOf(y.id)[0]; return x.status === 'reversed' ? x : null; });
   ok('…and a refund of the year afterwards still reverses its month 1', ref.status === 200 && rev && ledgerOf(yr.id).filter((l) => l.kind === 'reversal').length === 1, rev || paymentOf(y.id)[0]);
+
+  section('Monthly → yearly → monthly again before month 2: the year keeps its month-1 mark, month 1 credited once');
+  const t = await member('yrswitchback');
+  await pick(t, USERS.mara);
+  ({ sid } = await checkout(t, {}));
+  await pay(sid);
+  const tMonthly = paymentOf(t.id)[0];
+  ok('a monthly payment credited this month', tMonthly && tMonthly.months === 1 && ledgerOf(tMonthly.id).length === 1, tMonthly);
+  sub = await subscriptionOf(t.id);
+  const up2 = portalInvoice(sub, 'up2', { reason: 'subscription_update', paid: 7500, lines: [{ price: PRICE.monthly, amount: -400, proration: true }, { price: PRICE.yearly, amount: 7900 }] });
+  // Dated back 90 minutes, so the daily catch-up below looks at it too.
+  ev = await stripeHook('/__event', { method: 'POST', body: { type: 'invoice.paid', object: up2, ageMinutes: 90 } });
+  let year2 = paymentByInvoice(up2.id);
+  ok('the year: month 1 paid by the monthly plan, no lines of its own', ev.json.delivery.status < 300 && year2 && year2.months === 12 && year2.months_credited === 1 && year2.reverse_reason === 'month 1 paid by the monthly plan' && ledgerOf(year2.id).length === 0, year2);
+  await sleep(1500);
+  const back = portalInvoice(sub, 'back', { reason: 'subscription_cycle', paid: 799, lines: [{ price: PRICE.monthly, amount: 799 }] });
+  ev = await stripeHook('/__event', { method: 'POST', body: { type: 'invoice.paid', object: back } });
+  year2 = paymentByInvoice(up2.id);
+  ok('a monthly invoice that pays a month stops the year (stopped, nothing next, still paid)', ev.json.delivery.status < 300 && year2.stopped_at && year2.next_month_at === null && year2.status === 'split' && year2.months_credited === 1, year2);
+  ok('…and the year keeps its mark (the stop is stopped_at, not a new reason)', year2.reverse_reason === 'month 1 paid by the monthly plan', year2.reverse_reason);
+  ev = await stripeHook('/__event', { method: 'POST', body: { type: 'invoice.paid', object: up2 } });
+  ok('the year’s invoice delivered again → still no month-1 lines', ev.json.delivery.status < 300 && ledgerOf(year2.id).length === 0, ledgerOf(year2.id));
+  r = await cron();
+  ok('…and the daily catch-up writes none either', r.status === 200 && ledgerOf(year2.id).length === 0 && paymentByInvoice(up2.id).months_credited === 1, r.json && r.json.stripeCatchup);
 }
 
 async function artistSupportNote(m) {
