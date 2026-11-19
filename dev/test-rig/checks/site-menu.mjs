@@ -103,7 +103,7 @@ await runCheck('site-menu', async () => {
       const yours = pg.locator('.sm-section[data-section="yours"] .sm-section-head');
       await yours.tap();
       const rowsYours = await pg.$$eval('.sm-section[data-section="yours"] .sm-row', (els) => els.map((e) => e.textContent.trim()));
-      ok('Your things opens in place with its rows', rowsYours.join('|') === 'My working card|My locations|Location requests|My productions', rowsYours);
+      ok('Your things opens in place with its rows', rowsYours.join('|') === 'My working card|My locations|Location requests|Your productions', rowsYours);
       ok('…and says it is open', (await yours.getAttribute('aria-expanded')) === 'true');
       const creatorRows = async () => { await pg.locator('.sm-section[data-section="creator"] .sm-section-head').tap(); return pg.$$eval('.sm-section[data-section="creator"] .sm-row', (els) => els.map((e) => e.textContent.trim())); };
       const cr = await creatorRows();

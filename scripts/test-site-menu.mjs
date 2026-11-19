@@ -143,6 +143,40 @@ t('counts are read again after two minutes', () => {
   assert.equal(R.countsFresh(undefined, now), false);
 });
 
+t('Your things: Your productions goes to /productions/mine', () => {
+  const yours = R.menuSections({ signedIn: true }).find((x) => x.id === 'yours');
+  assert.deepEqual(yours.rows.map((r) => r.label), ['My working card', 'My locations', 'Location requests', 'Your productions']);
+  assert.equal(yours.rows[3].href, '/productions/mine');
+});
+
+t('Running now: two productions, their lines and what needs you; only signed in, only with one', () => {
+  const A = '11111111-2222-4333-8444-555555555555';
+  const B = '22222222-2222-4333-8444-555555555555';
+  const C = '33333333-2222-4333-8444-555555555555';
+  const running = { items: [
+    { id: A, title: 'Night Bus', line: 'Prep · shooting Dec 6', needsYou: 4 },
+    { id: B, title: 'Paper Moons', line: 'Post', needsYou: 1 },
+    { id: C, title: 'Third', line: 'Prep', needsYou: 0 },
+    { id: '../evil', title: 'Bad id', line: '', needsYou: 0 }
+  ], total: 3 };
+  const card = R.menuRunning(running);
+  assert.equal(card.title, 'Running now');
+  assert.equal(card.count, '3 productions');
+  assert.deepEqual(card.items.map((x) => [x.title, x.line, x.needs, x.href, x.primary]), [
+    ['Night Bus', 'Prep · shooting Dec 6', '4 need you', `/productions/${A}/dashboard`, true],
+    ['Paper Moons', 'Post', '1 needs you', `/productions/${B}/dashboard`, false]
+  ]);
+  assert.deepEqual(card.all, { href: '/productions/mine', label: 'All your productions' });
+  assert.equal(R.menuRunning({ items: [], total: 0 }), null);
+  assert.equal(R.menuRunning(null), null);
+  assert.equal(R.menuRunning({ items: [{ id: A, title: 'One', line: 'Post', needsYou: 0 }] }).count, '1 production');
+  assert.equal(R.menuRunning({ items: [{ id: A, title: 'One', line: 'Post', needsYou: 0 }] }).items[0].needs, null);
+  assert.ok(R.siteMenu({ side: 'stream', signedIn: true, running }).running);
+  assert.ok(R.siteMenu({ side: 'connect', signedIn: true, running }).running);
+  assert.equal(R.siteMenu({ signedIn: false, running }).running, null);
+  assert.equal(R.siteMenu({ signedIn: true }).running, null);
+});
+
 t('the side follows the page', () => {
   assert.equal(R.menuSide(true), 'stream');
   assert.equal(R.menuSide(false), 'connect');

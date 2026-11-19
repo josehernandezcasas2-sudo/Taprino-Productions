@@ -7,12 +7,13 @@ import { StatusPill, PersonLine, fmtRange, fmtDay } from '../../../components/pr
 import { Avatar } from '../../../components/crew/CrewBits';
 import TierChip from '../../../components/crew/TierChip';
 import DayForm from '../../../components/productions/DayForm';
+import AddMember from '../../../components/productions/AddMember';
 import ReportButton from '../../../components/ReportButton';
 import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getProduction, ownReleaseOptions, bookedPlacesFor } from '../../../lib/productions';
-import { CREW_ROLES } from '../../../lib/crewOptions';
-import { OWNER_STATUSES, PRODUCTION_STATUS, MAX_ROLE_CHARS } from '../../../lib/productionRules';
+import { OWNER_STATUSES, PRODUCTION_STATUS } from '../../../lib/productionRules';
+import { DASH_WORDS, MANAGER_STATUSES, PITCH_WORDS, isProducerRole, productionFundingCard } from '../../../lib/productionDashRules';
 
 // One production: what it is, who's on it, the shoot days, the open
 // calls, the release. The owner runs it from here (status, crew, days,
@@ -34,6 +35,9 @@ export async function getServerSideProps({ req, res, params }) {
   let bookedPlaces = [];
   if (data && data.isOwner) {
     [releases, bookedPlaces] = await Promise.all([ownReleaseOptions(account.userId).catch(() => []), bookedPlacesFor(account.userId).catch(() => [])]);
+  } else if (data && data.canManage && account.userId) {
+    // A listed producer attaches the places they booked themselves.
+    bookedPlaces = await bookedPlacesFor(account.userId).catch(() => []);
   }
   return { props: { ...shellProps(account, episodes), data: data ? JSON.parse(JSON.stringify(data)) : null, notFound, setupError, releases, bookedPlaces } };
 }
@@ -62,7 +66,7 @@ export default function ProductionPage(props) {
     );
   }
 
-  const { production: p, members, days, calls, isOwner, isMember, canEdit, canConfirm, confirmHint } = data;
+  const { production: p, members, days, calls, isOwner, isMember, canEdit, canConfirm, confirmHint, canOwn = isOwner || isAdmin, dashboardHref = null, funding = null } = data;
 
   async function api(url, body, method = 'POST') {
     setBusy(true);
@@ -88,10 +92,14 @@ export default function ProductionPage(props) {
   // On the crew (not the owner): a way to write to the producer.
   const writeProducer = Boolean(isMember && !isOwner && p.owner && p.owner.userId && p.owner.userId !== viewerId);
   const confirmed = members.filter((m) => m.worked).length;
+  const fundingCard = productionFundingCard(funding);
 
   return (
     <ProductionShell title={p.title} description={p.logline || undefined} {...props}>
-      <div className="crew-crumbs"><Link href="/productions">Productions</Link><span>/</span><span>{p.title}</span></div>
+      <div className="crew-crumbs prod-crumbs-row">
+        <span><Link href="/productions">Productions</Link><span>/</span><span>{p.title}</span></span>
+        {dashboardHref && <Link href={dashboardHref} className="prod-dash-link">{DASH_WORDS.link} ›</Link>}
+      </div>
 
       <header className="crew-panel prod-hero">
         <div className="prod-hero-main">
@@ -115,15 +123,15 @@ export default function ProductionPage(props) {
           {canEdit && (
             <>
               <label className="crew-field"><span>Status</span>
-                <select className="crew-select" value={p.status} disabled={busy} onChange={(e) => api(`/api/productions/${p.id}`, { status: e.target.value }, 'PATCH')}>
-                  {OWNER_STATUSES.map((s) => <option key={s} value={s}>{PRODUCTION_STATUS[s]}</option>)}
+                <select className="crew-select" value={p.status} disabled={busy || (!canOwn && ['archived', 'removed'].includes(p.status))} onChange={(e) => api(`/api/productions/${p.id}`, { status: e.target.value }, 'PATCH')}>
+                  {(canOwn ? OWNER_STATUSES : [...MANAGER_STATUSES, ...(MANAGER_STATUSES.includes(p.status) ? [] : [p.status])]).map((s) => <option key={s} value={s}>{PRODUCTION_STATUS[s]}</option>)}
                 </select>
               </label>
               <div className="crew-actions">
                 <Link href={`/productions/${p.id}/edit`} className="crew-btn sm">Edit details</Link>
                 <Link href={`/crew/calls/new?production=${p.id}`} className="crew-btn sm primary">+ Post a call</Link>
                 <Link href="/locations" className="crew-btn sm">Book a place</Link>
-                <Link href={`/productions/${p.id}/distribution`} className="crew-btn sm">Distribution & screeners</Link>
+                {canOwn && <Link href={`/productions/${p.id}/distribution`} className="crew-btn sm">Distribution & screeners</Link>}
                 <Link href="/resources?kind=paperwork" className="crew-btn sm ghost" title="Release forms, deal memos, NDAs, location agreements — from the Resources directory">Paperwork templates</Link>
               </div>
             </>
@@ -148,6 +156,19 @@ export default function ProductionPage(props) {
       {note && <div className="crew-status ok" role="status">{note}</div>}
       {error && <div className="crew-status error" role="alert">{error}</div>}
 
+      {/* The pitch it grew out of, still taking backing (2026-11-19). */}
+      {fundingCard && (
+        <section className="crew-panel prod-funding" aria-label={PITCH_WORDS.fundingCard}>
+          <div className="prod-funding-top">
+            <span className="crew-mono">{fundingCard.kicker}</span>
+            {fundingCard.percent != null && <span className="prod-funding-pct">{fundingCard.percent}%</span>}
+          </div>
+          <div className="prod-funding-main">{fundingCard.line}</div>
+          {fundingCard.percent != null && <div className="prod-funding-bar" aria-hidden="true"><span style={{ width: `${fundingCard.percent}%` }} /></div>}
+          <Link href={fundingCard.button.href} className={`crew-btn sm${fundingCard.button.primary ? ' primary' : ''}`}>{fundingCard.button.label} ›</Link>
+        </section>
+      )}
+
       <div className="prod-grid2">
         <div className="prod-col">
           {/* ---- crew ---- */}
@@ -156,7 +177,7 @@ export default function ProductionPage(props) {
               <h2 className="cc-h2">Crew · {members.length}</h2>
               <span className="crew-mono">{confirmed} confirmed worked{p.release ? ' · credited on the release' : ''}</span>
             </div>
-            {members.length === 0 && <div className="crew-muted">Nobody on it yet.{isOwner ? ' Book people through a call posted for this production, or add them below.' : ''}</div>}
+            {members.length === 0 && <div className="crew-muted">Nobody on it yet.{canEdit ? ' Book people through a call posted for this production, or add them below.' : ''}</div>}
             {(isOwner || isMember) && <div className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>Release forms, deal memos, NDAs, location agreements: <Link href="/resources?kind=paperwork">Paperwork &amp; legal</Link> in Resources.</div>}
             {Object.entries(byDept).map(([dept, list]) => (
               <div key={dept} className="prod-dept">
@@ -175,10 +196,10 @@ export default function ProductionPage(props) {
                     </div>
                     {canEdit && (
                       <div className="cc-resp-acts">
-                        {isOwner && m.person.userId && m.person.userId !== viewerId && <Link href={messageHref(m.person.userId, p.id)} className="crew-btn sm">Message</Link>}
+                        {m.person.userId && m.person.userId !== viewerId && <Link href={messageHref(m.person.userId, p.id)} className="crew-btn sm">Message</Link>}
                         {!m.worked && !m.mine && canConfirm && <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => api(`/api/productions/${p.id}/members`, { memberId: m.id, worked: true }, 'PATCH')}>Worked it</button>}
                         {m.worked && isAdmin && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => api(`/api/productions/${p.id}/members`, { memberId: m.id, worked: false }, 'PATCH')}>Undo</button>}
-                        <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm(`Remove ${m.person.displayName} from the crew list?`)) api(`/api/productions/${p.id}/members`, { memberId: m.id }, 'DELETE'); }}>Remove</button>
+                        {(canOwn || (m.person.userId !== p.owner.userId && !isProducerRole(m.role))) && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm(`Remove ${m.person.displayName} from the crew list?`)) api(`/api/productions/${p.id}/members`, { memberId: m.id }, 'DELETE'); }}>Remove</button>}
                       </div>
                     )}
                   </div>
@@ -186,14 +207,14 @@ export default function ProductionPage(props) {
               </div>
             ))}
             {canEdit && members.some((m) => !m.worked && !m.mine) && confirmHint && <div className="crew-mono">{confirmHint}</div>}
-            {canEdit && <AddMember productionId={p.id} busy={busy} onResult={(r) => { if (r && r.production) setData(r); }} api={api} />}
+            {canEdit && <div id="add-crew"><AddMember productionId={p.id} busy={busy} api={api} /></div>}
           </section>
 
           {/* ---- open calls ---- */}
           <section className="crew-panel prod-section">
             <div className="crew-rhead">
               <h2 className="cc-h2">Crew needed</h2>
-              {isOwner && <Link href={`/crew/calls/new?production=${p.id}`} className="crew-btn sm">+ Post a call</Link>}
+              {canEdit && <Link href={`/crew/calls/new?production=${p.id}`} className="crew-btn sm">+ Post a call</Link>}
             </div>
             {calls.length === 0 && <div className="crew-muted">No open calls for this production right now.</div>}
             <div className="cc-list">
@@ -214,7 +235,7 @@ export default function ProductionPage(props) {
               <h2 className="cc-h2">Shoot days · {days.length}</h2>
               {inside && days.length > 0 && <span className="crew-mono">open a day for the call sheet</span>}
             </div>
-            {days.length === 0 && <div className="crew-muted">No shoot days on the sheet yet.{isOwner ? ' Add them below, or book a place under this production and its dates land here.' : ''}</div>}
+            {days.length === 0 && <div className="crew-muted">No shoot days on the sheet yet.{canEdit ? ' Add them below, or book a place under this production and its dates land here.' : ''}</div>}
             <div className="prod-days">
               {days.map((d) => (
                 inside
@@ -257,58 +278,6 @@ export default function ProductionPage(props) {
         {isOwner && p.status !== 'archived' && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm('Archive this production? It leaves the public list; you keep it.')) api(`/api/productions/${p.id}`, { status: 'archived' }, 'PATCH'); }}>Archive</button>}
       </div>
     </ProductionShell>
-  );
-}
-
-/* ---- owner: add someone by name / @handle ---- */
-
-function AddMember({ productionId, busy, api }) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState('');
-  const [role, setRole] = useState('');
-  const [picked, setPicked] = useState(null); // { userId, displayName }
-  const [people, setPeople] = useState([]);
-
-  useEffect(() => {
-    if (!open || picked || q.trim().length < 2 || q.trim().startsWith('@')) { setPeople([]); return undefined; }
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/crew/people?q=${encodeURIComponent(q.trim())}`);
-        const data = await res.json();
-        if (res.ok) setPeople((data.people || []).slice(0, 6));
-      } catch (err) { /* nothing */ }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [q, open, picked]);
-
-  async function submit(e) {
-    e.preventDefault();
-    const body = picked ? { userId: picked.userId, role } : { handle: q.trim(), role };
-    const r = await api(`/api/productions/${productionId}/members`, body);
-    if (r) { setQ(''); setRole(''); setPicked(null); setPeople([]); }
-  }
-
-  if (!open) return <div><button type="button" className="crew-btn sm" onClick={() => setOpen(true)}>+ Add someone</button></div>;
-  return (
-    <form className="prod-add" onSubmit={submit}>
-      <div className="crew-field" style={{ position: 'relative' }}><span>Who</span>
-        <input type="text" className="crew-input" value={picked ? picked.displayName : q} onChange={(e) => { setPicked(null); setQ(e.target.value); }} placeholder="Name on Crew Call, or @handle" autoComplete="off" />
-        {people.length > 0 && !picked && (
-          <div className="prod-suggest" role="listbox">
-            {people.map((x) => <button key={x.userId} type="button" onClick={() => { setPicked({ userId: x.userId, displayName: x.displayName }); setPeople([]); }}><Avatar userId={x.userId} name={x.displayName} src={x.avatarUrl} position={x.avatarPosition} zoom={x.avatarZoom} size="sm" /><span>{x.displayName}{x.handle ? <small> @{x.handle}</small> : null}</span><small>{(x.roles || []).slice(0, 3).join(', ')}</small></button>)}
-          </div>
-        )}
-      </div>
-      <label className="crew-field"><span>Role</span>
-        <input type="text" className="crew-input" list="prod-roles" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Gaffer" maxLength={MAX_ROLE_CHARS} required />
-        <datalist id="prod-roles">{CREW_ROLES.map((r) => <option key={r} value={r} />)}</datalist>
-      </label>
-      <div className="crew-actions">
-        <button type="submit" className="crew-btn sm primary" disabled={busy || (!picked && q.trim().length < 2) || role.trim().length < 2}>Add</button>
-        <button type="button" className="crew-btn sm ghost" onClick={() => { setOpen(false); setPicked(null); setQ(''); }}>Cancel</button>
-        <span className="crew-mono">They get a notification and can take themselves off.</span>
-      </div>
-    </form>
   );
 }
 

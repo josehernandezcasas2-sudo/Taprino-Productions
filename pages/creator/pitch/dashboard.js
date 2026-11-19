@@ -13,6 +13,10 @@ import PayoutsCard from '../../../components/creator/PayoutsCard';
 import PitchEarnings from '../../../components/creator/PitchEarnings';
 import { getEarningsForCreator } from '../../../lib/pitchDonations';
 import { SITE } from '../../../lib/siteConfig';
+import StartSheet from '../../../components/productions/StartSheet';
+import { productionsForPitches } from '../../../lib/productions';
+import { channelClock } from '../../../lib/channelEngine';
+import { pitchBox } from '../../../lib/productionDashRules';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -23,8 +27,14 @@ export async function getServerSideProps({ req, res }) {
   const { userId } = getAuth(req);
   const [episodes, pitches] = await Promise.all([getPublicEpisodes(), getPitchesForCreator(userId)]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-  // Paid backings per project (lib/pitchDonations.js) — empty before any.
-  const earnings = await getEarningsForCreator(userId, pitches);
+  // Paid backings per project (lib/pitchDonations.js) — empty before any —
+  // and the production each approved pitch grew into (2026-11-19). A read
+  // that fails leaves the production boxes out rather than offering a
+  // second production.
+  const [earnings, productions] = await Promise.all([
+    getEarningsForCreator(userId, pitches),
+    productionsForPitches(pitches.filter((p) => p.status === 'approved').map((p) => p.id), { viewerId: userId, isAdmin: account.isAdmin }).catch((err) => { console.error('pitch dashboard productions:', err && err.message); return null; })
+  ]);
 
   return {
     props: {
@@ -35,7 +45,9 @@ export async function getServerSideProps({ req, res }) {
       isCreator: account.isCreator,
       mainGenres,
       pitches,
-      earnings
+      earnings,
+      productions,
+      today: channelClock().date
     }
   };
 }
@@ -80,9 +92,10 @@ function PitchUpdateForm({ pitchId, onPosted }) {
   );
 }
 
-export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, earnings = {} }) {
+export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, earnings = {}, productions = null, today = null }) {
   const [openUpdateFor, setOpenUpdateFor] = useState(null);
   const [postedFlash, setPostedFlash] = useState(null);
+  const [starting, setStarting] = useState(null);
 
   return (
     <>
@@ -129,6 +142,22 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
               </div>
               <p style={{ fontSize: '0.86rem', opacity: 0.8, marginTop: '0.6rem' }}>{p.logline}</p>
               {p.status === 'approved' && (p.funding_enabled || earnings[p.id]) && <PitchEarnings pitch={p} earnings={earnings[p.id]} />}
+              {productions && (() => {
+                const box = pitchBox({ pitch: p, production: productions[p.id] || null, today });
+                if (!box) return null;
+                return box.kind === 'start' ? (
+                  <div className="pitch-ready" data-pitch={p.id}>
+                    <b className="pitch-ready-title">{box.title}</b>
+                    <span className="pitch-ready-line">{box.line}</span>
+                    <button type="button" className="pitch-ready-go" onClick={() => setStarting(p)}>{box.button.label}</button>
+                  </div>
+                ) : (
+                  <div className="pitch-ready running" data-pitch={p.id}>
+                    <span className="pitch-ready-top"><span className="pitch-ready-pill">{box.pill}</span><span className="pitch-ready-line">{box.line}</span></span>
+                    <Link href={box.button.href} className="pitch-ready-open">{box.button.label} ›</Link>
+                  </div>
+                );
+              })()}
 
               {p.status === 'approved' && (
                 <>
@@ -153,6 +182,7 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
       </main>
       <Footer />
       <MobileTabBar />
+      {starting && <StartSheet pitch={{ id: starting.id, title: starting.title, logline: starting.logline, tag: starting.tag }} backers={(earnings[starting.id] && earnings[starting.id].backers) || 0} onClose={() => setStarting(null)} />}
     </>
   );
 }

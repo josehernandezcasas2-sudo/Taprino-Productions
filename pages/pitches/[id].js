@@ -18,6 +18,8 @@ import { TAX_NOTE } from '../../lib/salesTaxRules';
 // focal point and zoom, same as the header and profile page.
 import { AvatarImg } from '../../components/AvatarPhoto';
 import { cssUrl } from '../../lib/cssUrl';
+import StartSheet from '../../components/productions/StartSheet';
+import { crewNeededHead, pitchOwnerAction, pitchProductionCard } from '../../lib/productionDashRules';
 
 export async function getServerSideProps({ req, res, params }) {
   const data = await getPitchDetailData(params.id, req);
@@ -63,7 +65,7 @@ const PAYOUT_STATE_LABELS = {
   unavailable: 'Payouts aren’t set up on this site yet (migration 083)'
 };
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false, creatorPayoutState = null, backingTaxed = false }) {
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false, creatorPayoutState = null, backingTaxed = false, production = null, productionLink = null, today = null }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
@@ -98,6 +100,11 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
     ? splitDonation(Math.round(Number(donationAmount) * 100), pitch.platform_cut_percent || 0)
     : null;
   const [currentTotalRaisedCents, setCurrentTotalRaisedCents] = useState(totalRaisedCents);
+  // The production it grew into (2026-11-19, lib/productionDashRules.js).
+  const [starting, setStarting] = useState(false);
+  const productionCard = pitchProductionCard(production, today);
+  const ownerAction = pitchOwnerAction({ isPitchOwner, production: productionLink, canManage: Boolean(productionLink && productionLink.canManage) });
+  const crewHead = crewNeededHead(crewCalls.length, production);
 
   // funding_enabled pitches are tracked for real via pitch_donations
   // (currentTotalRaisedCents), so the bar/percentage should reflect that
@@ -419,6 +426,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
         <div className="hero-scrim" />
         <div className="hero-inner">
           <div className="hero-content">
+            {productionCard && <span className="pitch-prod-pill"><i aria-hidden="true" />{productionCard.pill}</span>}
             <div className="hero-eyebrow">{pitch.tag || 'Project'} &middot; Pitch Room</div>
             <h2>{pitch.title}</h2>
 
@@ -465,6 +473,15 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
               )}
             </div>
             <p>{pitch.logline}</p>
+            {productionCard && (
+              <Link href={productionCard.link.href} className="pitch-prod-card">
+                <span className="pitch-prod-card-text"><b>{productionCard.title}</b><span>{productionCard.line}</span></span>
+                <span className="pitch-prod-card-go">{productionCard.link.label} ›</span>
+              </Link>
+            )}
+            {ownerAction && (ownerAction.kind === 'start'
+              ? <button type="button" className="pitch-prod-start" onClick={() => setStarting(true)}>{ownerAction.label}</button>
+              : <Link href={ownerAction.href} className="pitch-prod-open">{ownerAction.label} ›</Link>)}
             <div className="hero-actions">
               {pitch.funding_enabled && (
                 <a href="#fund" className="fund-btn"><BackItIcon size={17} src={iconOverrides.back_it} /> Back this project</a>
@@ -593,7 +610,10 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             and joining live side by side; only the creator can post one. */}
         {(crewCalls.length > 0 || isPitchOwner) && (
           <>
-            <div className="pitch-section-label">Crew needed</div>
+            <div className="pitch-section-label pitch-crew-head">
+              <span>{crewHead.title}</span>
+              {crewHead.all && <Link href={crewHead.all.href} className="pitch-crew-all">{crewHead.all.label} ›</Link>}
+            </div>
             <div className="cc-list" style={{ maxWidth: 760, marginBottom: '1.6rem' }}>
               {crewCalls.map((c) => (
                 <Link key={c.id} href={`/crew/calls/${c.id}`} className="crew-panel cc-call">
@@ -602,7 +622,8 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 </Link>
               ))}
               {crewCalls.length === 0 && <p className="crew-muted" style={{ margin: 0 }}>No open calls for this project yet.</p>}
-              {isPitchOwner && <div><Link href={`/crew/calls/new?project=pitch:${pitch.id}`} className="crew-btn sm">+ Post a call for this project</Link></div>}
+              {crewHead.note && crewCalls.length > 0 && <p className="crew-muted pitch-crew-note">{crewHead.note}</p>}
+              {isPitchOwner && <div><Link href={production ? `/crew/calls/new?production=${production.id}` : `/crew/calls/new?project=pitch:${pitch.id}`} className="crew-btn sm">+ Post a call for this project</Link></div>}
             </div>
           </>
         )}
@@ -713,6 +734,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
       </main>
       <Footer />
       <MobileTabBar />
+      {starting && <StartSheet pitch={{ id: pitch.id, title: pitch.title, logline: pitch.logline, tag: pitch.tag }} backers={backerCount || 0} onClose={() => setStarting(false)} />}
     </>
   );
 }

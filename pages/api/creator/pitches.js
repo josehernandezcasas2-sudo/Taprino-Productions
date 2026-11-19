@@ -4,6 +4,8 @@ import { getEarningsForCreator } from '../../../lib/pitchDonations';
 import { getPayoutAccount, payoutState } from '../../../lib/creatorPayouts';
 import { isStripeConfigured } from '../../../lib/stripe';
 import { applyCors } from '../../../lib/cors';
+import { productionsForPitches } from '../../../lib/productions';
+import { channelClock } from '../../../lib/channelEngine';
 
 // The app's "Your pitches" screen (mobile/src/app/creator/pitches.js):
 // the same data pages/creator/pitch/dashboard.js assembles in
@@ -27,7 +29,14 @@ export default async function handler(req, res) {
 
   try {
     const pitches = await getPitchesForCreator(userId);
-    const earnings = await getEarningsForCreator(userId, pitches);
+    const [earnings, productions] = await Promise.all([
+      getEarningsForCreator(userId, pitches),
+      // The production each pitch grew into (2026-11-19): the "Ready to
+      // shoot it?" box or "In production · Open its dashboard"
+      // (lib/productionDashRules.js pitchBox). A read that fails leaves
+      // the boxes out rather than offering a second production.
+      productionsForPitches(pitches.filter((p) => p.status === 'approved').map((p) => p.id), { viewerId: userId, isAdmin }).catch((err) => { console.error('creator/pitches productions:', err && err.message); return null; })
+    ]);
     // Payout state degrades to "none" before migration 083 or without Stripe.
     let payout = { configured: isStripeConfigured(), state: 'none' };
     if (payout.configured) {
@@ -54,7 +63,15 @@ export default async function handler(req, res) {
         created_at: p.created_at
       })),
       earnings,
-      payout
+      payout,
+      // { [pitchId]: { id, title, status, statusLabel, startsOn, endsOn,
+      //   placeLabel, crewCount, openRoles, visibility, canManage, visible } },
+      // or null when it couldn't be read (show no Start button then).
+      productions,
+      // For the start sheet's "Tell my N backers".
+      backers: Object.fromEntries(Object.entries(earnings || {}).map(([id, e]) => [id, e.backers || 0])),
+      // The Pacific day, for pitchBox's "Shooting from …".
+      today: channelClock().date
     });
   } catch (err) {
     console.error('creator/pitches error:', err.message);

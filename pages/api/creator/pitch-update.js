@@ -21,7 +21,9 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Not signed in.' });
   }
 
-  const { pitchId, title, body } = req.body || {};
+  // alsoBackers: the production dashboard's update also tells the pitch's
+  // backers (its "your backers haven't heard from you" line links here).
+  const { pitchId, title, body, alsoBackers } = req.body || {};
   if (!pitchId || typeof title !== 'string' || typeof body !== 'string' || !title.trim() || !body.trim()) {
     return res.status(400).json({ error: 'pitchId, title, and body are required.' });
   }
@@ -47,7 +49,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'That’s three updates today — post the next one tomorrow.' });
   }
 
-  const result = await postPitchUpdate(pitchId, title.trim(), body.trim());
+  const result = await postPitchUpdate(pitchId, title.trim(), body.trim(), { alsoBackers: alsoBackers === true });
   if (!result.ok) {
     return res.status(500).json({ error: 'Could not post the update. Try again in a moment.' });
   }

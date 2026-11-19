@@ -7,6 +7,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { listProductions, listMyProductions } from '../../lib/productions';
 import { PRODUCTION_KINDS, PRODUCTION_STATUS } from '../../lib/productionRules';
+import { MINE_PATH, MINE_WORDS } from '../../lib/productionDashRules';
 
 // Productions (Connect, migration 104): who's making what. Public list
 // with filters; a signed-in person's own productions and the ones they're
@@ -79,8 +80,11 @@ export default function ProductionsPage(props) {
         <span className="crew-tab on" aria-current="page">Productions{board.total ? ` · ${board.total}` : ''}</span>
       </div>
 
+      {/* /productions#mine still lands here; the full list with the
+          dashboards is Your productions (/productions/mine, 2026-11-19). */}
       {hasMine && (
         <section className="prod-mine" id="mine">
+          <div className="crew-rhead"><Link href={MINE_PATH} className="crew-btn sm">{MINE_WORDS.title} ›</Link></div>
           {mine.owned.length > 0 && (
             <>
               <div className="crew-rhead"><span className="crew-mono">Yours · {mine.owned.length}</span><Link href="/productions/new" className="crew-mono">+ start another</Link></div>

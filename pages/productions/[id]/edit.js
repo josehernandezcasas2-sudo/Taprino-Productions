@@ -18,13 +18,17 @@ export async function getServerSideProps({ req, res, params }) {
   } catch (err) {
     if (err.status === 404 || err.status === 503 || err.status === 403) notFound = true; else throw err;
   }
-  const projects = data && !notFound ? await ownProjectOptions(data.production.owner.userId).catch(() => []) : [];
-  return { props: { ...shellProps(account, episodes), production: data && !notFound ? JSON.parse(JSON.stringify(data.production)) : null, notFound, projects } };
+  // A listed producer edits the details; who sees it and the project it
+  // grew out of stay the owner's (lib/productionDashRules.js), so their
+  // form leaves those two out.
+  const canOwn = Boolean(data && data.canOwn);
+  const projects = data && !notFound && canOwn ? await ownProjectOptions(data.production.owner.userId).catch(() => []) : [];
+  return { props: { ...shellProps(account, episodes), production: data && !notFound ? JSON.parse(JSON.stringify(data.production)) : null, notFound, projects, canOwn } };
 }
 
 export default function EditProduction(props) {
   const router = useRouter();
-  const { production, notFound, projects } = props;
+  const { production, notFound, projects, canOwn = true } = props;
   return (
     <ProductionShell title={production ? `Edit ${production.title}` : 'Edit'} {...props}>
       <div className="crew-crumbs"><Link href="/productions">Productions</Link><span>/</span>{production && <><Link href={`/productions/${production.id}`}>{production.title}</Link><span>/</span></>}<span>Edit</span></div>
@@ -32,7 +36,7 @@ export default function EditProduction(props) {
         <div className="crew-panel crew-empty">That production isn’t yours to edit.<br /><Link href="/productions" className="crew-btn sm" style={{ marginTop: '0.6rem' }}>Back to productions</Link></div>
       ) : (
         <div className="crew-card-grid">
-          <ProductionForm initial={production} projects={projects} cancelHref={`/productions/${production.id}`} onSaved={() => router.push(`/productions/${production.id}`)} />
+          <ProductionForm initial={production} projects={projects} ownerFields={canOwn} cancelHref={`/productions/${production.id}`} onSaved={() => router.push(`/productions/${production.id}`)} />
           <aside className="crew-aside">
             <div className="crew-panel crew-wc-side">
               <h3>Status, crew and days</h3>

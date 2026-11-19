@@ -63,6 +63,9 @@ const TINT = {
 
 // Read at most once per MENU_COUNTS_MAX_AGE_MS while the tab stays open.
 let countsCache = { counts: null, at: NaN };
+// "Running now" (/api/productions/running), the same two minutes; dropped
+// when the menu opens signed out.
+let runningCache = { running: null, at: NaN, who: null };
 let genresCache = null;
 
 function readOpen() {
@@ -75,6 +78,8 @@ function writeOpen(ids) {
 export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, isSignedIn, isSubscriber, roles, settings, ownProfile, profileHref, mainGenres, activeGenre, returnFocus, accountTypes = null }) {
   const [side, setSide] = useState(initialSide);
   const [counts, setCounts] = useState(countsCache.counts);
+  const runningWho = isSignedIn && ownProfile && ownProfile.userId ? ownProfile.userId : null;
+  const [running, setRunning] = useState(isSignedIn && runningCache.who === runningWho ? runningCache.running : null);
   const [genres, setGenres] = useState(mainGenres && mainGenres.length ? mainGenres : genresCache);
   const [showMore, setShowMore] = useState(false);
   const menu = siteMenu({
@@ -85,7 +90,8 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
     settings,
     counts,
     displayName: ownProfile ? ownProfile.displayName : null,
-    profileHref
+    profileHref,
+    running
   });
   const [openIds, setOpenIds] = useState([]);
 
@@ -161,6 +167,24 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
       .catch(() => {});
     return () => { live = false; };
   }, []);
+
+  // "Running now": the productions this person runs, read as the menu
+  // opens (signed in), at most every two minutes.
+  useEffect(() => {
+    if (!isSignedIn) { runningCache = { running: null, at: NaN, who: null }; setRunning(null); return undefined; }
+    // Kept for the same account only (another sign-in in this tab reads again).
+    if (runningCache.who === runningWho && countsFresh(runningCache.at)) { setRunning(runningCache.running); return undefined; }
+    let live = true;
+    fetch('/api/productions/running', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || !Array.isArray(d.items)) return;
+        runningCache = { running: d, at: Date.now(), who: runningWho };
+        if (live) setRunning(d);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [isSignedIn, runningWho]);
 
   // The genres for the Stream side: the page's own list when it has one
   // (the Stream pages pass it), else the public list once per tab.
@@ -292,6 +316,22 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
                 <SignUpHere><button type="button" className="sm-btn" onClick={onClose}>{MENU_WORDS.createAccount}</button></SignUpHere>
               </div>
             </div>
+          )}
+
+          {menu.running && (
+            <section className="sm-card sm-running" aria-label={menu.running.title}>
+              <div className="sm-running-head"><span className="sm-running-title">{menu.running.title}</span><span className="sm-running-count">{menu.running.count}</span></div>
+              {menu.running.items.map((r) => (
+                <div key={r.id} className="sm-running-row">
+                  <span className="sm-running-text">
+                    <span className="sm-running-name">{r.title}</span>
+                    <span className="sm-running-line">{r.line}{r.needs && <>{r.line ? ' · ' : ''}<b>{r.needs}</b></>}</span>
+                  </span>
+                  <Link href={r.href} className={`sm-running-open${r.primary ? ' primary' : ''}`} onClick={go} aria-label={`${r.open} ${r.title}`}>{r.open}</Link>
+                </div>
+              ))}
+              <Link href={menu.running.all.href} className="sm-running-all" onClick={go}>{menu.running.all.label} ›</Link>
+            </section>
           )}
 
           <div className="sm-sides" role="group" aria-label={MENU_WORDS.sides}>

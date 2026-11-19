@@ -36,6 +36,13 @@ export default async function handler(req, res) {
     bypassingDisabled: data.bypassingDisabled,
     userId: data.userId,
     isPitchOwner: data.isPitchOwner,
+    // The production it grew into (2026-11-19): the card, the start / open
+    // action (lib/productionDashRules.js pitchOwnerAction) and Crew needed
+    // with the production's open calls merged in.
+    production: data.production,
+    productionLink: data.productionLink,
+    crewCalls: data.crewCalls,
+    today: data.today,
     creatorPayoutState: data.creatorPayoutState,
     pitch: data.pitch,
     similar: data.similar,

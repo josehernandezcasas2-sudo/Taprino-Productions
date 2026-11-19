@@ -6,7 +6,9 @@ import { PRODUCTION_KINDS, VISIBILITY, MAX_TITLE_CHARS, MAX_LOGLINE_CHARS, MAX_N
 // Start / edit a production. `initial` is the production as the API
 // returns it (edit) or null (new). Submits to the given endpoint; the
 // parent decides where to go next with the returned production.
-export default function ProductionForm({ initial = null, projects = [], onSaved, cancelHref }) {
+// `ownerFields`: who sees it and what it grew out of — the owner's
+// (a listed producer's form leaves them out and never sends them).
+export default function ProductionForm({ initial = null, projects = [], onSaved, cancelHref, ownerFields = true }) {
   const [form, setForm] = useState({
     title: initial ? initial.title : '',
     logline: initial ? initial.logline : '',
@@ -29,6 +31,7 @@ export default function ProductionForm({ initial = null, projects = [], onSaved,
     try {
       const [type, id] = form.project ? form.project.split(':') : [null, null];
       const body = { ...form, project: type ? { type, id } : null };
+      if (!ownerFields) { delete body.visibility; delete body.project; }
       const res = await fetch(initial ? `/api/productions/${initial.id}` : '/api/productions', { method: initial ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save that.');
@@ -53,9 +56,11 @@ export default function ProductionForm({ initial = null, projects = [], onSaved,
         <label className="crew-field"><span>Kind</span>
           <select className="crew-select" value={form.kind} onChange={(e) => set({ kind: e.target.value })}>{Object.entries(PRODUCTION_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
         </label>
-        <label className="crew-field"><span>Who sees it</span>
-          <select className="crew-select" value={form.visibility} onChange={(e) => set({ visibility: e.target.value })}>{Object.entries(VISIBILITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
-        </label>
+        {ownerFields && (
+          <label className="crew-field"><span>Who sees it</span>
+            <select className="crew-select" value={form.visibility} onChange={(e) => set({ visibility: e.target.value })}>{Object.entries(VISIBILITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
+          </label>
+        )}
       </div>
       <div className="crew-row2">
         <label className="crew-field"><span>First shoot day</span><input type="date" className="crew-input" value={form.startsOn} onChange={(e) => set({ startsOn: e.target.value })} /></label>
@@ -64,12 +69,14 @@ export default function ProductionForm({ initial = null, projects = [], onSaved,
       <div className="crew-field"><span>Home base</span>
         <PlaceSearch value={form.place} onChange={(p) => set({ place: p })} placeholder="City (pick from the suggestions)" />
       </div>
-      <label className="crew-field"><span>Grew out of (optional)</span>
-        <select className="crew-select" value={form.project} onChange={(e) => set({ project: e.target.value })}>
-          <option value="">Nothing on Studio Tapa yet</option>
-          {options.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-        </select>
-      </label>
+      {ownerFields && (
+        <label className="crew-field"><span>Grew out of (optional)</span>
+          <select className="crew-select" value={form.project} onChange={(e) => set({ project: e.target.value })}>
+            <option value="">Nothing on Studio Tapa yet</option>
+            {options.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </label>
+      )}
       <label className="crew-field"><span>Notes for the crew</span><textarea className="crew-input" rows={5} value={form.notes} onChange={(e) => set({ notes: e.target.value })} placeholder="How the shoot runs, comms, who to call. The crew sees this; the public doesn’t." maxLength={MAX_NOTES_CHARS} /></label>
       {error && <div className="crew-status error" role="alert">{error}</div>}
       <div className="crew-actions">
