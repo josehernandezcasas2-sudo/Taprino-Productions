@@ -83,6 +83,9 @@ const newId = (prefix) => `${prefix}_rig${rand(20)}`;
 const clone = (o) => (o === undefined ? o : JSON.parse(JSON.stringify(o)));
 const bool = (v) => v === true || v === 'true';
 const int = (v, d = null) => (v === undefined || v === null || v === '' ? d : Number.parseInt(v, 10));
+// How long one paid period of a recurring price runs, in seconds (a yearly
+// price: a year; anything else: the 30 days the fake has always used).
+const periodSecs = (price) => (price && price.recurring && price.recurring.interval === 'year' ? 365 * 86400 : 30 * 86400);
 
 let objects = new Map();
 let balances = new Map();
@@ -149,6 +152,10 @@ function seed() {
   for (const [tier, name, amount] of plans) {
     const prod = put({ id: `prod_rig${tier[0].toUpperCase()}${tier.slice(1)}`, object: 'product', active: true, name, description: null, metadata: { tier }, created, updated: created, default_price: `price_rig${tier[0].toUpperCase()}${tier.slice(1)}`, images: [], livemode: false, type: 'service', tax_code: null, url: null });
     put({ id: `price_rig${tier[0].toUpperCase()}${tier.slice(1)}`, object: 'price', active: true, currency: 'usd', unit_amount: amount, unit_amount_decimal: String(amount), product: prod.id, recurring: { interval: 'month', interval_count: 1, usage_type: 'licensed', aggregate_usage: null, trial_period_days: null }, type: 'recurring', metadata: {}, nickname: null, created, livemode: false, lookup_key: null, billing_scheme: 'per_unit', tax_behavior: 'unspecified', tiers_mode: null, transform_quantity: null });
+    // The yearly price beside it (2026-11-19, yearly Stream plans: ten
+    // months' price rounded down to the dollar — $79 / $129 / $69).
+    const yearly = Math.floor((amount * 10) / 100) * 100;
+    put({ id: `price_rig${tier[0].toUpperCase()}${tier.slice(1)}Yearly`, object: 'price', active: true, currency: 'usd', unit_amount: yearly, unit_amount_decimal: String(yearly), product: prod.id, recurring: { interval: 'year', interval_count: 1, usage_type: 'licensed', aggregate_usage: null, trial_period_days: null }, type: 'recurring', metadata: {}, nickname: null, created: created + 1, livemode: false, lookup_key: null, billing_scheme: 'per_unit', tax_behavior: 'unspecified', tiers_mode: null, transform_quantity: null });
   }
   put(accountObj({ id: PLATFORM, email: 'studio@rig.example.com', ready: true, name: 'Studio Tapa TV (rig)', schedule: 'manual' }));
   put(accountObj({ id: 'acct_rigMara', email: 'mara@rig.example.com', ready: true, name: 'Mara Reyes', metadata: { userId: 'user_rigMara' } }));
@@ -411,10 +418,10 @@ async function completeSession(id) {
     const ch = objects.get(pi.latest_charge);
     const sub = put({
       id: subId, object: 'subscription', customer, status: 'active', metadata: sd.metadata || {}, cancel_at_period_end: false, cancel_at: null, canceled_at: null, ended_at: null,
-      current_period_start: start, current_period_end: start + 30 * 86400, start_date: start, created: start, latest_invoice: invId, livemode: false, collection_method: 'charge_automatically',
+      current_period_start: start, current_period_end: start + periodSecs(first && first.price), start_date: start, created: start, latest_invoice: invId, livemode: false, collection_method: 'charge_automatically',
       automatic_tax: { enabled: Boolean(s.automatic_tax && s.automatic_tax.enabled), liability: s.automatic_tax && s.automatic_tax.enabled ? { type: 'self' } : null },
-      items: { object: 'list', data: s._line_items.map((li) => ({ id: newId('si'), object: 'subscription_item', price: clone(li.price), quantity: li.quantity, created: start, subscription: subId, current_period_start: start, current_period_end: start + 30 * 86400 })), has_more: false, url: `/v1/subscription_items?subscription=${subId}` },
-      plan: first ? { id: first.price.id, object: 'plan', amount: first.price.unit_amount, interval: 'month', product: first.price.product, active: true } : null
+      items: { object: 'list', data: s._line_items.map((li) => ({ id: newId('si'), object: 'subscription_item', price: clone(li.price), quantity: li.quantity, created: start, subscription: subId, current_period_start: start, current_period_end: start + periodSecs(li.price) })), has_more: false, url: `/v1/subscription_items?subscription=${subId}` },
+      plan: first ? { id: first.price.id, object: 'plan', amount: first.price.unit_amount, interval: (first.price.recurring && first.price.recurring.interval) || 'month', product: first.price.product, active: true } : null
     });
     // Stripe Tax on the first invoice, in the shape of the event's API
     // version (2024-06-20: tax + total_tax_amounts; with the tax state's
@@ -432,7 +439,7 @@ async function completeSession(id) {
       status_transitions: { paid_at: start, finalized_at: start },
       subscription_details: { metadata: sub.metadata },
       parent: { type: 'subscription_details', subscription_details: { subscription: subId, metadata: sub.metadata } },
-      lines: { object: 'list', data: s._line_items.map((li) => ({ id: newId('il'), object: 'line_item', amount: li.amount_subtotal, currency: 'usd', price: clone(li.price), quantity: li.quantity, period: { start, end: start + 30 * 86400 }, subscription: subId, type: 'subscription' })), has_more: false }
+      lines: { object: 'list', data: s._line_items.map((li) => ({ id: newId('il'), object: 'line_item', amount: li.amount_subtotal, currency: 'usd', price: clone(li.price), quantity: li.quantity, period: { start, end: start + periodSecs(li.price) }, proration: false, subscription: subId, type: 'subscription' })), has_more: false }
     });
     // customer_update[address]=auto saves the address typed in Checkout.
     if (taxed && s.customer_update && s.customer_update.address === 'auto') {
@@ -962,7 +969,7 @@ async function hooks(req, res, url, parts, body) {
       status_transitions: { paid_at: at, finalized_at: at },
       subscription_details: { metadata: s.metadata },
       parent: { type: 'subscription_details', subscription_details: { subscription: s.id, metadata: s.metadata } },
-      lines: { object: 'list', data: s.items.data.map((it) => ({ id: newId('il'), object: 'line_item', amount: it.price.unit_amount * (it.quantity || 1), currency: 'usd', price: clone(it.price), quantity: it.quantity, period: { start: at, end: at + 30 * 86400 }, subscription: s.id, type: 'subscription' })), has_more: false }
+      lines: { object: 'list', data: s.items.data.map((it) => ({ id: newId('il'), object: 'line_item', amount: it.price.unit_amount * (it.quantity || 1), currency: 'usd', price: clone(it.price), quantity: it.quantity, period: { start: at, end: at + periodSecs(it.price) }, proration: false, subscription: s.id, type: 'subscription' })), has_more: false }
     });
     s.latest_invoice = invId;
     const ev = makeEvent('invoice.paid', out(inv));

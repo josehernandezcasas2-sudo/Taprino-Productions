@@ -4,6 +4,7 @@ import { Avatar } from './crew/CrewBits';
 import { tierLabel } from '../lib/membershipTiers';
 import { SITE } from '../lib/siteConfig';
 import { MAX_PICKS, MAX_WEIGHT, MIN_WEIGHT, dollars, splitLineup } from '../lib/artistSupportRules';
+import { BILLING_WORDS } from '../lib/yearlyPlanRules';
 
 // The member's side of Membership Artist Support (mockups/creator-share-v1
 // + the playable creator-share-play.html): their share for the month, the
@@ -114,9 +115,12 @@ export default function ArtistSupportCard({ initial, apiPath = '/api/artist-supp
       </div>
       <div className="asup-meta">
         {picks.length
-          ? `${mode === 'custom' ? 'Your own shares' : 'Equal shares'} · changes apply from your next renewal`
+          ? `${mode === 'custom' ? 'Your own shares' : 'Equal shares'} · ${initial.yearlyNote ? BILLING_WORDS.picksApplyYearly : BILLING_WORDS.picksApply}`
           : 'Nothing picked · your share follows what you watch'}
       </div>
+      {/* A yearly plan's share goes out month by month (migration 127;
+          lib/yearlyPlanRules.js yearlyShareNote). */}
+      {initial.yearlyNote && <p className="asup-yearly">{initial.yearlyNote}</p>}
 
       {!available && (
         <div className="asup-empty"><b>Artist Support isn&rsquo;t switched on yet.</b> The database part (migration 088) hasn&rsquo;t been run, so picks can&rsquo;t be saved. Everything below still works as a preview.</div>

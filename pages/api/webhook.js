@@ -3,7 +3,7 @@ import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
 import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
-import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge, restoreMembershipCharge } from '../../lib/creatorShare';
+import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge, restoreMembershipCharge, stopMembershipMonths } from '../../lib/creatorShare';
 import { recordAdCreditPurchase, reverseAdCreditPurchase, restoreAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
 import { completePurchaseFromSession, failPurchaseFromSession, refundPurchaseFromCharge } from '../../lib/purchases';
@@ -245,6 +245,9 @@ export async function handleStripeEvent(event) {
       // A chargeback on a membership payment takes back the creator credits
       // that haven't been paid out yet (lib/creatorShare.js).
       const dispute = event.data.object;
+      // A yearly plan's months not yet credited stop first (migration 127),
+      // so the daily step can't credit another while the rest is reversed.
+      await run('stopMembershipMonths (dispute)', () => stopMembershipMonths({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed'));
       await run('reverseMembershipCharge (dispute)', () => reverseMembershipCharge({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed'));
       // ...and ends the membership, so the access it paid for goes with the
       // money (security fixes, 2026-11-15; lib/membershipDisputes.js). One
@@ -312,6 +315,10 @@ export async function handleStripeEvent(event) {
       // back to Stripe like its neighbours (it used to be logged and the
       // event marked done, so the buyer kept the title).
       await run('refundPurchaseFromCharge', () => refundPurchaseFromCharge(event.data.object));
+      // A refunded yearly membership payment, in full or in part, credits
+      // no more months (migration 127; a partial refund stops them and
+      // nothing else).
+      await run('stopMembershipMonths', () => stopMembershipMonths(event.data.object, event.data.object.refunded ? 'refunded' : 'partly refunded'));
       // A fully refunded membership payment: its unpaid creator credits
       // are reversed (a partial refund leaves them alone).
       if (event.data.object.refunded) {

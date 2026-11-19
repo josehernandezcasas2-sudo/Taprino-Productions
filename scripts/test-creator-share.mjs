@@ -7,7 +7,10 @@ import {
   standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue,
   fitShareToPayment, countWatched, invoiceRetryVerdict, INVOICE_RETRY_HOURS,
   isStudioLine, inheritStudio, stampLines, unstampedCreators, owedByStudio, splitStudioCents, restoreLinesFor,
-  chargeReversalReason, membershipLineKey, membershipPaidCents, paymentPromisesLines
+  chargeReversalReason, membershipLineKey, membershipPaidCents, paymentPromisesLines,
+  YEARLY_MONTHS, addCalendarMonths, yearlyMonthDue, yearlyScheduleStart, yearlyRunning, yearlyMonthDueNow, afterYearlyMonth, yearlyMonthNote,
+  yearlySharesAhead, invoiceBilling, invoiceLineInterval,
+  yearlyStartsCredited, monthlyStopsYear, YEARLY_MONTH1_COVERED, YEARLY_SWITCHED_TO_MONTHLY
 } from '../lib/creatorShareRules.js';
 import { stableLineId, withMembershipLineIds } from '../lib/ledgerIds.js';
 import { claimLines, CLAIM_CHUNK } from '../lib/payoutClaims.js';
@@ -265,6 +268,169 @@ test('reminderDue: 60, 30 and 7 days before the end, once each, the most urgent 
   assert.equal(reminderDue(left, new Date('2026-12-31T00:00:00Z')), null);
   assert.equal(reminderDue({ ...left, forfeited_at: '2026-12-31T00:00:00Z' }, new Date('2026-12-25T00:00:00Z')), null);
   assert.equal(reminderDue({ collect_until: '2026-12-30T00:00:00Z' }, new Date('2026-12-25T00:00:00Z')), null);
+});
+
+// ---- yearly Stream plans (migration 127) ---------------------------------------
+test('yearly: a calendar month on keeps the day where the month has it, from the payment each time', () => {
+  assert.equal(addCalendarMonths('2026-01-31T10:30:00.000Z', 1), '2026-02-28T10:30:00.000Z');
+  assert.equal(addCalendarMonths('2028-01-31T10:30:00.000Z', 1), '2028-02-29T10:30:00.000Z');
+  assert.equal(addCalendarMonths('2026-11-19T08:00:00.000Z', 2), '2027-01-19T08:00:00.000Z');
+  assert.equal(addCalendarMonths('not a date', 1), null);
+  // Month k counts from the payment, so the 31st never drifts to the 28th.
+  assert.equal(yearlyMonthDue('2026-01-31T00:00:00.000Z', 1), '2026-01-31T00:00:00.000Z');
+  assert.equal(yearlyMonthDue('2026-01-31T00:00:00.000Z', 2), '2026-02-28T00:00:00.000Z');
+  assert.equal(yearlyMonthDue('2026-01-31T00:00:00.000Z', 3), '2026-03-31T00:00:00.000Z');
+  assert.equal(yearlyMonthDue('2026-01-31T00:00:00.000Z', 12), '2026-12-31T00:00:00.000Z');
+});
+
+test('yearly: the schedule a payment starts with, and a payment already refunded starts stopped', () => {
+  const paid = '2026-11-19T12:00:00.000Z';
+  assert.equal(YEARLY_MONTHS, 12);
+  assert.deepEqual(yearlyScheduleStart(paid), { months: 12, months_credited: 1, next_month_at: '2026-12-19T12:00:00.000Z' });
+  assert.deepEqual(yearlyScheduleStart(paid, { stoppedAt: '2026-11-19T12:05:00.000Z' }), { months: 12, months_credited: 1, next_month_at: null, stopped_at: '2026-11-19T12:05:00.000Z' });
+});
+
+test('yearly: which month is due, and the twelfth ends the schedule', () => {
+  const paid = '2026-01-15T00:00:00.000Z';
+  const p = { months: 12, months_credited: 1, next_month_at: '2026-02-15T00:00:00.000Z', status: 'split', stopped_at: null, paid_at: paid };
+  assert.equal(yearlyMonthDueNow(p, new Date('2026-02-14T23:59:00Z')), null);
+  assert.equal(yearlyMonthDueNow(p, new Date('2026-02-15T00:00:00Z')), 2);
+  assert.deepEqual(afterYearlyMonth(paid, 2), { months_credited: 2, next_month_at: '2026-03-15T00:00:00.000Z' });
+  assert.deepEqual(afterYearlyMonth(paid, 11), { months_credited: 11, next_month_at: '2026-12-15T00:00:00.000Z' });
+  assert.deepEqual(afterYearlyMonth(paid, 12), { months_credited: 12, next_month_at: null });
+  // Not running: a monthly payment, a stopped one, a reversed one, a finished one.
+  assert.equal(yearlyRunning(p), true);
+  assert.equal(yearlyRunning({ ...p, months: 1 }), false);
+  assert.equal(yearlyRunning({ ...p, stopped_at: '2026-03-01T00:00:00Z' }), false);
+  assert.equal(yearlyRunning({ ...p, status: 'reversed' }), false);
+  assert.equal(yearlyRunning({ ...p, months_credited: 12, next_month_at: null }), false);
+  assert.equal(yearlyRunning({ ...p, months_credited: 12 }), false);
+  assert.equal(yearlyMonthDueNow({ ...p, stopped_at: '2026-02-01T00:00:00Z' }, new Date('2026-03-01T00:00:00Z')), null);
+  // A row read before 127 (no months key) is monthly and credited.
+  assert.equal(yearlyRunning({ status: 'split', share_cents: 200 }), false);
+  assert.equal(yearlyMonthNote(7), 'Yearly plan · month 7 of 12');
+});
+
+test('yearly: fitShareToPayment measures one month against a twelfth of what was paid', () => {
+  // $79 a year: $6.58 a month, so $2.00 + $1.00 fits whole.
+  assert.deepEqual(fitShareToPayment({ amountCents: 7900, billingReason: 'subscription_create', shareCents: 200, bonusCents: 100, months: 12 }), { shareCents: 200, bonusCents: 100 });
+  // A 95%-off first year ($3.95): $0.32 a month, scaled down.
+  assert.deepEqual(fitShareToPayment({ amountCents: 395, billingReason: 'subscription_create', shareCents: 200, bonusCents: 100, months: 12 }), { shareCents: 21, bonusCents: 11 });
+  // Under 12 cents a year: nothing a month.
+  assert.deepEqual(fitShareToPayment({ amountCents: 11, billingReason: 'subscription_create', shareCents: 200, bonusCents: 0, months: 12 }), { shareCents: 0, bonusCents: 0 });
+  // A move from monthly to yearly in the portal: 'subscription_update' opens the year.
+  assert.deepEqual(fitShareToPayment({ amountCents: 7500, billingReason: 'subscription_update', shareCents: 200, bonusCents: 0, months: 12, startsPeriod: true }), { shareCents: 200, bonusCents: 0 });
+  assert.deepEqual(fitShareToPayment({ amountCents: 7500, billingReason: 'subscription_update', shareCents: 200, bonusCents: 0, months: 12 }), { shareCents: 0, bonusCents: 0 });
+  // months 1 is the old rule exactly.
+  assert.deepEqual(fitShareToPayment({ amountCents: 100, billingReason: 'subscription_create', shareCents: 350, bonusCents: 150, months: 1 }), { shareCents: 70, bonusCents: 30 });
+});
+
+test('yearly: invoiceBilling reads the subscription line in every invoice shape', () => {
+  const plans = [{ tier: 'standard', monthly: { priceId: 'price_m', amountCents: 799 }, yearly: { priceId: 'price_y', amountCents: 7900 } }];
+  const classic = (interval) => ({ lines: { data: [{ price: { id: `price_${interval[0]}`, recurring: { interval } }, proration: false }] } });
+  assert.deepEqual(invoiceBilling(classic('year'), plans), { interval: 'year', yearly: true, prorationOnly: false });
+  assert.deepEqual(invoiceBilling(classic('month'), plans), { interval: 'month', yearly: false, prorationOnly: false });
+  // 2025+: only the price's id on the line — the plans say which.
+  const basil = { lines: { data: [{ pricing: { price_details: { price: 'price_y', product: 'prod_s' } }, parent: { subscription_item_details: { proration: false } } }] } };
+  assert.equal(invoiceBilling(basil, plans).yearly, true);
+  // Older: plan.interval.
+  assert.equal(invoiceLineInterval({ plan: { id: 'plan_old', interval: 'year' } }, []), 'year');
+  // Nothing to go on but the period it covers.
+  assert.equal(invoiceLineInterval({ price: 'price_unknown', period: { start: 1700000000, end: 1700000000 + 365 * 86400 } }, plans), 'year');
+  assert.equal(invoiceLineInterval({ price: 'price_unknown', period: { start: 1700000000, end: 1700000000 + 30 * 86400 } }, plans), 'month');
+  // Prorations only (Standard yearly → Premium yearly): starts nothing.
+  const swap = { lines: { data: [
+    { price: { id: 'price_y', recurring: { interval: 'year' } }, proration: true, amount: -5000 },
+    { price: { id: 'price_py', recurring: { interval: 'year' } }, proration: true, amount: 8000 }
+  ] } };
+  assert.deepEqual(invoiceBilling(swap, plans), { interval: 'year', yearly: false, prorationOnly: true });
+  // 2025+ shape of the same: the proration flag under parent.
+  const swapBasil = { lines: { data: [{ pricing: { price_details: { price: 'price_y' } }, parent: { subscription_item_details: { proration: true } } }] } };
+  assert.equal(invoiceBilling(swapBasil, plans).prorationOnly, true);
+  // Monthly → yearly: a proration credit plus the yearly line that opens the year.
+  const move = { lines: { data: [
+    { price: { id: 'price_m', recurring: { interval: 'month' } }, proration: true, amount: -400 },
+    { price: { id: 'price_y', recurring: { interval: 'year' } }, proration: false, amount: 7900 }
+  ] } };
+  assert.deepEqual(invoiceBilling(move, plans), { interval: 'year', yearly: true, prorationOnly: false });
+  assert.deepEqual(invoiceBilling({}, plans), { interval: null, yearly: false, prorationOnly: false });
+});
+
+test('yearly: each later month keys its lines by the month; month 1 keeps the old key', () => {
+  const pay = '7d0d6c1e-1111-4aaa-8bbb-000000000127';
+  const line = { payment_id: pay, kind: 'member_share', creator_id: 'user_mara' };
+  assert.equal(membershipLineKey(line), `membership:${pay}:member_share:user_mara`);
+  assert.equal(membershipLineKey(line, { month: 1 }), `membership:${pay}:member_share:user_mara`);
+  assert.equal(membershipLineKey(line, { month: 2 }), `membership:${pay}:m2:member_share:user_mara`);
+  // .map(membershipLineKey) passes an index, never read as a month.
+  assert.deepEqual([line, line, line].map(membershipLineKey), Array(3).fill(`membership:${pay}:member_share:user_mara`));
+  const m1 = withMembershipLineIds([line])[0].id;
+  const m2 = withMembershipLineIds([line], { month: 2 })[0].id;
+  const m3 = withMembershipLineIds([line], { month: 3 })[0].id;
+  assert.equal(new Set([m1, m2, m3]).size, 3);
+  assert.equal(withMembershipLineIds([line], { month: 2 })[0].id, m2);
+  // A reversal's key is its credit's, whatever month.
+  assert.equal(membershipLineKey({ kind: 'reversal', reverses_id: m2 }, { month: 5 }), `membership:reversal:${m2}`);
+});
+
+test('yearly: the share still to credit — months ahead × the share, the bonus only inside its window', () => {
+  const paid = '2026-01-01T00:00:00.000Z';
+  const base = { months: 12, status: 'split', stopped_at: null, paid_at: paid, share_cents: 200, bonus_cents: 100 };
+  const running = { ...base, id: 'a', stripe_subscription_id: 'sub_a', months_credited: 3, next_month_at: '2026-04-01T00:00:00.000Z' };
+  // The referral's window: 12 months from its first payment (Jan 1) → every month of this year.
+  const refs = { sub_a: { creator_id: 'user_mara', locked_at: paid } };
+  assert.deepEqual(yearlySharesAhead([running], { referrals: refs, bonusMonths: 12 }), { cents: 9 * 300, payments: 1, months: 9 });
+  // A window of six months: months 4–6 earn the bonus, 7–12 don't.
+  assert.deepEqual(yearlySharesAhead([running], { referrals: refs, bonusMonths: 6 }), { cents: 9 * 200 + 3 * 100, payments: 1, months: 9 });
+  // An ended referral earns nothing more; no referral row, nothing.
+  assert.equal(yearlySharesAhead([running], { referrals: { sub_a: { ...refs.sub_a, ended_at: '2026-03-15T00:00:00Z' } }, bonusMonths: 12 }).cents, 9 * 200);
+  assert.equal(yearlySharesAhead([running], {}).cents, 9 * 200);
+  // Stopped, reversed, finished and monthly payments owe nothing.
+  const none = [
+    { ...running, stopped_at: '2026-03-02T00:00:00Z' },
+    { ...running, status: 'reversed' },
+    { ...running, months_credited: 12, next_month_at: null },
+    { ...running, months: 1 }
+  ];
+  assert.deepEqual(yearlySharesAhead(none, { referrals: refs, bonusMonths: 12 }), { cents: 0, payments: 0, months: 0 });
+});
+
+test('yearly: monthly → yearly — a year that starts inside a month the monthly plan paid has month 1 already credited', () => {
+  // Monthly paid Nov 1; switched to yearly Nov 19: inside the paid month.
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: '2026-11-01T09:00:00.000Z', paidAt: '2026-11-19T12:00:00.000Z' }), true);
+  // The same moment the month runs out: not covered (the next month starts).
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: '2026-11-01T09:00:00.000Z', paidAt: '2026-12-01T09:00:00.000Z' }), false);
+  // A month that ran out long ago (a lapsed member coming back yearly): not covered.
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: '2026-08-01T00:00:00.000Z', paidAt: '2026-11-19T00:00:00.000Z' }), false);
+  // The 31st: the month ends on the last day of the next month.
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: '2026-01-31T00:00:00.000Z', paidAt: '2026-02-27T23:00:00.000Z' }), true);
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: '2026-01-31T00:00:00.000Z', paidAt: '2026-02-28T00:00:00.000Z' }), false);
+  // No monthly payment, or one dated after the year: not covered.
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: null, paidAt: '2026-11-19T00:00:00.000Z' }), false);
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: '2026-11-20T00:00:00.000Z', paidAt: '2026-11-19T00:00:00.000Z' }), false);
+  assert.equal(yearlyStartsCredited({ lastMonthlyPaidAt: 'not a date', paidAt: '2026-11-19T00:00:00.000Z' }), false);
+  // Recorded that way, the year promises no month-1 lines — a repeat
+  // delivery and the daily catch-up leave it alone; reversed, it promises none anyway.
+  const covered = { status: 'split', basis: 'picks', share_cents: 200, bonus_cents: 100, months: 12, reverse_reason: YEARLY_MONTH1_COVERED };
+  assert.equal(YEARLY_MONTH1_COVERED, 'month 1 paid by the monthly plan');
+  assert.equal(paymentPromisesLines(covered), false);
+  assert.equal(paymentPromisesLines({ ...covered, reverse_reason: null }), true);
+  assert.equal(paymentPromisesLines({ ...covered, status: 'reversed', reverse_reason: 'refunded' }), false);
+  // A year stopped by a switch to monthly still promised (and has) its month-1 lines.
+  assert.equal(paymentPromisesLines({ ...covered, reverse_reason: YEARLY_SWITCHED_TO_MONTHLY }), true);
+});
+
+test('yearly: yearly → monthly — only a monthly invoice that credits a month stops the year', () => {
+  assert.equal(YEARLY_SWITCHED_TO_MONTHLY, 'switched to monthly');
+  // A monthly renewal or a new monthly plan that pays a month: stops it.
+  assert.equal(monthlyStopsYear({ yearly: false, prorationOnly: false, creditsMonth: true }), true);
+  // The switch's own invoice and the months Stripe pays from the year's
+  // unused credit ($0): the year keeps crediting the months that credit pays for.
+  assert.equal(monthlyStopsYear({ yearly: false, prorationOnly: false, creditsMonth: false }), false);
+  // Standard yearly → Premium yearly (prorations only), or a yearly renewal: never.
+  assert.equal(monthlyStopsYear({ yearly: false, prorationOnly: true, creditsMonth: false }), false);
+  assert.equal(monthlyStopsYear({ yearly: true, prorationOnly: false, creditsMonth: true }), false);
+  assert.equal(monthlyStopsYear(), false);
 });
 
 test('fitShareToPayment: a paid month only, and never more than was paid', () => {

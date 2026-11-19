@@ -30,7 +30,7 @@ export default async function handler(req, res) {
       }
       await saveLineup(account.userId, req.body || {});
     }
-    const payload = await getArtistSupportPayload(account.userId, account.tier);
+    const payload = await getArtistSupportPayload(account.userId, account.tier, account.billingInterval);
     return res.status(200).json(payload);
   } catch (err) {
     // ArtistSupportError carries its status and line; anything else is

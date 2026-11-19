@@ -10,6 +10,7 @@ import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { Avatar } from '../../components/CrewBits';
 import { MAX_PICKS, MAX_WEIGHT, MIN_WEIGHT, dollars, splitLineup } from '../../lib/artistSupportRules';
+import { BILLING_WORDS } from '../../lib/yearlyPlanRules';
 
 // Mirrors pages/artist-support.js + components/ArtistSupportCard.js:
 // Membership Artist Support, where a member chooses the creators their
@@ -199,7 +200,10 @@ export default function ArtistSupport() {
               <View key={s.id} style={{ flex: s.cents, backgroundColor: COLORS[i % COLORS.length] }} />
             ))}
           </View>
-          <Text style={styles.meta}>{picks.length ? `${mode === 'custom' ? 'Your own shares' : 'Equal shares'} · changes apply from your next renewal` : 'Nothing picked · your share follows what you watch'}</Text>
+          <Text style={styles.meta}>{picks.length ? `${mode === 'custom' ? 'Your own shares' : 'Equal shares'} · ${data.yearlyNote ? BILLING_WORDS.picksApplyYearly : BILLING_WORDS.picksApply}` : 'Nothing picked · your share follows what you watch'}</Text>
+          {/* A yearly plan's share goes out month by month (migration 127;
+              lib/yearlyPlanRules.js yearlyShareNote, sent by the server). */}
+          {data.yearlyNote ? <Text style={styles.yearlyNote}>{data.yearlyNote}</Text> : null}
 
           {!available ? (
             <View style={styles.empty}><Text style={styles.emptyText}><Text style={styles.emptyStrong}>Artist Support isn't switched on yet. </Text>The database part (migration 088) hasn't been run, so picks can't be saved yet.</Text></View>
@@ -309,6 +313,7 @@ const styles = StyleSheet.create({
   shareCopy: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.inkDim, flex: 1, minWidth: 180 },
   bar: { height: 8, borderRadius: 999, backgroundColor: colors.surface3, overflow: 'hidden', flexDirection: 'row', marginTop: 10, marginBottom: 4 },
   meta: { fontFamily: fonts.mono, fontSize: 10.5, lineHeight: 16, color: colors.inkFaint },
+  yearlyNote: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 20, color: colors.inkDim, marginTop: 8 },
   empty: { borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(251,232,211,0.25)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14, marginTop: 12 },
   emptyText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.inkDim },
   emptyStrong: { fontFamily: fonts.bodyBold, color: colors.ink },

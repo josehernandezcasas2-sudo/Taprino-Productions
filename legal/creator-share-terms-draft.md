@@ -80,3 +80,19 @@ Live on the site since 2026-11-16 (`pages/terms.js`, the `#secured-pay` paragrap
 > If the poster says the job didn't happen, the poster gets everything back; if the poster cancels the booking or takes the person off the job, the poster gets everything back except the card fee. Either way the money waits three days before it goes back, and in those three days the crew member can tell us the job happened: then it stays held until we decide, and we may ask both of them for details. While the money waits, a poster who said the job didn't happen or was cancelled can change that to "worked it", and the rate is then sent as for any confirmed job.
 
 **Question for counsel.** Studio Tapa now holds a poster's money for three days after they ask for it back, and for as long as it takes to decide when the crew member says the job happened — deciding between the two of them on what each says. Does that holding and deciding change how the platform should describe itself in section 14 (today: "not a party to the job … only holding or releasing the money"), and does it need anything under money-transmission or escrow rules, or a limit on how long a contested amount may be held before it must go back?
+
+## 8. Terms of Service · sections 4 and 5 · yearly plans (2026-11-19)
+
+Live on the site since 2026-11-19 (`pages/terms.js`; Jose: "yearly should be 10 months plan for price" and "have the credit go month by month. this allows the user to change who they support after each month"):
+
+> {Tapa +} is a recurring subscription, billed monthly or yearly. A yearly plan costs ten months' price for twelve months and renews each year. … access continues to the end of the period you've already paid for (the month, or the year). … That goes for a yearly plan too: cancelling one stops its next renewal, and you switch or cancel it the same way, in Manage subscription.
+
+> On a yearly plan the share is credited for each of its 12 months, one month at a time, and each month is split by your picks as they are that month. … Changing your list affects future payments only (on a yearly plan, the months not yet credited).
+
+> (Section 5, Member share) … for a yearly membership, once for each of its 12 months, a month at a time, to whoever the member supports that month. … A yearly membership that is refunded or disputed credits no further months.
+
+**Questions for counsel.**
+
+1. A yearly member pays up front for twelve months and the creator share is credited a month at a time over the year: the money for the eleven later months sits in Studio Tapa's Stripe balance (the admin's Studio money page keeps it back from sweeps). Is that a liability the LLC must account for or disclose differently from monthly revenue, and does it change the money-transmission framing of question 3 (the LLC still pays its own contractors from its own revenue, only later)?
+2. California's automatic-renewal law asks for more on a yearly term (a reminder before an annual renewal, among others). Stripe sends renewal emails only if the studio switches them on in the Dashboard — what does the law require here, and should section 4 say when the reminder comes?
+3. A member who cancels a yearly plan keeps it to the end of the year and is not refunded ("generally non-refundable"); a partial refund the studio chooses to give stops the creator share for the months not yet credited, and the months already credited stand. Is that fair to creators as written, or should section 5 say so in more words?

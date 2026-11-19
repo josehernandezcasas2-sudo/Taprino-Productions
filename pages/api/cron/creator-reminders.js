@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getRoleContext } from '../../../lib/roles';
 import { sendCollectReminders } from '../../../lib/creatorShareBatch';
+import { creditYearlyMonths } from '../../../lib/creatorShare';
 import { releaseDueCrewPay, refundDueCrewPay } from '../../../lib/crewPay';
 import { payeeCutoverStep, realignPriceOwners, repairTitlePayees } from '../../../lib/payees';
 import { runStripeCatchup } from '../../../lib/stripeCatchup';
@@ -25,7 +26,11 @@ import { handleStripeEvent } from '../webhook';
 // with its counts in the audit log, and since 2026-11-16 the refunds posters
 // asked for on secured crew pay whose three days are up with no answer from
 // the crew member (lib/crewPay.js refundDueCrewPay; migration 125), counted
-// in an audit line of their own when there were any. Vercel's cron sends
+// in an audit line of their own when there were any, and since 2026-11-19
+// the yearly Stream plans' months after the first (lib/creatorShare.js
+// creditYearlyMonths; migration 127): every yearly payment whose next month
+// is due gets that month's share, split by the member's picks that day,
+// counted in an audit line of its own when there was anything. Vercel's cron sends
 // `Authorization: Bearer <CRON_SECRET>`, same as the other crons; a full
 // admin can also POST it by hand.
 function sameSecret(a, b) {
@@ -69,8 +74,14 @@ export default async function handler(req, res) {
     // Last, with its own clock: the Stripe catch-up. Never throws past here.
     const stripeCatchup = await runStripeCatchup({ handleEvent: handleStripeEvent }).catch((err) => { console.error('runStripeCatchup:', err.message); return { error: 'it couldn’t run (see the logs)' }; });
     await recordAudit({ adminId, adminEmail, action: 'stripe_catchup', targetType: 'creator_share', targetId: 'daily', details: `${isCronRequest ? 'cron' : 'manual'} · ${catchupAuditLine(stripeCatchup)}` });
+    // After the others, whatever they did: the yearly plans' months that
+    // are due (lib/creatorShare.js; before migration 127 it finds none).
+    const yearlyMonths = await creditYearlyMonths().catch((err) => { console.error('creditYearlyMonths:', err.message); return { error: true }; });
+    if (yearlyMonths.error || yearlyMonths.credited || yearlyMonths.failed || yearlyMonths.waiting) {
+      await recordAudit({ adminId, adminEmail, action: 'yearly_months', targetType: 'creator_share', targetId: 'daily', details: `${isCronRequest ? 'cron' : 'manual'} · ${yearlyMonths.error ? 'it couldn’t run (see the logs)' : `${yearlyMonths.credited} month${yearlyMonths.credited === 1 ? '' : 's'} credited · ${yearlyMonths.finished || 0} year${yearlyMonths.finished === 1 ? '' : 's'} finished · ${yearlyMonths.failed || 0} failed · ${yearlyMonths.waiting || 0} waiting`}` }).catch(() => null);
+    }
     if (remindersError) return sendError(res, remindersError, 'cron/creator-reminders');
-    return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length, crewPay, crewPayRefunds, payeeCutover, payeeRepair, priceOwners, stripeCatchup });
+    return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length, crewPay, crewPayRefunds, payeeCutover, payeeRepair, priceOwners, stripeCatchup, yearlyMonths });
   } catch (err) {
     console.error('cron/creator-reminders error:', err.message);
     return sendError(res, err, 'cron/creator-reminders');

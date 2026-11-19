@@ -10,12 +10,15 @@ import { applyCors } from '../../lib/cors';
 import { sendError } from '../../lib/apiErrors';
 import { getTaxSettings, recordSkippedTax } from '../../lib/salesTax';
 import { membershipTaxParams, refusedOverRequest, stripeReason } from '../../lib/salesTaxRules';
+import { BILLING_WORDS, billingInterval, noMonthlyLine, noYearlyLine, planPriceFor } from '../../lib/yearlyPlanRules';
 
 // Starts Stripe Checkout for one membership tier (lib/membershipTiers.js):
-//   POST { tier: 'standard' | 'premium' | 'sponsor', returnTo?: '/account' }
+//   POST { tier: 'standard' | 'premium' | 'sponsor', interval?: 'month' | 'year', returnTo?: '/account' }
 // The price comes from the Stripe product carrying that tier
-// (lib/membershipPlans.js). No tier = the first plan on sale, which keeps
-// the older "Join Tapa +" buttons working.
+// (lib/membershipPlans.js): its monthly price, or with `interval: 'year'`
+// (yearly Stream plans, 2026-11-19) its yearly one — refused with a line
+// for a tier that has none. No tier = the first plan on sale, monthly,
+// which keeps the older "Join Tapa +" buttons working.
 export default async function handler(req, res) {
   // The app calls this too (the Account screen's plan picker, with a
   // Bearer token), so it answers preflights like the other app-facing
@@ -45,6 +48,9 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Please sign in first, then pick a plan.' });
   }
 
+  const interval = billingInterval(body.interval);
+  if (!interval) return res.status(400).json({ error: BILLING_WORDS.unknownInterval });
+
   let plan = null;
   if (body.tier) {
     if (!isPaidTier(body.tier)) return res.status(400).json({ error: 'Unknown plan.' });
@@ -53,6 +59,13 @@ export default async function handler(req, res) {
   } else {
     plan = (await getMembershipPlans())[0] || null;
     if (!plan) return res.status(500).json({ error: 'No membership plans are set up in Stripe yet.' });
+  }
+  // The price for the billing asked for: the tier's monthly one, or its
+  // yearly one (a tier without a yearly price is refused with a line, so
+  // the member can pick monthly instead).
+  const price = planPriceFor(plan, interval);
+  if (!price) {
+    return res.status(400).json({ error: interval === 'year' ? noYearlyLine(tierLabel(plan.tier)) : noMonthlyLine(tierLabel(plan.tier)) });
   }
 
   const stripe = getStripe();
@@ -117,7 +130,7 @@ export default async function handler(req, res) {
     const params = {
       mode: 'subscription',
       payment_method_types: ['card'],
-      line_items: [{ price: plan.priceId, quantity: 1 }],
+      line_items: [{ price: price.priceId, quantity: 1 }],
       success_url: viaApp ? viaApp.success : `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back !== '/' ? '&to=account' : ''}`,
       // From the account page on the website, land back on it.
       cancel_url: viaApp ? viaApp.cancel : `${origin}${back}?checkout=cancelled`,

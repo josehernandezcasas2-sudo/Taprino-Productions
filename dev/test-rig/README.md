@@ -241,7 +241,9 @@ objects, lists (`limit`, `starting_after`, `ending_before`), `expand`
 `Stripe-Account` for a connected account's balance and payouts, and Stripe's
 error shape (404 `resource_missing` for unknown ids and for any endpoint it
 doesn't implement). Seeded: products/prices for Standard $7.99, Premium $12.99,
-Sponsor $6.99 (metadata `tier`), the platform account `acct_rigPlatform`
+Sponsor $6.99 (metadata `tier`), each with a yearly price beside it (`price_rig<Tier>Yearly`:
+$79, $129, $69 — 2026-11-19; a subscription, its items and its invoice lines run a
+year on a yearly price, 30 days otherwise), the platform account `acct_rigPlatform`
 (payout schedule `manual`, $500 available) and Mara's ready Express account
 `acct_rigMara`.
 

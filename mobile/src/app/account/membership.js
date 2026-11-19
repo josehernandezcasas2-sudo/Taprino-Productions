@@ -6,7 +6,8 @@ import { apiPost } from '../../lib/api';
 import { readVia } from '../../lib/referral';
 import MembershipPlans from '../../components/MembershipPlans';
 import ReferredByField from '../../components/ReferredByField';
-import { AccountFrame, useAccountData, freeAccessNoteFor, formatDate, formatShortDate, isPaidTier, currentPlan, planMoney, styles } from '../../components/account/AccountBits';
+import { AccountFrame, useAccountData, freeAccessNoteFor, formatDate, formatShortDate, isPaidTier, currentPlan, styles } from '../../components/account/AccountBits';
+import { memberPriceText, renewLine } from '../../lib/yearlyPlanRules';
 
 // Membership (option B, 2026-10-29; mirrors pages/account/membership.js):
 // a paying member sees their plan, Renews/Ends, Manage subscription and a
@@ -36,12 +37,13 @@ export default function AccountMembership() {
   // pitch), which comes back to the app by itself once paid or cancelled
   // (lib/inAppBrowser.js openCheckout), then re-read the account so the
   // plan row flips.
-  async function startCheckout(tier) {
+  // `interval`: 'month' or 'year' (the picker's Monthly / Yearly switch).
+  async function startCheckout(tier, interval = 'month') {
     setJoiningTier(tier);
     try {
       const token = await withToken();
       const via = referredBy.trim();
-      const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account/membership', appReturn: appReturnAddress(), ...(via ? { via, viaSource: via === viaFromLink ? 'link' : 'typed' } : {}) }, token);
+      const data = await apiPost('/api/create-checkout-session', { tier, interval, returnTo: '/account/membership', appReturn: appReturnAddress(), ...(via ? { via, viaSource: via === viaFromLink ? 'link' : 'typed' } : {}) }, token);
       if (data.url) {
         const back = await openCheckout(data.url);
         await reload();
@@ -115,8 +117,8 @@ export default function AccountMembership() {
             <>
               <View style={styles.planRow}>
                 <Text style={styles.planTier}>{plan && !plan.legacy ? plan.name : TIER_NAMES[tier]}</Text>
-                {plan ? <Text style={styles.planPrice}>{planMoney(plan)} a {plan.interval || 'month'}</Text> : null}
-                {sub ? <Text style={styles.planWhen}>{sub.cancelsAtPeriodEnd ? `Ends ${formatShortDate(sub.renewsAt)} — it won’t renew.` : `Renews ${formatShortDate(sub.renewsAt)}.`}</Text> : null}
+                {memberPriceText(plan, sub) ? <Text style={styles.planPrice}>{memberPriceText(plan, sub)}</Text> : null}
+                {sub ? <Text style={styles.planWhen}>{sub.cancelsAtPeriodEnd ? `${renewLine(sub, formatShortDate(sub.renewsAt))} — it won’t renew.` : `${renewLine(sub, formatShortDate(sub.renewsAt))}.`}</Text> : null}
               </View>
               <View style={styles.planActions}>
                 <Pressable style={[styles.btnSmall, portalLoading && { opacity: 0.6 }]} onPress={openPortal} disabled={portalLoading}>

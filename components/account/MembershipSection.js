@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
-import MembershipPlans, { formatPlanPrice } from '../MembershipPlans';
+import MembershipPlans from '../MembershipPlans';
 import ReferredByField from '../ReferredByField';
 import { TIER_INFO, isPaidTier, tierLabel } from '../../lib/membershipTiers';
 import { SITE } from '../../lib/siteConfig';
 import { formatLongDate, formatShortDate } from '../../lib/accountRules';
+import { memberPriceText, renewLine } from '../../lib/yearlyPlanRules';
 
 // /account/membership (option B, 2026-10-29). A paying member sees one
 // plan row — name, price, renews, what it includes, Manage subscription
@@ -30,14 +31,15 @@ export default function MembershipSection({ plans = [], tier = 'basic', subscrip
   // Join: straight into Stripe Checkout (these pages only render signed
   // in, so no sign-in detour like the episode paywall needs). Checkout
   // comes back to the Membership page (pages/api/confirm-checkout.js).
-  async function startCheckout(planTier) {
+  // `interval`: 'month' or 'year' (the picker's Monthly / Yearly switch).
+  async function startCheckout(planTier, interval = 'month') {
     setJoiningTier(planTier);
     const via = referredBy.trim();
     try {
       const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: planTier, returnTo: '/account', ...(via ? { via, viaSource: via === viaHandle ? 'link' : 'typed' } : {}) })
+        body: JSON.stringify({ tier: planTier, interval, returnTo: '/account', ...(via ? { via, viaSource: via === viaHandle ? 'link' : 'typed' } : {}) })
       });
       const data = await res.json();
       if (data.url) {
@@ -111,14 +113,14 @@ export default function MembershipSection({ plans = [], tier = 'basic', subscrip
             <div className="acct-plan-row">
               <div className="acct-plan-name">
                 <span className="acct-plan-tier">{plan && !plan.legacy ? plan.name : tierLabel(tier)}</span>
-                <span className="acct-plan-price">{plan ? `${formatPlanPrice(plan)} a ${plan.interval || 'month'}` : ''}</span>
+                <span className="acct-plan-price">{memberPriceText(plan, subscriptionDetails) || ''}</span>
               </div>
               <ul className="acct-plan-perks">
                 {info.perks.map((p) => <li key={p}>{p}</li>)}
               </ul>
               {subscriptionDetails && (
                 <p className="account-fineprint" style={{ margin: 0 }}>
-                  {subscriptionDetails.cancelsAtPeriodEnd ? 'Ends' : 'Renews'} {formatLongDate(subscriptionDetails.renewsAt)}. {SITE.premiumTier} is the name on your statement.
+                  {renewLine(subscriptionDetails, formatLongDate(subscriptionDetails.renewsAt))}. {SITE.premiumTier} is the name on your statement.
                 </p>
               )}
               <div className="acct-plan-actions">
@@ -206,8 +208,9 @@ export function membershipTileLines({ plans = [], tier = 'basic', subscriptionDe
   if (isPaidTier(tier)) {
     const plan = plans.find((p) => p.tier === tier) || null;
     const name = plan && !plan.legacy ? plan.name : tierLabel(tier);
-    const price = plan ? ` · ${formatPlanPrice(plan)} a ${plan.interval || 'month'}` : '';
-    const when = subscriptionDetails ? `${subscriptionDetails.cancelsAtPeriodEnd ? 'Ends' : 'Renews'} ${formatShortDate(subscriptionDetails.renewsAt)}` : 'Manage subscription';
+    const priceText = memberPriceText(plan, subscriptionDetails);
+    const price = priceText ? ` · ${priceText}` : '';
+    const when = subscriptionDetails ? renewLine(subscriptionDetails, formatShortDate(subscriptionDetails.renewsAt)) : 'Manage subscription';
     return [`${name}${price}`, when];
   }
   return ['Basic · free, with ads', `Join ${SITE.premiumTier} for the whole library`];

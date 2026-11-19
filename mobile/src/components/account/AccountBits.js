@@ -13,6 +13,7 @@ import { apiGet, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../TopNav';
 import { rememberStayInStream } from '../../lib/stayInStream';
+import { memberPriceText, renewLine } from '../../lib/yearlyPlanRules';
 
 // What the account hub's screens share (option B, 2026-10-29, mirroring
 // components/account/* on the website): the account + profile read
@@ -84,9 +85,12 @@ export function membershipTileLines(dashboard) {
   if (isPaidTier(tier)) {
     const plan = currentPlan(dashboard);
     const name = plan && !plan.legacy ? plan.name : TIER_NAMES[tier];
-    const price = plan ? ` · ${planMoney(plan)} a ${plan.interval || 'month'}` : '';
     const sub = dashboard.subscriptionDetails;
-    const when = sub ? `${sub.cancelsAtPeriodEnd ? 'Ends' : 'Renews'} ${formatShortDate(sub.renewsAt)}` : 'Manage subscription';
+    // The subscription's own price and billing (a yearly plan reads "$79 a
+    // year", lib/yearlyPlanRules.js).
+    const priceText = memberPriceText(plan, sub);
+    const price = priceText ? ` · ${priceText}` : '';
+    const when = sub ? renewLine(sub, formatShortDate(sub.renewsAt)) : 'Manage subscription';
     return [`${name}${price}`, when];
   }
   return ['Basic · free, with ads', 'Join Tapa + for the whole library'];

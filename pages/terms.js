@@ -70,7 +70,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-16';
+const TEXT_UPDATED = '2026-11-19';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -87,8 +87,8 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       account={account}
       summary={
         <>
-          <strong>The short version.</strong> Watch the free stuff freely. {SITE.premiumTier} is a monthly
-          subscription you can cancel any time. If you upload work, <strong>you keep ownership of
+          <strong>The short version.</strong> Watch the free stuff freely. {SITE.premiumTier} is a monthly or
+          yearly subscription you can cancel any time. If you upload work, <strong>you keep ownership of
           it</strong> — you&rsquo;re giving us permission to stream it, not signing it over. Don&rsquo;t
           upload things you don&rsquo;t have the rights to, and don&rsquo;t try to rip our video.
           We&rsquo;re in private testing, and these terms may still be revised before we open to the
@@ -119,14 +119,17 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
 
       <h2>4. {SITE.premiumTier} membership</h2>
       <p>
-        {SITE.premiumTier} is a recurring monthly subscription. It renews automatically until you cancel,
+        {SITE.premiumTier} is a recurring subscription, billed monthly or yearly. A yearly plan costs ten
+        months&rsquo; price for twelve months and renews each year. Either renews automatically until you cancel,
         and you can cancel any time from your account page — access continues to the end of the
-        period you&rsquo;ve already paid for. Where the law requires it, sales tax is added at checkout
+        period you&rsquo;ve already paid for (the month, or the year). Where the law requires it, sales tax is added at checkout
         and shown before you pay.
       </p>
       <p>
         <strong>Refunds.</strong> Payments are generally non-refundable except where the law requires
-        otherwise, or where we can&rsquo;t deliver what you paid for. If something went wrong, email
+        otherwise, or where we can&rsquo;t deliver what you paid for. That goes for a yearly plan too:
+        cancelling one stops its next renewal, and you switch or cancel it the same way, in Manage
+        subscription. If something went wrong, email
         {SITE.contactEmail} and we&rsquo;ll deal with it fairly rather than hiding behind this paragraph.
       </p>
       <p>
@@ -157,11 +160,14 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         share of our membership revenue. For each paid membership that share is {dollars(n.shareCents.standard)} a month on
         Standard, {dollars(n.shareCents.premium)} on Premium and {dollars(n.shareCents.sponsor)} on Sponsor. You choose who receives it by naming up to 10
         creators on your account page (Artist Support); we split it between them, equally unless you
-        set your own shares, every month you pay, including the first. If you haven&rsquo;t named
+        set your own shares, every month you pay, including the first. On a yearly plan the share is
+        credited for each of its 12 months, one month at a time, and each month is split by your picks
+        as they are that month. If you haven&rsquo;t named
         anyone, we allocate it to the creators of the titles you watched in the 30 days before that
         payment, and
         if you watched nothing, among creators on the platform in proportion to how much their work
-        was watched. You can&rsquo;t name yourself. Changing your list affects future payments only. This is how we share our own
+        was watched. You can&rsquo;t name yourself. Changing your list affects future payments only (on a yearly
+        plan, the months not yet credited). This is how we share our own
         revenue: it is not a payment from you to a creator, not a donation and not a purchase, it is
         not tax-deductible, and it gives you nothing beyond the membership itself. If you joined
         through a creator&rsquo;s link, that creator is your first pick until you change it, and we
@@ -217,10 +223,12 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       <p>
         <strong>Member share.</strong> When a member names you on their account page, or watches your
         released work under the default described in section 4, we credit you a share of that
-        member&rsquo;s payment. Payouts start on the 1st of each month for every balance of {dollars(n.payoutMinimumCents)} or more;
+        member&rsquo;s payment — for a yearly membership, once for each of its 12 months, a month at a
+        time, to whoever the member supports that month. Payouts start on the 1st of each month for every balance of {dollars(n.payoutMinimumCents)} or more;
         smaller balances carry over. If our own balance can&rsquo;t cover every payout that day, the
         longest-waiting credits are paid first and the rest follow as soon as funds allow. If a member&rsquo;s payment is refunded or reversed, the
-        matching unpaid credit is reversed; if it has already been paid to you, we absorb it. The
+        matching unpaid credit is reversed; if it has already been paid to you, we absorb it. A yearly
+        membership that is refunded or disputed credits no further months. The
         amounts are published here. A change that pays creators less takes effect no sooner than 30
         days after we publish it here and email creators about it; a change in creators&rsquo; favour
         can start straight away. A credit already made never changes.

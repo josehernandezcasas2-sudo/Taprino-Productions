@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { dollars, SWEEP_MODES } from '../../lib/studioMoneyRules';
+import { dollars, SWEEP_MODES, YEARLY_AHEAD_CHANGE_SUB, YEARLY_AHEAD_LABEL, yearlyAheadSub } from '../../lib/studioMoneyRules';
 
 // /admin/money (mockups/studio-money-v1.html): the Stripe balance, what
 // has to stay, what can leave, the sweep, the rules, earmarks, the
@@ -71,7 +71,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
     if (!data) return;
     const ok = window.confirm(
       `Send ${dollars(data.canLeave.cents)} to the bank now?\n\n` +
-      `Stays in Stripe: ${dollars(data.canLeave.stayCents)} (creators ${dollars(data.obligations.owedCents)}, advertisers ${dollars(data.obligations.adCreditsCents)}, crew pay held ${dollars(data.obligations.crewPayHeldCents || 0)}, reserve ${dollars(data.obligations.reserve.cents)}, earmarks ${dollars(data.obligations.earmarkCents)}).\n\n` +
+      `Stays in Stripe: ${dollars(data.canLeave.stayCents)} (creators ${dollars(data.obligations.owedCents)}, ${YEARLY_AHEAD_LABEL.toLowerCase()} ${dollars(data.obligations.yearlySharesAheadCents || 0)}, advertisers ${dollars(data.obligations.adCreditsCents)}, crew pay held ${dollars(data.obligations.crewPayHeldCents || 0)}, reserve ${dollars(data.obligations.reserve.cents)}, earmarks ${dollars(data.obligations.earmarkCents)}).\n\n` +
       'This creates one Stripe payout to the studio’s bank and closes this period. It can’t be undone from here.'
     );
     if (!ok) return;
@@ -139,6 +139,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
               <tbody>
                 <tr><td className="op" /><td>Available in Stripe<span className="sm-sub">Stripe balance · pending money is never counted</span></td><td>{dollars(stripe.availableCents)}</td></tr>
                 <tr><td className="op">−</td><td>Owed to creators<span className="sm-sub">Creator Share ledger, unpaid lines · {obligations.owedCreators} creator{obligations.owedCreators === 1 ? '' : 's'}{(obligations.studioKeptCents || 0) > 0 && <> · not counted: {dollars(obligations.studioKeptCents)} members picked the studio’s own account for — the studio’s money, never paid out</>}</span></td><td className="neg">{dollars(obligations.owedCents)}</td></tr>
+                <tr><td className="op">−</td><td>{YEARLY_AHEAD_LABEL}<span className="sm-sub">{yearlyAheadSub({ payments: obligations.yearlyPayments, months: obligations.yearlyMonthsAhead })}</span></td><td className="neg">{dollars(obligations.yearlySharesAheadCents || 0)}</td></tr>
                 <tr><td className="op">−</td><td>Advertisers’ credits not yet served<span className="sm-sub">prepaid, refundable until the impressions run</span></td><td className="neg">{dollars(obligations.adCreditsCents)}</td></tr>
                 <tr><td className="op">−</td><td>Crew pay held for booked people<span className="sm-sub">{obligations.crewPayHeld || 0} payment{(obligations.crewPayHeld || 0) === 1 ? '' : 's'} funded by posters · {dollars(obligations.crewPayHeldWorkerCents || 0)} of it is the workers’ · goes to them on “worked it” or back to the poster, never to the bank</span></td><td className="neg">{dollars(obligations.crewPayHeldCents || 0)}</td></tr>
                 <tr><td className="op">−</td><td>Refund &amp; dispute reserve<span className="sm-sub">{obligations.reserve.percent}% of the last {obligations.reserve.days} days’ card volume ({dollars(obligations.reserve.volumeCents)}), floor {dollars(obligations.reserve.floorCents)}</span></td><td className="neg">{dollars(obligations.reserve.cents)}</td></tr>
@@ -333,6 +334,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
                 <tr><td className="op" /><td>Membership revenue</td><td>{dollars(m.grossCents)}</td></tr>
                 <tr><td className="op">−</td><td>Stripe fees<span className="sm-sub">as charged</span></td><td className="neg">{dollars(m.feeCents)}</td></tr>
                 <tr><td className="op">−</td><td>Creator Share credited<span className="sm-sub">member shares and referral bonuses · {m.split.creators}% of gross{(m.studioKeptCents || 0) > 0 && <> · {dollars(m.studioKeptCents)} more went to members’ picks of the studio’s own account and is kept here, in the margin</>}</span></td><td className="neg">{dollars(m.creditedCents)}</td></tr>
+                {(m.yearlyAheadChangeCents || 0) !== 0 && <tr><td className="op">−</td><td>{YEARLY_AHEAD_LABEL}<span className="sm-sub">{YEARLY_AHEAD_CHANGE_SUB}</span></td><td className={m.yearlyAheadChangeCents > 0 ? 'neg' : ''}>{dollars(m.yearlyAheadChangeCents)}</td></tr>}
                 <tr><td className="op">−</td><td>Refunds and disputes<span className="sm-sub">their credits were reversed; what’s left is the studio’s loss</span></td><td className="neg">{dollars(m.lossCents)}</td></tr>
                 <tr className="total"><td className="op">=</td><td>Membership margin</td><td>{dollars(m.marginCents)}</td></tr>
               </tbody>

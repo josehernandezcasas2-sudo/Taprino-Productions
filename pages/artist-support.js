@@ -21,7 +21,7 @@ export async function getServerSideProps({ req, res }) {
   let payload = null;
   if (account.isSignedIn) {
     try {
-      payload = await getArtistSupportPayload(account.userId, account.tier);
+      payload = await getArtistSupportPayload(account.userId, account.tier, account.billingInterval);
     } catch (err) {
       console.error('artist-support page error:', err.message);
       // Only a line written for the member is shown; a database error's

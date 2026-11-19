@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts } from '../lib/theme';
 import { TAX_NOTE } from '../lib/salesTaxRules';
+import { BILLING_WORDS, billingSwitch, joinLabel, planCardPrice, renewLine } from '../lib/yearlyPlanRules';
 
 // The Account screen's plan picker — the app's twin of
 // components/MembershipPlans.js (mockups/membership-tiers.html, section 3):
@@ -8,6 +10,10 @@ import { TAX_NOTE } from '../lib/salesTaxRules';
 // plan marked, Join → Stripe Checkout in the in-app browser, Manage
 // subscription → Stripe's portal (where switching plans happens).
 // Tier copy mirrors lib/membershipTiers.js on the web.
+// Yearly Stream plans (2026-11-19): the Monthly / Yearly switch, the
+// yearly cards' prices and the join buttons' words come from
+// lib/yearlyPlanRules.js, the website's file word for word; Join checks
+// out the chosen billing (`onJoin(tier, 'year')`).
 const TIER_ORDER = ['basic', 'standard', 'premium', 'sponsor'];
 const PAID = ['standard', 'premium', 'sponsor'];
 const INFO = {
@@ -17,10 +23,12 @@ const INFO = {
   sponsor: { label: 'Sponsor', tagline: 'no ads · everything in Premium', flag: 'Launch offer · limited time', perks: ['Everything in Premium', 'Keep this price for as long as you stay', 'Sponsor badge on your profile', '5% off the Studio Tapa shop (soon)'], missing: [] }
 };
 
-const money = (plan) => new Intl.NumberFormat('en-US', { style: 'currency', currency: (plan.currency || 'usd').toUpperCase() }).format((plan.amountCents || 0) / 100);
 const fmtDate = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export default function MembershipPlans({ plans = [], tier = 'basic', subscriptionDetails = null, onJoin, onPortal, joiningTier = null, portalLoading = false }) {
+  const [billing, setBilling] = useState('month');
+  const toggle = billingSwitch(plans);
+  const interval = toggle ? billing : 'month';
   const paid = PAID.includes(tier);
   const byTier = Object.fromEntries(plans.map((p) => [p.tier, p]));
   let tiers = ['basic', ...TIER_ORDER.filter((t) => t !== 'basic' && byTier[t])];
@@ -29,6 +37,18 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
   return (
     <View>
       {!paid ? <Text style={styles.lede}>Pick how you want to watch. Switch or cancel any time from Manage subscription.</Text> : null}
+      {toggle ? (
+        <View style={styles.billing} accessibilityRole="radiogroup" accessibilityLabel={toggle.label}>
+          {toggle.options.map((o) => {
+            const on = interval === o.value;
+            return (
+              <Pressable key={o.value} onPress={() => setBilling(o.value)} accessibilityRole="radio" accessibilityState={{ checked: on }} style={[styles.billingBtn, on && styles.billingBtnOn]}>
+                <Text style={[styles.billingText, on && styles.billingTextOn]} numberOfLines={1}>{o.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       <View style={styles.grid}>
         {tiers.map((t) => {
           const info = INFO[t];
@@ -38,13 +58,16 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
           const flagColor = current ? colors.ok : t === 'sponsor' ? colors.brass : colors.olive;
           const sub = current && subscriptionDetails;
           const accent = t === 'sponsor' ? 'brass' : t === 'premium' ? 'primary' : null;
+          const card = plan ? planCardPrice(plan, interval) : null;
+          const unavailable = Boolean(card && !card.available) && t !== 'basic';
           return (
-            <View key={t} style={[styles.plan, current && styles.planCurrent, t === 'premium' && !current && styles.planFeatured, t === 'sponsor' && styles.planSponsor]}>
+            <View key={t} style={[styles.plan, current && styles.planCurrent, t === 'premium' && !current && styles.planFeatured, t === 'sponsor' && styles.planSponsor, unavailable && !current && styles.planOff]}>
               {flag ? <View style={[styles.flag, { borderColor: flagColor }]}><Text style={[styles.flagText, { color: flagColor }]}>{flag}</Text></View> : null}
               <Text style={[styles.name, flag && { marginTop: 8 }]}>{plan && !plan.legacy ? plan.name : info.label}</Text>
-              <Text style={styles.price}>{plan ? money(plan) : t === 'basic' ? 'Free' : '—'}{plan ? <Text style={styles.per}>  / {plan.interval || 'month'}</Text> : null}</Text>
+              <Text style={styles.price}>{card ? card.price : t === 'basic' ? 'Free' : '—'}{card && card.per ? <Text style={styles.per}>  {card.per}</Text> : null}</Text>
+              {card && card.sub ? <Text style={[styles.yearly, !card.available && styles.yearlyOff]}>{card.sub}</Text> : null}
               {plan && plan.taxNote ? <Text style={styles.taxNote}>{TAX_NOTE}</Text> : null}
-              <Text style={styles.tag}>{sub ? `${sub.cancelsAtPeriodEnd ? 'Ends' : 'Renews'} ${fmtDate(sub.renewsAt)}` : info.tagline}</Text>
+              <Text style={styles.tag}>{sub ? renewLine(sub, fmtDate(sub.renewsAt)) : info.tagline}</Text>
               <View style={styles.perks}>
                 {info.perks.map((p) => <Text key={p} style={styles.perk}><Text style={styles.tick}>✓  </Text>{p}</Text>)}
                 {info.missing.map((p) => <Text key={p} style={[styles.perk, styles.perkNo]}><Text style={styles.dash}>–  </Text>{p}</Text>)}
@@ -58,13 +81,13 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
               {!current && t === 'basic' ? <View style={[styles.btn, styles.ghost]}><Text style={styles.ghostText}>Cancel in Manage subscription</Text></View> : null}
               {!current && t !== 'basic' ? (
                 <Pressable
-                  style={[styles.btn, accent === 'primary' && styles.btnPrimary, accent === 'brass' && styles.btnBrass, (joiningTier || portalLoading) && styles.disabled]}
-                  disabled={Boolean(joiningTier) || portalLoading}
-                  onPress={() => (paid ? onPortal() : onJoin(t))}
+                  style={[styles.btn, accent === 'primary' && styles.btnPrimary, accent === 'brass' && styles.btnBrass, (joiningTier || portalLoading || (!paid && unavailable)) && styles.disabled]}
+                  disabled={Boolean(joiningTier) || portalLoading || (!paid && unavailable)}
+                  onPress={() => (paid ? onPortal() : onJoin(t, interval))}
                 >
                   {joiningTier === t
                     ? <ActivityIndicator color={accent ? '#241a05' : colors.ink} />
-                    : <Text style={[styles.btnText, accent && styles.btnAccentText]}>{paid ? `Switch to ${info.label}` : t === 'sponsor' ? 'Become a Sponsor' : `Join ${info.label}`}</Text>}
+                    : <Text style={[styles.btnText, accent && styles.btnAccentText]}>{paid ? `Switch to ${info.label}` : joinLabel(t, info.label, interval)}</Text>}
                 </Pressable>
               ) : null}
             </View>
@@ -75,6 +98,7 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
         {paid
           ? '“Manage subscription” opens Stripe’s own secure page — switch plans, cancel, update your card, or view invoices there.'
           : 'Live channels run ads on every plan. Payment and cancellation are handled by Stripe.'}
+        {interval === 'year' ? ` ${BILLING_WORDS.yearlyFine}` : ''}
       </Text>
     </View>
   );
@@ -82,6 +106,14 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
 
 const styles = StyleSheet.create({
   lede: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.inkDim, marginBottom: 6 },
+  billing: { flexDirection: 'row', alignSelf: 'flex-start', maxWidth: '100%', padding: 3, borderRadius: 999, backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', marginTop: 8 },
+  billingBtn: { minHeight: 34, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', flexShrink: 1 },
+  billingBtnOn: { backgroundColor: colors.ink },
+  billingText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.inkDim },
+  billingTextOn: { fontFamily: fonts.displayBold, color: colors.surface0 },
+  planOff: { opacity: 0.55 },
+  yearly: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.mint, marginTop: 2 },
+  yearlyOff: { fontFamily: fonts.body, color: colors.inkFaint },
   grid: { gap: 18, marginTop: 14 },
   plan: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 8, paddingTop: 20, paddingHorizontal: 16, paddingBottom: 18 },
   planCurrent: { borderColor: 'rgba(132,205,152,0.5)' },
