@@ -12,6 +12,8 @@ import { hrefToRoute } from './PushListener';
 import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
 import PositionedImage from './PositionedImage';
 import { MenuGlyph } from './SiteMenuIcons';
+import { menuTypes } from '../lib/accountTypeRules';
+import { MenuTypes } from './account/AccountTypeBits';
 
 // The ☰ menu (Jose, 2026-11-18: option B plus a Facebook / Threads-style
 // menu; the canvas https://claude.ai/artifact/RFSJUdzGefwe1v11cCJA6M). It
@@ -198,6 +200,12 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
   const displayName = (ownProfile && ownProfile.displayName) || (role && role.displayName) || null;
   const ownHref = ownProfile && ownProfile.userId ? `/profile/${ownProfile.handle || ownProfile.userId}` : null;
   const profileHref = signedIn ? (ownHref || (role && role.profileHref) || null) : null;
+  // Account types (migration 126): /api/my-role's accountTypes, null signed
+  // out or before 126 (then none of it shows). A save anywhere in the app
+  // updates this copy (lib/adminRole.js setRoleAccountTypes).
+  const typesState = signedIn && role && role.isSignedIn && role.accountTypes && Array.isArray(role.accountTypes.types) ? role.accountTypes : null;
+  const typesMenu = typesState ? menuTypes(typesState) : null;
+  const typesLineText = typesMenu && typesMenu.line ? typesMenu.line : '';
 
   const menu = siteMenu({
     side,
@@ -270,6 +278,15 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     onClose();
     if (pathname !== '/search') router.push('/search');
   }
+  // "+ Add a type": Account → Profile with the Your types sheet up (on the
+  // Profile screen already, the sheet opens there).
+  function addType(href) {
+    onClose();
+    const where = hrefToRoute(href);
+    if (!where || !where.route) return;
+    if (pathname === '/account/profile') router.setParams({ types: '1' });
+    else router.push(where.route);
+  }
   function logOut() {
     onClose();
     forgetMenuMembership();
@@ -321,7 +338,7 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
               style={({ pressed }) => [styles.youRow, pressed && styles.pressed]}
               onPress={() => follow(p.href)}
               accessibilityRole="link"
-              accessibilityLabel={`${p.name}. ${p.sub}`}
+              accessibilityLabel={`${p.name}. ${typesLineText ? `${typesLineText}. ` : ''}${p.sub}`}
             >
               <View style={styles.youRing}>
                 <View style={styles.youPhoto}>
@@ -334,10 +351,12 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
               </View>
               <View style={styles.textCol}>
                 <Text style={styles.youName} numberOfLines={1}>{p.name}</Text>
+                {typesLineText ? <Text style={styles.planText} numberOfLines={1}>{typesLineText}</Text> : null}
                 <Text style={styles.youSub} numberOfLines={1}>{p.sub}</Text>
               </View>
               <MenuGlyph name="chev" size={18} color={colors.inkFaint} />
             </Pressable>
+            {typesState ? <MenuTypes state={typesState} getToken={getToken} onAdd={addType} /> : null}
             <View style={styles.planStrip}>
               {/* The plan shows once it is known, so a member never sees
                   "Free account" and a Join pill for a moment. */}

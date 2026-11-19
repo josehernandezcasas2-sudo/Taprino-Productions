@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Switch, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { apiGet, apiPost } from '../../lib/api';
@@ -10,6 +10,8 @@ import { updateOwnProfileCache } from '../../components/TopNav';
 import PositionedImage from '../../components/PositionedImage';
 import CropWindow from '../../components/CropWindow';
 import { AccountFrame, useAccountData, CardHead, Label, SaveRow, GENDERS, styles } from '../../components/account/AccountBits';
+import { TypesCard, TypesSheet, useAccountTypes } from '../../components/account/AccountTypeBits';
+import { hrefToRoute } from '../../components/PushListener';
 
 // Profile (option B, 2026-10-29; mirrors pages/account/profile.js): the
 // public profile — the photos preview with one "Edit photos" button that
@@ -19,10 +21,30 @@ import { AccountFrame, useAccountData, CardHead, Label, SaveRow, GENDERS, styles
 // creator's fiscal sponsor). One Save for the text; the photos and the
 // seal save the moment they change, as they did on the one-page screen
 // (a chosen photo that waited for Save was silently dropped on leaving).
+//
+// Account types (2026-11-18, migration 126): the "Your types" row at the
+// top opens the Your types sheet (components/account/AccountTypeBits.js),
+// which saves on its own. /account/profile?types=1 (the ☰ menu's
+// "+ Add a type", the website's /account/profile#types) opens the sheet
+// once the row has loaded.
 
 export default function AccountProfile() {
   const router = useRouter();
   const { dashboard, retry, profile, setProfile, profileFailed, originalAge, setOriginalAge, withToken } = useAccountData();
+  const types = useAccountTypes();
+  const [typesOpen, setTypesOpen] = useState(false);
+  const { types: typesParam } = useLocalSearchParams();
+  useEffect(() => {
+    if (typesParam !== '1' || types.status !== 'ok' || !types.state) return;
+    router.setParams({ types: undefined });
+    if (types.state.available !== false) setTypesOpen(true);
+  }, [typesParam, types.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The sheet's creator note opens /apply (closing the sheet first).
+  function openFromSheet(href) {
+    setTypesOpen(false);
+    const where = hrefToRoute(href);
+    if (where && where.route) router.push(where.route);
+  }
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState(null);
@@ -231,6 +253,24 @@ export default function AccountProfile() {
   const signedIn = Boolean(dashboard && dashboard.isSignedIn && !dashboard.loadError);
   const canSeal = Boolean(dashboard && (dashboard.isCreator || dashboard.isAdmin));
   const publicHref = dashboard && dashboard.userId ? `/profile/${(profile && profile.handle) || dashboard.userId}` : null;
+
+  // The "Your types" row and its sheet, above the rest of the screen.
+  const typesTop = signedIn ? (
+    <>
+      <TypesCard box={types} onChange={() => setTypesOpen(true)} />
+      {types.state ? (
+        <TypesSheet
+          visible={typesOpen}
+          onClose={() => setTypesOpen(false)}
+          state={types.state}
+          isCreator={types.state.isCreator}
+          getToken={types.getToken}
+          onSaved={(saved) => types.setState({ ...types.state, ...saved })}
+          onOpen={openFromSheet}
+        />
+      ) : null}
+    </>
+  ) : null;
 
   let body = null;
   if (signedIn && !profile && profileFailed) {
@@ -558,6 +598,7 @@ export default function AccountProfile() {
       onRetry={retry}
       scrollEnabled={!cropDragging}
     >
+      {typesTop}
       {body}
     </AccountFrame>
   );

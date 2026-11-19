@@ -149,6 +149,9 @@ export default function RootLayout() {
               request, Clerk or a gate: they read the index and the files. */}
           <Stack.Screen name="downloads/index" options={{ headerShown: false }} />
           <Stack.Screen name="downloads/[id]" options={{ headerShown: false }} />
+          {/* "What brings you here?" (account types, 2026-11-18): the
+              brand strip and Skip only, no site header and no bottom bar. */}
+          <Stack.Screen name="start" options={{ headerShown: false }} />
         </Stack>
         <BottomNav />
         {/* The private beta door: covers everything for a signed-out

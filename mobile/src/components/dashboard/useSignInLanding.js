@@ -3,6 +3,8 @@ import { usePathname, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
 import { readAdminRole } from '../../lib/adminRole';
 import { signInLanding } from '../../lib/creatorDashboardRules';
+import { ASK_PATH, askDue } from '../../lib/accountTypeRules';
+import { readAccountTypes } from '../../lib/accountTypes';
 import { hrefToRoute } from '../PushListener';
 
 // Where a person lands after signing in (Jose, 2026-11-14: "a creator
@@ -27,6 +29,11 @@ import { hrefToRoute } from '../PushListener';
 // components/account/AccountBits.js), and Tip, Own and the plans carry on
 // there by themselves (lib/resumeTask.js). Until then they were left on
 // the Account screen.
+//
+// Account types (2026-11-18, migration 126): before landing, someone who
+// has never answered "What brings you here?" is asked once (/start), with
+// where they were landing — or the screen they are on — as its ?next=. A
+// failed read lands as before.
 export const GENERAL_SIGN_IN = 'signin=general';
 
 export function isGeneralSignIn(params) {
@@ -60,14 +67,26 @@ export function useSignInLanding() {
     }
     if (!role || pathRef.current !== from) return null;
     const to = signInLanding(role, from);
-    if (!to || to === from) return null;
-    const where = hrefToRoute(to);
-    if (!where || !where.route) return null;
+    const where = to && to !== from ? hrefToRoute(to) : null;
+    const landing = where && where.route ? where.route : null;
+    // The account-type question first, when it is due.
+    const types = await readAccountTypes(getToken).catch(() => null);
+    if (pathRef.current !== from) return null;
+    if (askDue({ signedIn: true, state: types })) {
+      const ask = `${ASK_PATH}?next=${encodeURIComponent(landing || from)}`;
+      try {
+        routerRef.current.replace(ask);
+        return ask;
+      } catch {
+        // Lands as before.
+      }
+    }
+    if (!landing) return null;
     try {
-      routerRef.current.dismissTo(where.route);
+      routerRef.current.dismissTo(landing);
     } catch {
       return null;
     }
-    return where.route;
+    return landing;
   }, [getToken]);
 }

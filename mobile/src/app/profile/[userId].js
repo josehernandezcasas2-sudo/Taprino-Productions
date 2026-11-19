@@ -1,12 +1,12 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, absoluteFill, bannerGradient } from '../../lib/theme';
+import { colors, fonts, absoluteFill, bannerGradient } from '../../lib/theme';
 import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
@@ -17,6 +17,8 @@ import { TipButton } from '../../components/TipSheet';
 import { rememberVia, viaMatchesProfile } from '../../lib/referral';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useRereadWhenSignedIn } from '../../lib/resumeTask';
+import { mainFirst, orderedTypes } from '../../lib/accountTypeRules';
+import { TypesLine } from '../../components/account/AccountTypeBits';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -179,7 +181,11 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn, tipping, aiSeal } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn, tipping, aiSeal, accountTypes } = state.data;
+  // Account types (migration 126): what they ticked and their main, which
+  // orders the sections below; nothing for someone here to watch.
+  const typesList = accountTypes && Array.isArray(accountTypes.types) ? accountTypes.types : [];
+  const typesMain = orderedTypes(typesList, accountTypes && accountTypes.main)[0] || null;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -195,6 +201,293 @@ export default function PublicProfile() {
     if (post.kind === 'video') router.push(`/snippets/discover?post=${post.id}`);
     else if (post.imageUrl) setPhotoPost(post);
   }
+
+  // Each section of the page as { key, render }, keyed as
+  // lib/accountTypeRules.js MAIN_SECTION_KEYS names them: about, card
+  // (working / performer card), record, places (Locations), posts (Latest
+  // post + Posts), work (Tagged in), pitches. Saved Snippets ('saved') and
+  // Projects backed ('backed') keep their place among the rest. A section
+  // with nothing to show renders nothing, wherever it is put.
+  const sections = [
+    {
+      key: 'about',
+      render: () => (
+        <View style={styles.aboutBlock}>
+          <View style={styles.divider} />
+          <Text style={styles.sectionLabel}>About</Text>
+          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : (
+            <Text style={styles.emptyText}>
+              {isOwnProfile ? 'Add a line or two about what you make in your account settings.' : `${profile.displayName} hasn’t written a bio yet.`}
+            </Text>
+          )}
+          {knownForGenres.length > 0 ? (
+            <View style={styles.genreRow}>
+              <Text style={styles.genreLabel}>Known for</Text>
+              {knownForGenres.map((g) => (
+                <View key={g} style={styles.genreTag}><Text style={styles.genreTagText}>{g}</Text></View>
+              ))}
+            </View>
+          ) : null}
+
+          {profile.socialLinks.length > 0 ? (
+            <View style={styles.linksBox}>
+              <Text style={styles.linksBoxLabel}>Links</Text>
+              <View style={styles.linksRow}>
+                {profile.socialLinks.map((link, i) => (
+                  <Pressable key={i} style={styles.linkPill} onPress={() => Linking.openURL(link.url)}>
+                    <Text style={styles.linkPillText}>{link.platform || hostnameFor(link.url)}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+        </View>
+      )
+    },
+    {
+      key: 'card',
+      render: () => (
+        <>
+          {/* Crew Call working card — hidden on other people's profiles
+              until they set one up; the owner sees the prompt. */}
+          {crewCard || isOwnProfile ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Working card</Text>
+              {crewCard ? (
+                <CrewCardView
+                  card={crewCard}
+                  creditedWork={creditedWork}
+                  isOwn={isOwnProfile}
+                  onEdit={() => router.push('/crew/card')}
+                  onFind={() => router.push('/crew?tab=people')}
+                  onOpenWork={(w) => router.push(workHref(w))}
+                  performerFacts={<PerformerFacts card={crewCard} />}
+                />
+              ) : (
+                <Pressable onPress={() => router.push('/crew/card')}>
+                  <Text style={styles.emptyText}>Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Text style={{ color: colors.olive }}>Set up your card →</Text></Text>
+                </Pressable>
+              )}
+            </>
+          ) : null}
+        </>
+      )
+    },
+    {
+      key: 'record',
+      render: () => (
+        <>
+          {/* Track record (migration 082): confirmed Crew Call jobs, released
+              titles, the lines people left. The tier chip in the header
+              comes from this. */}
+          {crewRecord ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Track record</Text>
+              <View style={{ gap: 10 }}>
+                <View style={crew.metaRow}>
+                  <TierChip person={crewRecord} />
+                  <Text style={crew.meta}>{crewRecord.tier === 'new' ? 'First month on Studio Tapa' : crewRecord.tier === 'veteran' ? `${crewRecord.done} jobs and titles confirmed` : 'Building a record'}</Text>
+                </View>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[[crewRecord.jobs, 'jobs confirmed on Crew Call'], [crewRecord.titles, 'released titles'], [crewRecord.posted, `calls posted · ${crewRecord.filled} filled`], [crewRecord.wouldAgain, '“would work again”']].map(([n, l]) => (
+                    <View key={l} style={{ width: '47%', backgroundColor: colors.surface2, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 }}>
+                      <Text style={{ fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink }}>{n}</Text>
+                      <Text style={crew.cat}>{l}</Text>
+                    </View>
+                  ))}
+                </View>
+                {crewRecord.recentJobs.length > 0 ? (
+                  <>
+                    <Text style={crew.h4}>Recent jobs</Text>
+                    {crewRecord.recentJobs.map((j) => (
+                      <Pressable key={j.id} style={crew.gearRow} onPress={() => router.push(`/crew/calls/${j.callId}`)}>
+                        <Text style={[crew.rowText, { flex: 1 }]}>{j.role} · {j.title}{j.projectTitle ? ` (${j.projectTitle})` : ''} <Text style={crew.cat}>· for {j.forName}</Text></Text>
+                        <View style={[crew.chip, crew.chipOk]}><Text style={[crew.chipText, crew.chipOk]}>confirmed</Text></View>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : null}
+                {crewRecord.endorsements.length > 0 ? (
+                  <>
+                    <Text style={crew.h4}>What people said</Text>
+                    {crewRecord.endorsements.map((e, i) => (
+                      <Text key={i} style={crew.muted}>“{e.line}” — {e.fromName}</Text>
+                    ))}
+                  </>
+                ) : null}
+                <Text style={crew.mono}>Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</Text>
+              </View>
+            </>
+          ) : null}
+        </>
+      )
+    },
+    {
+      key: 'places',
+      render: () => (
+        <>
+          {/* Locations (migration 086): places they host, shoots they
+              hosted or did, the lines people left. */}
+          {locations && (locations.listings.length || locations.hosted || locations.shotAt.length || locations.lines.length) ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Locations</Text>
+              <View style={{ gap: 10 }}>
+                {locations.hosted > 0 ? <Text style={crew.meta}>Hosted {locations.hosted} {locations.hosted === 1 ? 'shoot' : 'shoots'} that went as agreed</Text> : null}
+                {locations.listings.length > 0 ? (
+                  <>
+                    <Text style={crew.h4}>Places to shoot</Text>
+                    {locations.listings.map((l) => (
+                      <Pressable key={l.id} style={[crew.gearRow, { alignItems: 'flex-start' }]} onPress={() => router.push(`/locations/${l.id}`)}>
+                        <View style={{ width: 64, aspectRatio: 4 / 3, borderRadius: 6, backgroundColor: colors.surface3, overflow: 'hidden' }}>{l.coverUrl ? <SmartImage uri={l.coverUrl} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} /> : null}</View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={crew.rowText}>{l.title}</Text>
+                          <Text style={crew.mono}>{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : null}
+                {locations.shotAt.length > 0 ? (
+                  <>
+                    <Text style={crew.h4}>Shot at</Text>
+                    {locations.shotAt.map((s, i) => (
+                      <Pressable key={i} style={crew.gearRow} onPress={s.live ? () => router.push(`/locations/${s.locationId}`) : undefined}>
+                        <Text style={[crew.rowText, { flex: 1 }]}>{s.title}{s.project ? ` · ${s.project}` : ''}</Text>
+                        <Text style={crew.mono}>{s.when ? new Date(`${s.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</Text>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : null}
+                {locations.lines.length > 0 ? (
+                  <>
+                    <Text style={crew.h4}>What people said</Text>
+                    {locations.lines.map((e, i) => <Text key={i} style={crew.muted}>“{e.line}” — {e.fromName}</Text>)}
+                  </>
+                ) : null}
+                {isOwnProfile ? <Pressable onPress={() => router.push('/locations/mine')}><Text style={[crew.mono, { color: colors.olive }]}>Your places →</Text></Pressable> : null}
+              </View>
+            </>
+          ) : null}
+        </>
+      )
+    },
+    {
+      key: 'posts',
+      render: () => (
+        <>
+          {posts.length > 0 ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Latest post</Text>
+              <View style={styles.latestWrap}>
+                <PostTile post={posts[0]} onPress={() => openPost(posts[0])} large />
+                {posts[0].caption ? <Text style={styles.latestCaption}>{posts[0].caption}</Text> : null}
+              </View>
+              {posts.length > 1 ? (
+                <>
+                  <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Posts</Text>
+                  <View style={styles.postGrid}>
+                    {posts.slice(1).map((post) => (
+                      <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </>
+      )
+    },
+    {
+      key: 'saved',
+      render: () => (
+        <>
+          {isOwnProfile && savedSnippets.length > 0 ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Saved Snippets</Text>
+              <View style={styles.postGrid}>
+                {savedSnippets.map((post) => (
+                  <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
+                ))}
+              </View>
+            </>
+          ) : null}
+        </>
+      )
+    },
+    {
+      key: 'work',
+      render: () => (
+        <>
+          <View style={styles.divider} />
+          {/* A crew role, or a Studio / Producer credit linked to this account
+              (decision 20), reads after the type: "Series · Producer". */}
+          <Text style={styles.sectionLabel}>Tagged in</Text>
+          {creditedWork.length === 0 ? (
+            <Text style={styles.emptyText}>Nothing tagged here yet — this fills in once {profile.displayName} is credited on something.</Text>
+          ) : (
+            <View style={styles.workGrid}>
+              {creditedWork.map((item) => (
+                <Pressable key={`${item.type}-${item.id}`} style={styles.workItem} onPress={() => router.push(workHref(item))}>
+                  {item.poster ? <SmartImage uri={item.poster} style={styles.workPoster} /> : <View style={styles.workPoster} />}
+                  <Text style={styles.workTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.workType} numberOfLines={2}>{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </>
+      )
+    },
+    {
+      key: 'pitches',
+      render: () => (
+        <>
+          {pitches.length > 0 ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Pitch Room projects</Text>
+              <View style={styles.pitchGrid}>
+                {pitches.map((p) => (
+                  <Pressable key={p.id} style={styles.pitchCard} onPress={() => router.push(`/pitches/${p.id}`)}>
+                    {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
+                    {p.tag ? <Text style={styles.pitchTag}>{p.tag}</Text> : null}
+                    <Text style={styles.pitchTitle} numberOfLines={1}>{p.title}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </>
+      )
+    },
+    {
+      key: 'backed',
+      render: () => (
+        <>
+          {backedPitches.length > 0 ? (
+            <>
+              <View style={styles.divider} />
+              <Text style={styles.sectionLabel}>Projects backed</Text>
+              <View style={styles.pitchGrid}>
+                {backedPitches.map((p) => (
+                  <Pressable key={p.id} style={styles.pitchCard} onPress={() => router.push(`/pitches/${p.id}`)}>
+                    {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
+                    {p.tag ? <Text style={styles.pitchTag}>{p.tag}</Text> : null}
+                    <Text style={styles.pitchTitle} numberOfLines={1}>{p.title}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          ) : null}
+        </>
+      )
+    }
+  ];
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
@@ -228,6 +521,8 @@ export default function PublicProfile() {
               {/* The "Not for AI training" seal (components/AiSeal.js). */}
               {aiSeal !== false ? <AiSealChip /> : null}
             </View>
+            {/* "Crew · also Cast" (lib/accountTypeRules.js typesLine). */}
+            <TypesLine types={typesList} main={typesMain} style={styles.typesLine} mainStyle={styles.typesLineMain} />
             {profile.handle ? <Text style={styles.handle}>@{profile.handle}</Text> : null}
             {joinedLabel ? <Text style={styles.joined}>On Studio Tapa TV since {joinedLabel}</Text> : null}
             {statParts.length > 0 ? <Text style={styles.statsText}>{statParts.join(' · ')}</Text> : null}
@@ -291,231 +586,14 @@ export default function PublicProfile() {
               </Text>
             ) : null}
           </View>
-
-          <View style={styles.divider} />
-          <Text style={styles.sectionLabel}>About</Text>
-          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : (
-            <Text style={styles.emptyText}>
-              {isOwnProfile ? 'Add a line or two about what you make in your account settings.' : `${profile.displayName} hasn’t written a bio yet.`}
-            </Text>
-          )}
-          {knownForGenres.length > 0 ? (
-            <View style={styles.genreRow}>
-              <Text style={styles.genreLabel}>Known for</Text>
-              {knownForGenres.map((g) => (
-                <View key={g} style={styles.genreTag}><Text style={styles.genreTagText}>{g}</Text></View>
-              ))}
-            </View>
-          ) : null}
-
-          {profile.socialLinks.length > 0 ? (
-            <View style={styles.linksBox}>
-              <Text style={styles.linksBoxLabel}>Links</Text>
-              <View style={styles.linksRow}>
-                {profile.socialLinks.map((link, i) => (
-                  <Pressable key={i} style={styles.linkPill} onPress={() => Linking.openURL(link.url)}>
-                    <Text style={styles.linkPillText}>{link.platform || hostnameFor(link.url)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : null}
         </View>
 
-        {/* Crew Call working card — hidden on other people's profiles
-            until they set one up; the owner sees the prompt. */}
-        {crewCard || isOwnProfile ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Working card</Text>
-            {crewCard ? (
-              <CrewCardView
-                card={crewCard}
-                creditedWork={creditedWork}
-                isOwn={isOwnProfile}
-                onEdit={() => router.push('/crew/card')}
-                onFind={() => router.push('/crew?tab=people')}
-                onOpenWork={(w) => router.push(workHref(w))}
-                performerFacts={<PerformerFacts card={crewCard} />}
-              />
-            ) : (
-              <Pressable onPress={() => router.push('/crew/card')}>
-                <Text style={styles.emptyText}>Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Text style={{ color: colors.olive }}>Set up your card →</Text></Text>
-              </Pressable>
-            )}
-          </>
-        ) : null}
-
-        {/* Track record (migration 082): confirmed Crew Call jobs, released
-            titles, the lines people left. The tier chip in the header
-            comes from this. */}
-        {crewRecord ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Track record</Text>
-            <View style={{ gap: 10 }}>
-              <View style={crew.metaRow}>
-                <TierChip person={crewRecord} />
-                <Text style={crew.meta}>{crewRecord.tier === 'new' ? 'First month on Studio Tapa' : crewRecord.tier === 'veteran' ? `${crewRecord.done} jobs and titles confirmed` : 'Building a record'}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {[[crewRecord.jobs, 'jobs confirmed on Crew Call'], [crewRecord.titles, 'released titles'], [crewRecord.posted, `calls posted · ${crewRecord.filled} filled`], [crewRecord.wouldAgain, '“would work again”']].map(([n, l]) => (
-                  <View key={l} style={{ width: '47%', backgroundColor: colors.surface2, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 }}>
-                    <Text style={{ fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink }}>{n}</Text>
-                    <Text style={crew.cat}>{l}</Text>
-                  </View>
-                ))}
-              </View>
-              {crewRecord.recentJobs.length > 0 ? (
-                <>
-                  <Text style={crew.h4}>Recent jobs</Text>
-                  {crewRecord.recentJobs.map((j) => (
-                    <Pressable key={j.id} style={crew.gearRow} onPress={() => router.push(`/crew/calls/${j.callId}`)}>
-                      <Text style={[crew.rowText, { flex: 1 }]}>{j.role} · {j.title}{j.projectTitle ? ` (${j.projectTitle})` : ''} <Text style={crew.cat}>· for {j.forName}</Text></Text>
-                      <View style={[crew.chip, crew.chipOk]}><Text style={[crew.chipText, crew.chipOk]}>confirmed</Text></View>
-                    </Pressable>
-                  ))}
-                </>
-              ) : null}
-              {crewRecord.endorsements.length > 0 ? (
-                <>
-                  <Text style={crew.h4}>What people said</Text>
-                  {crewRecord.endorsements.map((e, i) => (
-                    <Text key={i} style={crew.muted}>“{e.line}” — {e.fromName}</Text>
-                  ))}
-                </>
-              ) : null}
-              <Text style={crew.mono}>Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</Text>
-            </View>
-          </>
-        ) : null}
-
-        {/* Locations (migration 086): places they host, shoots they
-            hosted or did, the lines people left. */}
-        {locations && (locations.listings.length || locations.hosted || locations.shotAt.length || locations.lines.length) ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Locations</Text>
-            <View style={{ gap: 10 }}>
-              {locations.hosted > 0 ? <Text style={crew.meta}>Hosted {locations.hosted} {locations.hosted === 1 ? 'shoot' : 'shoots'} that went as agreed</Text> : null}
-              {locations.listings.length > 0 ? (
-                <>
-                  <Text style={crew.h4}>Places to shoot</Text>
-                  {locations.listings.map((l) => (
-                    <Pressable key={l.id} style={[crew.gearRow, { alignItems: 'flex-start' }]} onPress={() => router.push(`/locations/${l.id}`)}>
-                      <View style={{ width: 64, aspectRatio: 4 / 3, borderRadius: 6, backgroundColor: colors.surface3, overflow: 'hidden' }}>{l.coverUrl ? <SmartImage uri={l.coverUrl} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} /> : null}</View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={crew.rowText}>{l.title}</Text>
-                        <Text style={crew.mono}>{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</Text>
-                      </View>
-                    </Pressable>
-                  ))}
-                </>
-              ) : null}
-              {locations.shotAt.length > 0 ? (
-                <>
-                  <Text style={crew.h4}>Shot at</Text>
-                  {locations.shotAt.map((s, i) => (
-                    <Pressable key={i} style={crew.gearRow} onPress={s.live ? () => router.push(`/locations/${s.locationId}`) : undefined}>
-                      <Text style={[crew.rowText, { flex: 1 }]}>{s.title}{s.project ? ` · ${s.project}` : ''}</Text>
-                      <Text style={crew.mono}>{s.when ? new Date(`${s.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</Text>
-                    </Pressable>
-                  ))}
-                </>
-              ) : null}
-              {locations.lines.length > 0 ? (
-                <>
-                  <Text style={crew.h4}>What people said</Text>
-                  {locations.lines.map((e, i) => <Text key={i} style={crew.muted}>“{e.line}” — {e.fromName}</Text>)}
-                </>
-              ) : null}
-              {isOwnProfile ? <Pressable onPress={() => router.push('/locations/mine')}><Text style={[crew.mono, { color: colors.olive }]}>Your places →</Text></Pressable> : null}
-            </View>
-          </>
-        ) : null}
-
-        {posts.length > 0 ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Latest post</Text>
-            <View style={styles.latestWrap}>
-              <PostTile post={posts[0]} onPress={() => openPost(posts[0])} large />
-              {posts[0].caption ? <Text style={styles.latestCaption}>{posts[0].caption}</Text> : null}
-            </View>
-            {posts.length > 1 ? (
-              <>
-                <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Posts</Text>
-                <View style={styles.postGrid}>
-                  {posts.slice(1).map((post) => (
-                    <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
-                  ))}
-                </View>
-              </>
-            ) : null}
-          </>
-        ) : null}
-
-        {isOwnProfile && savedSnippets.length > 0 ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Saved Snippets</Text>
-            <View style={styles.postGrid}>
-              {savedSnippets.map((post) => (
-                <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        <View style={styles.divider} />
-        {/* A crew role, or a Studio / Producer credit linked to this account
-            (decision 20), reads after the type: "Series · Producer". */}
-        <Text style={styles.sectionLabel}>Tagged in</Text>
-        {creditedWork.length === 0 ? (
-          <Text style={styles.emptyText}>Nothing tagged here yet — this fills in once {profile.displayName} is credited on something.</Text>
-        ) : (
-          <View style={styles.workGrid}>
-            {creditedWork.map((item) => (
-              <Pressable key={`${item.type}-${item.id}`} style={styles.workItem} onPress={() => router.push(workHref(item))}>
-                {item.poster ? <SmartImage uri={item.poster} style={styles.workPoster} /> : <View style={styles.workPoster} />}
-                <Text style={styles.workTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.workType} numberOfLines={2}>{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-
-        {pitches.length > 0 ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Pitch Room projects</Text>
-            <View style={styles.pitchGrid}>
-              {pitches.map((p) => (
-                <Pressable key={p.id} style={styles.pitchCard} onPress={() => router.push(`/pitches/${p.id}`)}>
-                  {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
-                  {p.tag ? <Text style={styles.pitchTag}>{p.tag}</Text> : null}
-                  <Text style={styles.pitchTitle} numberOfLines={1}>{p.title}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {backedPitches.length > 0 ? (
-          <>
-            <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Projects backed</Text>
-            <View style={styles.pitchGrid}>
-              {backedPitches.map((p) => (
-                <Pressable key={p.id} style={styles.pitchCard} onPress={() => router.push(`/pitches/${p.id}`)}>
-                  {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
-                  {p.tag ? <Text style={styles.pitchTag}>{p.tag}</Text> : null}
-                  <Text style={styles.pitchTitle} numberOfLines={1}>{p.title}</Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : null}
+        {/* The sections, the main type's first (account types, 2026-11-18,
+            migration 126; lib/accountTypeRules.js mainFirst): About stays on
+            top, then a Crew or Cast main's working card and track record, a
+            Creator's titles and pitches, a Studio's places and titles; the
+            rest keep their order. */}
+        {mainFirst(sections, typesMain).map((item) => <Fragment key={item.key}>{item.render()}</Fragment>)}
       </ScrollView>
 
       <PhotoPostViewer post={photoPost} onClose={() => setPhotoPost(null)} />
@@ -578,7 +656,9 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, fontSize: 15, textAlign: 'center' },
   emptyText: { color: colors.inkDim, fontSize: 13, lineHeight: 19 },
 
-  hero: { marginBottom: 4 },
+  hero: {},
+  // About used to close the hero; its 4pt under it stay with it.
+  aboutBlock: { marginBottom: 4 },
   banner: { height: 140, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.hairline },
   header: { alignItems: 'flex-start', marginTop: -44, paddingHorizontal: 8, marginBottom: 6 },
   avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 4, borderColor: colors.surface0, overflow: 'hidden' },
@@ -594,6 +674,8 @@ const styles = StyleSheet.create({
   roleBadge: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8 },
   roleBadgeText: { color: colors.onBrass, fontSize: 10, fontWeight: '700' },
   handle: { color: colors.inkDim, fontSize: 12.5, marginBottom: 2 },
+  typesLine: { color: colors.inkDim, fontSize: 13.5, fontFamily: fonts.display, marginBottom: 3 },
+  typesLineMain: { color: colors.olive, fontFamily: fonts.displayBold },
   joined: { color: colors.inkFaint, fontSize: 11.5, marginBottom: 8 },
   placeholderNote: { color: colors.inkDim, fontSize: 13, lineHeight: 19, marginBottom: 10 },
   actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },

@@ -163,6 +163,14 @@ function keptQuery(href, keep = PUBLIC_KEEP) {
   return kept.length ? `?${kept.map((k) => `${k}=${enc(q[k])}`).join('&')}` : '';
 }
 
+// The Your types sheet (account types, 2026-11-18): the website's
+// /account/profile#types (lib/accountTypeRules.js TYPES_HREF, the ☰ menu's
+// "+ Add a type") is the app's Profile screen with the sheet up.
+function wantsTypesSheet(href) {
+  const at = href.indexOf('#');
+  return (at >= 0 && href.slice(at + 1) === 'types') || queryOf(href).types === '1';
+}
+
 export function hrefToRoute(href) {
   if (typeof href !== 'string' || !href.startsWith('/')) return null;
   const path = href.split(/[?#]/)[0].replace(/\/$/, '') || '/';
@@ -170,6 +178,7 @@ export function hrefToRoute(href) {
   if (show) return { route: show };
   const target = ALIASES[path] || path;
   if (target === '/') return { route: '/' };
+  if (target === '/account/profile' && wantsTypesSheet(href)) return { route: '/account/profile?types=1' };
   if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
   if (PODCAST_SHOW.test(target)) return { route: `${target}${keptQuery(href, PODCAST_KEEP)}` };
   if (CREATOR_TITLE.test(target)) return { route: `${target}${keptQuery(href, TITLE_KEEP)}` };

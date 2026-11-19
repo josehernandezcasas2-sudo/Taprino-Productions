@@ -260,8 +260,9 @@ export default function BottomNav() {
   // keeps the tab bar on the website (pages/pitches/discover.js does
   // render MobileTabBar), so it stays visible here too. A conversation
   // (/messages/<id>, /messages/new) is full screen too (the simpler
-  // Messages, 2026-11-18): its composer sits where the bar would be.
-  if (pathname === '/vertical/discover' || pathname === '/snippets/discover' || /^\/messages\/[^/]+/.test(pathname)) return null;
+  // Messages, 2026-11-18): its composer sits where the bar would be. So is
+  // the account-type question (/start, 2026-11-18), like the website's.
+  if (pathname === '/vertical/discover' || pathname === '/snippets/discover' || pathname === '/start' || /^\/messages\/[^/]+/.test(pathname)) return null;
 
   return (
     <>

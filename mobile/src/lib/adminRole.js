@@ -41,6 +41,21 @@ export function clearAdminRoleCache() {
   publish(null);
 }
 
+// Account types (migration 126): /api/my-role carries `accountTypes`
+// ({ types, main, asked }, or null before 126). A save on the question
+// (/start), the Your types sheet or the ☰ menu's chips puts the new state
+// into the copy every mounted useAdminRole holds, so the menu's you card
+// shows it at once. Does nothing while no role is held (signed out, or not
+// read yet: the next read brings the saved state anyway).
+export function setRoleAccountTypes(accountTypes) {
+  if (!cache || !cache.isSignedIn) return;
+  publish({ ...cache, accountTypes: accountTypes || null });
+}
+
+export function currentRole() {
+  return cache;
+}
+
 // One read of /api/my-role for whoever is signed in now, handed to every
 // mounted useAdminRole. → the role, or null when it can't be read or the
 // server doesn't see the session yet (a token that isn't ready the moment

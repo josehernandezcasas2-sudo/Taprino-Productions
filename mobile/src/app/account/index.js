@@ -10,6 +10,8 @@ import { dollars } from '../../lib/creatorMoneyRules';
 import PositionedImage from '../../components/PositionedImage';
 import { PushPrompt } from '../../components/PushPrompt';
 import { AccountFrame, useAccountData, membershipTileLines, roleBadgeFor, memberBadgeFor, styles } from '../../components/account/AccountBits';
+import { TypesNudge, useAccountTypes } from '../../components/account/AccountTypeBits';
+import { ASK_PATH } from '../../lib/accountTypeRules';
 
 // The account hub (option B of the "Account page" canvas, 2026-10-29;
 // mirrors pages/account.js): the identity card, six tiles that carry
@@ -56,6 +58,9 @@ export default function Account() {
   useEffect(() => { if (section === 'membership') router.replace('/account/membership'); }, [section]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { dashboard, profile, retry, getToken, signOut } = useAccountData({ refreshOnFocus: true });
+  // Account types (migration 126): read on every visit, so the nudge goes
+  // once the question is answered on /start.
+  const types = useAccountTypes({ refreshOnFocus: true });
   const signedIn = Boolean(dashboard && dashboard.isSignedIn && !dashboard.loadError);
   const isCreator = Boolean(dashboard && (dashboard.isCreator || dashboard.isAdmin));
 
@@ -123,6 +128,18 @@ export default function Account() {
         {/* Push notifications (2026-10-24): our own ask, once; the switch
             lives on the Preferences screen. */}
         <PushPrompt getToken={getToken} />
+
+        {/* "What brings you here?" until it is answered or skipped (the
+            website's hub has the same card). Pick asks it and comes back
+            here; Skip answers it with "here to watch". */}
+        {types.status === 'ok' && types.state ? (
+          <TypesNudge
+            state={types.state}
+            getToken={getToken}
+            onPick={() => router.push(`${ASK_PATH}?next=${encodeURIComponent('/account')}`)}
+            onSaved={types.setState}
+          />
+        ) : null}
 
         <View style={styles.tiles} accessibilityRole="menu">
           <Tile width={tileW} kind="membership" title="Membership" cta="Manage" lines={membershipTileLines(dashboard)} onPress={() => router.push('/account/membership')} />
