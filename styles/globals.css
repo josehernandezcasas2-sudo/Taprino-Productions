@@ -15378,6 +15378,159 @@ a.ccx-gear-owner:hover { color: var(--ink); }
 .ccx-back > span { font-size: 18px; line-height: 1; margin-top: -2px; }
 .ccx-call-page .cc-back { display: none !important; }
 
+/* ---- Account types (2026-11-18, migration 126) ---------------------------
+   The canvas https://claude.ai/artifact/GxAa8Qj57oQRuBF7c5xo4q (boards Main,
+   Switch, MenuCard, Profile). pages/start.js is the sign-up question (the
+   beta door's brand strip with Skip, the four cards, the Main chips, the
+   button); components/account/AccountTypesCard.js is Account → Profile's
+   "Your types" row and the Your types sheet (a bottom sheet under 900px, a
+   dialog from 900px); the hub's nudge (pages/account.js), the ☰ menu's you
+   card (components/SiteMenu.js) and the line under a profile's name.
+   Every word is lib/accountTypeRules.js. */
+.atp-start { min-height: 100vh; min-height: 100dvh; font-family: var(--font-display); }
+.atp-start-bar { min-height: 64px; box-sizing: border-box; padding: 0 20px; }
+.atp-start-skip { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--ink-dim); font-family: var(--font-display); font-size: 14px; cursor: pointer; }
+.atp-start-skip:hover { color: var(--brass); }
+.atp-start-main { flex: 1; width: 100%; max-width: 520px; margin: 0 auto; box-sizing: border-box; padding: 22px 20px 0; display: flex; flex-direction: column; gap: 12px; }
+.atp-start-title { margin: 0; font-family: var(--font-body); font-weight: 700; font-size: 30px; line-height: 1.15; color: var(--ink); }
+.atp-start-intro { margin: 0 0 2px; font-size: 15px; line-height: 1.45; color: var(--ink-dim); }
+.atp-cards { display: flex; flex-direction: column; gap: 10px; }
+.atp-card {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-height: 68px; box-sizing: border-box;
+  padding: 12px 14px; border-radius: 16px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background: var(--surface-1); color: var(--ink); text-align: left; font-family: var(--font-display); cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.atp-card:hover { border-color: rgba(var(--brass-rgb), 0.45); }
+/* Ticked: a 2px orange edge (drawn inside, so nothing moves); the main
+   one a full orange, the others a softer one. */
+.atp-card.on { border-color: rgba(var(--brass-rgb), 0.6); box-shadow: inset 0 0 0 1px rgba(var(--brass-rgb), 0.6); background: rgba(var(--brass-rgb), 0.05); }
+.atp-card.main { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); background: rgba(var(--brass-rgb), 0.08); }
+.atp-card-icon { width: 44px; height: 44px; border-radius: 12px; flex: none; display: flex; align-items: center; justify-content: center; }
+.atp-card-icon.tint-ink { color: var(--ink); background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.atp-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.atp-card-label { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+.atp-card-blurb { font-size: 13px; line-height: 1.35; color: var(--ink-faint); }
+.atp-card.on .atp-card-blurb { color: var(--ink-dim); }
+.atp-main-pill { font-family: var(--font-mono); font-weight: 500; font-size: 9px; letter-spacing: 1px; line-height: 1.4; color: var(--surface-0); background: var(--brass); border-radius: 999px; padding: 2px 7px; }
+.atp-main-pill.big { flex: none; height: 30px; box-sizing: border-box; padding: 0 12px; font-size: 10px; display: inline-flex; align-items: center; }
+.atp-tick { width: 22px; height: 22px; flex: none; box-sizing: border-box; border-radius: 7px; border: 2px solid color-mix(in srgb, var(--ink) 30%, transparent); display: flex; align-items: center; justify-content: center; color: var(--surface-0); }
+.atp-card.on .atp-tick { background: var(--brass); border-color: var(--brass); }
+.atp-start-main-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 2px 0; }
+.atp-start-main-label, .sm-you-main-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ink-faint); }
+.atp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.atp-chip { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); background: none; color: var(--ink-dim); font-family: var(--font-display); font-weight: 600; font-size: 14px; cursor: pointer; }
+.atp-chip:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 40%, transparent); }
+.atp-chip.on { background: var(--olive); border-color: var(--olive); color: var(--surface-0); font-weight: 700; }
+.atp-start-note { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--ink-faint); }
+.atp-start-foot {
+  position: sticky; bottom: 0; width: 100%; max-width: 520px; margin: 0 auto; box-sizing: border-box;
+  padding: 14px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-0) 0%, transparent), var(--surface-0) 28%);
+}
+.atp-continue { width: 100%; height: 52px; border: 0; border-radius: 14px; background: var(--brass); color: var(--surface-0); font-family: var(--font-display); font-weight: 700; font-size: 16px; cursor: pointer; }
+.atp-continue:hover:not(:disabled) { filter: brightness(1.06); }
+.atp-continue:disabled { opacity: 0.45; cursor: default; }
+.atp-start-skip-long { min-height: 44px; padding: 0 10px; border: 0; background: none; color: var(--ink-dim); font-family: var(--font-display); font-size: 14px; cursor: pointer; }
+.atp-start-skip-long:hover { color: var(--brass); }
+.atp-start-skip:disabled, .atp-start-skip-long:disabled { opacity: 0.5; cursor: default; }
+.atp-error { margin: 0; width: 100%; box-sizing: border-box; padding: 8px 12px; border-radius: 10px; background: rgba(var(--danger-rgb), 0.12); border: 1px solid rgba(var(--danger-rgb), 0.45); color: var(--ink); font-size: 14px; line-height: 1.4; }
+.atp-start button:focus-visible, .atp-sheet button:focus-visible, .atp-sheet a:focus-visible, .atp-sheet input:focus-visible,
+.atp-rowcard-change:focus-visible, .acct-types-nudge a:focus-visible, .acct-types-nudge button:focus-visible,
+.sm-type-chip:focus-visible, .sm-type-add:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+@media (min-width: 900px) {
+  .atp-start-main { padding-top: 40px; }
+  .atp-start-title { font-size: 34px; }
+}
+
+/* The account hub's nudge, above the tiles. */
+.acct-types-nudge { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 18px; margin: 0 0 1.2rem; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(var(--brass-rgb), 0.45); background: rgba(var(--brass-rgb), 0.07); }
+.acct-types-nudge-text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.acct-types-nudge h2 { margin: 0; font-family: var(--font-body); font-weight: 700; font-size: 1.15rem; line-height: 1.25; color: var(--ink); }
+.acct-types-nudge p { margin: 0; font-family: var(--font-display); font-size: 0.86rem; line-height: 1.45; color: var(--ink-dim); }
+.acct-types-nudge .atp-error { margin-top: 4px; font-size: 0.84rem; }
+.acct-types-nudge-acts { display: flex; align-items: center; gap: 8px; }
+.acct-types-nudge-pick { min-height: 44px; padding: 0 22px; box-sizing: border-box; border-radius: 999px; background: var(--brass); color: var(--surface-0); font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; display: inline-flex; align-items: center; text-decoration: none; }
+.acct-types-nudge-pick:hover { filter: brightness(1.06); color: var(--surface-0); }
+.acct-types-nudge-skip { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent); background: none; color: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+.acct-types-nudge-skip:hover { border-color: var(--ink-dim); }
+.acct-types-nudge-skip:disabled { opacity: 0.6; cursor: default; }
+
+/* Account → Profile: the "Your types" row at the top of the public card. */
+.atp-rowcard { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; box-sizing: border-box; margin: 0 0 1.1rem; padding: 8px 8px 8px 14px; border-radius: 14px; background: var(--surface-2); border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); scroll-margin-top: 96px; }
+.atp-rowcard-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.atp-rowcard-label { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.atp-rowcard-value { font-family: var(--font-display); font-weight: 700; font-size: 0.98rem; color: var(--ink); overflow-wrap: anywhere; }
+.atp-rowcard-note { font-family: var(--font-display); font-size: 0.8rem; line-height: 1.4; color: var(--ink-faint); }
+.atp-rowcard-change { flex: none; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid rgba(var(--brass-rgb), 0.5); background: none; color: var(--brass); font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; cursor: pointer; }
+.atp-rowcard-change:hover:not(:disabled) { background: rgba(var(--brass-rgb), 0.1); }
+.atp-rowcard-change:disabled { opacity: 0.5; cursor: not-allowed; border-color: color-mix(in srgb, var(--ink) 20%, transparent); color: var(--ink-faint); }
+
+/* The Your types sheet: from the bottom on a phone, a dialog from 900px.
+   Its rows scroll between the heading and Save; the page never moves. */
+.atp-sheet-back { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; justify-content: center; background: color-mix(in srgb, var(--surface-0) 72%, transparent); font-family: var(--font-display); color: var(--ink); }
+.atp-sheet {
+  width: 100%; max-width: 640px; max-height: calc(100vh - 72px); max-height: calc(100dvh - 72px); box-sizing: border-box;
+  display: flex; flex-direction: column; background: var(--surface-1);
+  border-radius: 22px 22px 0 0; border-top: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.35); animation: atp-up 0.22s cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+@keyframes atp-up { from { transform: translateY(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .atp-sheet { animation: none; } }
+.atp-grab { flex: none; align-self: center; width: 40px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 25%, transparent); margin-top: 8px; }
+.atp-sheet-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 16px 6px; }
+.atp-sheet-head-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.atp-sheet-title { margin: 0; font-family: var(--font-body); font-weight: 700; font-size: 22px; line-height: 1.2; color: var(--ink); outline: none; }
+.atp-sheet-intro { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-dim); }
+.atp-x { flex: none; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); background: none; color: var(--ink-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.atp-x:hover { color: var(--ink); border-color: var(--ink-dim); }
+.atp-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 16px 12px; display: flex; flex-direction: column; gap: 10px; }
+.atp-sheet-body > * { flex: none; }
+.atp-rows { display: flex; flex-direction: column; }
+.atp-row { padding: 10px 0; border-bottom: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+.atp-row:last-child { border-bottom: 0; }
+.atp-row-main { display: flex; align-items: center; gap: 12px; }
+.atp-row-label { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.atp-row-label input { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--brass); color-scheme: dark; cursor: pointer; }
+.atp-row-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.atp-row-name { font-weight: 700; font-size: 15px; color: var(--ink); }
+.atp-row-line { font-size: 12px; line-height: 1.35; color: var(--ink-faint); }
+.atp-makemain { flex: none; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent); background: none; color: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 13px; cursor: pointer; }
+.atp-makemain:hover { border-color: var(--olive); color: var(--olive); }
+.atp-row-note { margin: 6px 0 0 34px; font-size: 12px; line-height: 1.45; color: var(--ink-dim); }
+.atp-row-note a { color: var(--brass); }
+.atp-sheet-note { display: flex; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 13px; line-height: 1.45; color: var(--ink-dim); }
+.atp-sheet-note-icon { flex: none; display: flex; color: var(--mint); }
+.atp-sheet-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 16px calc(18px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+.atp-sheet-foot .atp-continue { height: 50px; }
+@media (pointer: coarse) { .atp-makemain { min-height: 44px; } }
+@media (min-width: 900px) {
+  .atp-sheet-back { align-items: center; padding: 24px; }
+  .atp-sheet { width: 480px; max-width: 100%; max-height: min(680px, calc(100vh - 48px)); max-height: min(680px, calc(100dvh - 48px)); border-radius: 20px; border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); }
+  .atp-grab { display: none; }
+  .atp-sheet-head { padding: 18px 20px 6px; }
+  .atp-sheet-body { padding: 4px 20px 12px; }
+  .atp-sheet-foot { padding: 12px 20px 18px; }
+}
+
+/* The ☰ menu's you card: the line, the main chips, "+ Add a type". */
+.sm-you-types { display: flex; flex-direction: column; gap: 8px; padding: 10px 14px 12px; border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+.sm-you-typeline { font-size: 0.82rem; color: var(--ink-dim); }
+.sm-you-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sm-you-radios { display: flex; flex-wrap: wrap; gap: 6px; }
+.sm-type-chip { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); background: none; color: var(--ink-dim); font-family: var(--font-display); font-weight: 600; font-size: 0.82rem; cursor: pointer; }
+.sm-type-chip:hover { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 40%, transparent); }
+.sm-type-chip.on { background: var(--olive); border-color: var(--olive); color: var(--surface-0); font-weight: 700; }
+.sm-type-add { height: 36px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px dashed color-mix(in srgb, var(--ink) 25%, transparent); color: var(--ink-dim); text-decoration: none; font-family: var(--font-display); font-weight: 600; font-size: 0.82rem; display: inline-flex; align-items: center; }
+.sm-type-add:hover { color: var(--brass); border-color: rgba(var(--brass-rgb), 0.6); }
+.sm-you-note { margin: 0; font-size: 0.75rem; line-height: 1.4; color: var(--ink-faint); }
+.sm-you-err { margin: 0; font-size: 0.78rem; line-height: 1.4; color: var(--danger); }
+@media (pointer: coarse) { .sm-type-chip, .sm-type-add { height: 44px; } }
+
+/* The public profile: "Crew · also Cast" under the name. */
+.profile-types { font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; color: var(--olive); margin-top: 0.2rem; }
+
 /* ---- No zoom when a field is tapped (2026-11-17) --------------------------
    Jose: "when clicking certain buttons or text areas, it zooms me in … not
    supposed to happen unless it needs to". Safari on an iPhone zooms the page

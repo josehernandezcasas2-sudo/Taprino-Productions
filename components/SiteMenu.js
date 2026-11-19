@@ -5,6 +5,8 @@ import AvatarPhoto from './AvatarPhoto';
 import SignInHere, { SignUpHere } from './SignInHere';
 import { keepScrollInside } from '../lib/menuScroll';
 import { MENU_LIVE_LINES, MENU_WORDS, countsFresh, keptOpen, siteMenu } from '../lib/siteMenuRules';
+import { TYPE_WORDS, makeMain, menuTypes, orderedTypes } from '../lib/accountTypeRules';
+import { MainChips, announceAccountTypes, postAccountTypes } from './account/AccountTypeBits';
 
 // The ☰ menu (Jose, 2026-11-18; the canvas
 // https://claude.ai/artifact/RFSJUdzGefwe1v11cCJA6M): a full-screen sheet
@@ -70,7 +72,7 @@ function writeOpen(ids) {
   try { window.sessionStorage.setItem(STORE_KEY, JSON.stringify(ids)); } catch (err) { /* private mode */ }
 }
 
-export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, isSignedIn, isSubscriber, roles, settings, ownProfile, profileHref, mainGenres, activeGenre, returnFocus }) {
+export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, isSignedIn, isSubscriber, roles, settings, ownProfile, profileHref, mainGenres, activeGenre, returnFocus, accountTypes = null }) {
   const [side, setSide] = useState(initialSide);
   const [counts, setCounts] = useState(countsCache.counts);
   const [genres, setGenres] = useState(mainGenres && mainGenres.length ? mainGenres : genresCache);
@@ -86,6 +88,58 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
     profileHref
   });
   const [openIds, setOpenIds] = useState([]);
+
+  // Account types (migration 126; lib/accountTypeRules.js menuTypes): the
+  // line under the name, the main as chips to switch, "+ Add a type". A
+  // switch shows at once and is saved a moment later (arrow keys move
+  // through the chips the way radio buttons do, so only where they stop is
+  // sent); a failed save puts the last saved main back and says so.
+  const [types, setTypes] = useState(accountTypes);
+  const [typesError, setTypesError] = useState(null);
+  const savedTypes = useRef(accountTypes);
+  const typesTimer = useRef(null);
+  const typesPending = useRef(null);
+  const typesSeq = useRef(0);
+  const typesBusy = useRef(false);
+  useEffect(() => {
+    if (typesBusy.current) return;
+    savedTypes.current = accountTypes;
+    setTypes(accountTypes);
+  }, [accountTypes]);
+  const sendTypes = (want, seq) => {
+    postAccountTypes({ types: orderedTypes(want.types, want.main), main: want.main }).then((r) => {
+      if (seq !== typesSeq.current) return; // a later switch is on its way
+      typesBusy.current = false;
+      if (r.ok) {
+        const st = r.state || {};
+        const done = { types: orderedTypes(st.types, st.main), main: st.main || null, asked: true };
+        savedTypes.current = done;
+        announceAccountTypes(done);
+      } else {
+        setTypes(savedTypes.current);
+        setTypesError(TYPE_WORDS.failed);
+      }
+    });
+  };
+  const pickMain = (type) => {
+    if (!types) return;
+    const want = { ...types, ...makeMain(types, type) };
+    setTypes(want);
+    setTypesError(null);
+    typesBusy.current = true;
+    typesSeq.current += 1;
+    const seq = typesSeq.current;
+    clearTimeout(typesTimer.current);
+    typesPending.current = { want, seq };
+    typesTimer.current = setTimeout(() => { typesTimer.current = null; typesPending.current = null; sendTypes(want, seq); }, 350);
+  };
+  // Closing the menu with a switch still waiting sends it at once.
+  useEffect(() => () => {
+    clearTimeout(typesTimer.current);
+    const p = typesPending.current;
+    if (p) { typesPending.current = null; sendTypes(p.want, p.seq); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const mt = isSignedIn && types ? menuTypes(types) : null;
   useEffect(() => { setOpenIds(keptOpen(readOpen(), menu.sections)); }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const panelRef = useRef(null);
@@ -205,6 +259,20 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
                 </span>
                 <span className="sm-chev">{svg(ICONS.chev, 18)}</span>
               </Link>
+              {mt && (mt.line || mt.chips.length > 0 || mt.add) && (
+                <div className="sm-you-types">
+                  {mt.line && <div className="sm-you-typeline">{mt.line}</div>}
+                  {mt.chips.length > 0 && <span id="sm-you-main-label" className="sm-you-main-label">{mt.label}</span>}
+                  {(mt.chips.length > 0 || mt.add) && (
+                    <div className="sm-you-chips">
+                      {mt.chips.length > 0 && <MainChips items={mt.chips} labelledBy="sm-you-main-label" className="sm-you-radios" chipClass="sm-type-chip" onPick={pickMain} />}
+                      {mt.add && <Link href={mt.add.href} className="sm-type-add" onClick={go}>{mt.add.label}</Link>}
+                    </div>
+                  )}
+                  {mt.note && <p className="sm-you-note">{mt.note}</p>}
+                  {typesError && <p className="sm-you-err" role="alert">{typesError}</p>}
+                </div>
+              )}
               <div className="sm-you-plan">
                 <span className={isSubscriber ? 'member' : ''}>{p.plan}</span>
                 {p.join && <Link href={p.join.href} className="sm-join" onClick={go}>{p.join.label}</Link>}

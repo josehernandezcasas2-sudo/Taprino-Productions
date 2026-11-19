@@ -6,6 +6,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import SiteMenu from './SiteMenu';
+import { ACCOUNT_TYPES_EVENT } from './account/AccountTypeBits';
 import SignInHere from './SignInHere';
 import { MENU_WORDS, menuSide } from '../lib/siteMenuRules';
 import { isStreamPath } from '../lib/streamSection';
@@ -126,6 +127,19 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       .then(setOwnProfile)
       .catch(() => {});
   }, [isSignedIn]);
+
+  // Account types (migration 126): the Your types sheet, the sign-up
+  // question and the menu's own chips announce what they saved, so the ☰
+  // menu's you card follows without another read.
+  useEffect(() => {
+    function handleTypes(e) {
+      const d = e && e.detail;
+      if (!d || !Array.isArray(d.types)) return;
+      setRole((r) => ({ ...(r || {}), accountTypes: { types: d.types, main: d.main || null, asked: d.asked !== false } }));
+    }
+    window.addEventListener(ACCOUNT_TYPES_EVENT, handleTypes);
+    return () => window.removeEventListener(ACCOUNT_TYPES_EVENT, handleTypes);
+  }, []);
 
   // The account page announces a newly saved photo (see pages/account.js).
   useEffect(() => {
@@ -372,6 +386,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             settings={siteSettings}
             ownProfile={ownProfile}
             profileHref={ownProfileHref}
+            accountTypes={isSignedIn && role ? role.accountTypes || null : null}
             mainGenres={inStreamSection ? mainGenres : null}
             activeGenre={activeGenre}
             returnFocus={hamRef}

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import RepositionFrame, { CropWindow } from '../RepositionFrame';
 import PositionedPhoto from '../PositionedPhoto';
 import { AiSealGlyph } from '../AiSeal';
+import AccountTypesCard from './AccountTypesCard';
 import { BANNER_COLORS } from '../../lib/profileBanner';
 import { SITE } from '../../lib/siteConfig';
 
@@ -13,6 +14,8 @@ import { SITE } from '../../lib/siteConfig';
 // Private details (gender, age, a creator's fiscal sponsor), which used to
 // be the Privacy card. One Save for both. Every handler is the one the old
 // one-page /account had; `profile` comes from useOwnProfile in the page.
+// At the top of the public card, "Your types" (account types, migration
+// 126) with its own sheet and its own save (AccountTypesCard.js).
 
 // Avatars are only ever shown at 22–96px, so there's no reason to upload a
 // multi-MB original. Center-crops to a square and shrinks to a 512px JPEG.
@@ -55,7 +58,7 @@ function shrinkAvatar(file) {
   });
 }
 
-export default function ProfileSection({ profile, setProfile, originalAge, setOriginalAge, email, isCreator, isAdmin }) {
+export default function ProfileSection({ profile, setProfile, originalAge, setOriginalAge, email, isCreator, isAdmin, accountTypes = null }) {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState(null);
@@ -161,6 +164,8 @@ export default function ProfileSection({ profile, setProfile, originalAge, setOr
           <div className="account-subheading" style={{ marginBottom: 0 }}>Public profile</div>
           <span className="account-visibility public">Visible to anyone on {SITE.name}</span>
         </div>
+        {/* Your types (migration 126): its own sheet and its own save. */}
+        {accountTypes && <AccountTypesCard initial={accountTypes} isCreator={isCreator} />}
         {profileError && <p style={{ color: 'var(--danger)' }}>{profileError}</p>}
 
         {/* The photos: the preview as the profile page draws it, with one

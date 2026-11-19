@@ -28,8 +28,10 @@ const code = (text) => text.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*|\{\/\*
 
 // The general ways in: each names where a sign-in AND a sign-up land.
 const GENERAL = {
-  'pages/account.js': ['forceRedirectUrl="/signed-in?next=/account" signUpForceRedirectUrl="/account"', 'forceRedirectUrl="/account" signInForceRedirectUrl="/signed-in?next=/account"'],
-  'pages/welcome.js': ['forceRedirectUrl={landing} signUpForceRedirectUrl={next}'],
+  // A new account goes through /signed-in too, which asks "What brings
+  // you here?" first (account types, migration 126).
+  'pages/account.js': ['forceRedirectUrl="/signed-in?next=/account" signUpForceRedirectUrl="/signed-in?next=/account"', 'forceRedirectUrl="/signed-in?next=/account" signInForceRedirectUrl="/signed-in?next=/account"'],
+  'pages/welcome.js': ['forceRedirectUrl={landing} signUpForceRedirectUrl={landing}', '<SignUp routing="hash" forceRedirectUrl={landing}'],
   'pages/advertise/login.js': ['forceRedirectUrl="/advertise/dashboard" signUpForceRedirectUrl="/advertise/dashboard"']
 };
 

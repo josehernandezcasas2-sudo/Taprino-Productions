@@ -166,11 +166,13 @@ await runCheck('sign-in-here', async () => {
     // ---- SignInHere -------------------------------------------------------------------
     section('5. the other buttons mid-task');
     const s = await open(b, SIGNED_OUT);
-    for (const [pathname, label] of [['/crew/calls?urgent=1', 'Sign in to post a call'], ['/locations', 'Sign in to list a place'], ['/productions', 'Sign in to start one']]) {
+    // Crew Call's "Post a call" is the round + in the title row since
+    // Crew Call, simpler (2026-11-18): found by its label, not its text.
+    for (const [pathname, label] of [['/crew?urgent=1', 'Post a call'], ['/locations', 'Sign in to list a place'], ['/productions', 'Sign in to start one']]) {
       await goto(s.page, pathname);
       await clerkReady(s.page);
       await s.page.evaluate(() => { window.__clerkCalls = []; });
-      const btn = s.page.locator('button', { hasText: label }).first();
+      const btn = (label === 'Post a call' ? s.page.locator(`button[aria-label="${label}"]`) : s.page.locator('button', { hasText: label })).first();
       if ((await btn.count()) === 0) { ok(`${pathname}: “${label}” is there`, false); continue; }
       await btn.click();
       await s.page.waitForFunction(() => (window.__clerkCalls || []).length > 0, null, { timeout: 10000 }).catch(() => {});
@@ -186,8 +188,10 @@ await runCheck('sign-in-here', async () => {
     await s.page.locator('.account-btn-secondary', { hasText: 'Create a free account' }).click();
     await s.page.waitForFunction(() => (window.__clerkCalls || []).length > 1, null, { timeout: 10000 }).catch(() => {});
     const acct = await calls(s.page);
-    ok('Sign in: a sign-in goes through /signed-in, an account made from that box lands on the account page', acct[0] && acct[0].kind === 'openSignIn' && same(pick(acct[0].props), { forceRedirectUrl: '/signed-in?next=/account', signUpForceRedirectUrl: '/account' }), JSON.stringify(acct[0]));
-    ok('Create a free account: the same two, the other way round', acct[1] && acct[1].kind === 'openSignUp' && same(pick(acct[1].props), { forceRedirectUrl: '/account', signInForceRedirectUrl: '/signed-in?next=/account' }), JSON.stringify(acct[1]));
+    // Both outcomes go through /signed-in since account types (migration
+    // 126): a new account is asked "What brings you here?" on the way.
+    ok('Sign in: a sign-in and an account made from that box both go through /signed-in', acct[0] && acct[0].kind === 'openSignIn' && same(pick(acct[0].props), { forceRedirectUrl: '/signed-in?next=/account', signUpForceRedirectUrl: '/signed-in?next=/account' }), JSON.stringify(acct[0]));
+    ok('Create a free account: the same two', acct[1] && acct[1].kind === 'openSignUp' && same(pick(acct[1].props), { forceRedirectUrl: '/signed-in?next=/account', signInForceRedirectUrl: '/signed-in?next=/account' }), JSON.stringify(acct[1]));
     ok('no page errors', s.errors.length === 0, s.errors.join(' | '));
     await s.ctx.close();
   } finally {

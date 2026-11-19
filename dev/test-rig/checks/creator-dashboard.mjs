@@ -206,6 +206,14 @@ await runCheck('creator-dashboard', async () => {
 
     // ---- 2. where a sign-in lands -----------------------------------------------
     section('2. where a sign-in lands');
+    // Since account types (migration 126) someone who has never answered
+    // "What brings you here?" goes to /start first (dev/test-rig/checks/
+    // account-types.mjs checks that); these accounts have answered.
+    const has126 = rows(`select count(*)::int as n from information_schema.columns where table_schema = 'public' and table_name = 'user_profiles' and column_name = 'account_type_asked_at'`)[0].n === 1;
+    const landingIds = [USERS.mara, USERS.admin, USERS.viewer, sub.id];
+    if (has126) {
+      sql(`insert into public.user_profiles (user_id, account_type_asked_at) select id, now() from unnest(array[${landingIds.map(q).join(', ')}]) as id on conflict (user_id) do update set account_type_asked_at = coalesce(user_profiles.account_type_asked_at, now())`);
+    }
     const lands = async (who, next) => {
       const r = await page(`/signed-in${next == null ? '' : `?next=${encodeURIComponent(next)}`}`, who);
       return `${r.status} ${r.headers.get('location')}`;
@@ -222,6 +230,7 @@ await runCheck('creator-dashboard', async () => {
       ok(`never off the site: ${bad}`, got === '307 /creator/dashboard', got);
     }
     ok('no session → the account page', (await lands(SIGNED_OUT, '/account')) === '307 /account', await lands(SIGNED_OUT, '/account'));
+    if (has126) sql(`update public.user_profiles set account_type_asked_at = null where user_id in (${landingIds.map(q).join(', ')}) and cardinality(account_types) = 0`);
 
     // ---- 3. what the routes add ---------------------------------------------------
     section('3. the routes');

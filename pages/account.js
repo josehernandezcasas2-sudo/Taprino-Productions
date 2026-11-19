@@ -8,6 +8,9 @@ import { useOwnProfile } from '../components/account/useOwnProfile';
 import { membershipTileLines } from '../components/account/MembershipSection';
 import PositionedPhoto from '../components/PositionedPhoto';
 import { accountPageProps } from '../lib/accountPage';
+import { readAccountTypes } from '../lib/accountTypes';
+import { TYPE_WORDS, ASK_PATH, askDue } from '../lib/accountTypeRules';
+import { announceAccountTypes, postAccountTypes } from '../components/account/AccountTypeBits';
 import { freeAccessNoteFor, roleBadgeFor } from '../lib/accountRules';
 import { memberBadge } from '../lib/membershipTiers';
 import { dollars } from '../lib/creatorMoneyRules';
@@ -21,7 +24,15 @@ import { SITE } from '../lib/siteConfig';
 // page. Until 2026-10-29 this was one 6,000px column of nine cards; those
 // cards live on in components/account/*.js, one per page.
 export async function getServerSideProps({ req, res }) {
-  return accountPageProps(req, res);
+  const result = await accountPageProps(req, res);
+  // Account types (migration 126): someone who has never answered "What
+  // brings you here?" gets a small nudge above the tiles. A failed read
+  // (or a database before 126) reads as not due, so nothing shows.
+  if (result.props && result.props.isSignedIn && result.props.userId) {
+    const state = await readAccountTypes(result.props.userId).catch(() => null);
+    result.props.askTypes = askDue({ signedIn: true, state });
+  }
+  return result;
 }
 
 const LEGACY_HASHES = { '#membership': '/account/membership', '#purchases': '/account/purchases', '#money': '/creator/money', '#delete': '/account/security#delete' };
@@ -34,6 +45,39 @@ function TileIcon({ kind }) {
   if (kind === 'purchases') return <svg {...common} stroke="var(--ink-dim)"><path d="M4 8h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z" /><path d="M12 8v12" /></svg>;
   if (kind === 'preferences') return <svg {...common} stroke="var(--ink-dim)"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2.5" /><circle cx="10" cy="17" r="2.5" /></svg>;
   return <svg {...common} stroke="var(--ink-dim)"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg>;
+}
+
+// Account types (migration 126): the question, for someone who has never
+// answered it. Pick goes to /start and back here; Skip answers it as a
+// viewer and the card goes. The words are lib/accountTypeRules.js.
+function TypesNudge() {
+  const [gone, setGone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  if (gone) return null;
+  async function skip() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const r = await postAccountTypes({ skip: true });
+    setBusy(false);
+    if (r.ok) { announceAccountTypes(r.state); setGone(true); return; }
+    if (r.status === 503 && r.code === 'migration-126') { setGone(true); return; }
+    setError(TYPE_WORDS.failed);
+  }
+  return (
+    <section className="acct-types-nudge" aria-labelledby="acct-types-nudge-title">
+      <div className="acct-types-nudge-text">
+        <h2 id="acct-types-nudge-title">{TYPE_WORDS.askTitle}</h2>
+        <p>{TYPE_WORDS.askSkipNote}</p>
+        {error && <p className="atp-error" role="alert">{error}</p>}
+      </div>
+      <div className="acct-types-nudge-acts">
+        <Link href={`${ASK_PATH}?next=${encodeURIComponent('/account')}`} className="acct-types-nudge-pick">{TYPE_WORDS.pick}</Link>
+        <button type="button" className="acct-types-nudge-skip" onClick={skip} disabled={busy}>{busy ? TYPE_WORDS.saving : TYPE_WORDS.skip}</button>
+      </div>
+    </section>
+  );
 }
 
 function Tile({ href, kind, title, lines, cta }) {
@@ -50,7 +94,7 @@ function Tile({ href, kind, title, lines, cta }) {
 }
 
 export default function Account(props) {
-  const { isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, twoFactorEnabled = false, teamTwoStep = null } = props;
+  const { isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, twoFactorEnabled = false, teamTwoStep = null, askTypes = false } = props;
   const router = useRouter();
   const { signOut } = useClerk();
   const { profile } = useOwnProfile({ enabled: !!isSignedIn });
@@ -99,11 +143,13 @@ export default function Account(props) {
           {/* /signed-in decides where a sign-in lands: a creator or a team
               member on the Dashboard, everyone else back here (2026-11-14). */}
           {/* Each box can turn into the other ("Sign up" / "Sign in" at its
-              foot), so both name where each outcome lands. */}
-          <SignInButton mode="modal" forceRedirectUrl="/signed-in?next=/account" signUpForceRedirectUrl="/account">
+              foot), so both name where each outcome lands. A new account
+              goes through /signed-in too, which asks "What brings you
+              here?" first (migration 126). */}
+          <SignInButton mode="modal" forceRedirectUrl="/signed-in?next=/account" signUpForceRedirectUrl="/signed-in?next=/account">
             <button className="account-btn-primary">Sign in</button>
           </SignInButton>
-          <SignUpButton mode="modal" forceRedirectUrl="/account" signInForceRedirectUrl="/signed-in?next=/account">
+          <SignUpButton mode="modal" forceRedirectUrl="/signed-in?next=/account" signInForceRedirectUrl="/signed-in?next=/account">
             <button className="account-btn-secondary">Create a free account</button>
           </SignUpButton>
           <div className="account-fineprint">
@@ -154,6 +200,8 @@ export default function Account(props) {
           </Link>
         )}
       </div>
+
+      {askTypes && <TypesNudge />}
 
       <nav className="acct-tiles" aria-label="Account sections">
         <Tile

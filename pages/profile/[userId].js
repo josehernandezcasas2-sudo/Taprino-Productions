@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import SignInHere from '../../components/SignInHere';
 import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, TipIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
@@ -20,6 +20,7 @@ import TierChip from '../../components/crew/TierChip';
 import { AiSealChip, AiSealCard } from '../../components/AiSeal';
 import { TipButton, TippedBanner } from '../../components/TipSheet';
 import { cssUrl } from '../../lib/cssUrl';
+import { mainFirst, typesLine } from '../../lib/accountTypeRules';
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -67,7 +68,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator, tipping = null, aiSeal = true }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator, tipping = null, aiSeal = true, accountTypes = null }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -90,18 +91,11 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
   const latestPost = posts[0] || null;
   const olderPosts = posts.slice(1);
   const hasLocations = Boolean(locations && (locations.listings.length || locations.hosted || locations.shotAt.length || locations.lines.length));
-  const sections = [
-    { id: 'profile-about', label: 'About' },
-    (crewCard || isOwnProfile) && { id: 'profile-crew', label: 'Working card' },
-    crewRecord && { id: 'profile-record', label: 'Track record' },
-    hasLocations && { id: 'profile-locations', label: 'Locations' },
-    latestPost && { id: 'profile-latest', label: 'Latest post' },
-    olderPosts.length > 0 && { id: 'profile-posts', label: 'Posts' },
-    isOwnProfile && savedSnippets.length > 0 && { id: 'profile-saved', label: 'Saved' },
-    { id: 'profile-tagged', label: 'Tagged in' },
-    pitches.length > 0 && { id: 'profile-pitches', label: 'Pitches' },
-    backedPitches.length > 0 && { id: 'profile-backed', label: 'Backed' }
-  ].filter(Boolean);
+  // Account types (migration 126): "Crew · also Cast" under the name, and
+  // the main's sections right after About — in the jump list and in the
+  // page itself, in the same order (lib/accountTypeRules.js mainFirst).
+  const types = accountTypes && Array.isArray(accountTypes.types) ? accountTypes : { types: [], main: null };
+  const typeLine = typesLine(types.types, types.main);
 
   async function deleteOwnPost(postId) {
     const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
@@ -306,6 +300,248 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
     );
   }
 
+  // The profile's sections, as data, so the jump list and the page keep one
+  // order: About, then the main type's sections (account types, migration
+  // 126: lib/accountTypeRules.js mainFirst), then the rest as they were.
+  // Saved and Backed keep their place among the rest.
+  const sections = mainFirst([
+    {
+      id: 'profile-about', key: 'about', label: 'About', show: true,
+      render: () => (
+        <section id="profile-about" className="profile-section">
+          <div className="profile-section-label">About</div>
+          {profile.bio ? (
+            <p className="profile-bio">{profile.bio}</p>
+          ) : (
+            <p className="profile-bio profile-bio-empty">
+              {isOwnProfile ? 'Add a line or two about what you make in your account settings.' : `${profile.displayName} hasn’t written a bio yet.`}
+            </p>
+          )}
+          {knownForGenres.length > 0 && (
+            <div className="profile-genre-tags">
+              <span className="profile-genre-tags-label">Known for</span>
+              {knownForGenres.map((g) => <span key={g} className="profile-genre-tag">{g}</span>)}
+            </div>
+          )}
+        </section>
+      )
+    },
+    // Crew Call working card (migration 079). Hidden on other people's
+    // profiles until they set one up; the owner sees the prompt.
+    {
+      id: 'profile-crew', key: 'card', label: 'Working card', show: Boolean(crewCard || isOwnProfile),
+      render: () => (
+        <section id="profile-crew" className="profile-section">
+          <div className="profile-section-label">Working card</div>
+          {crewCard ? (
+            <CrewCardView card={crewCard} creditedWork={creditedWork} isOwn={isOwnProfile} />
+          ) : (
+            <p className="profile-bio profile-bio-empty">
+              Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Link href="/crew/card">Set up your card</Link>.
+            </p>
+          )}
+        </section>
+      )
+    },
+    // Track record (migration 082): what this person has actually done —
+    // confirmed Crew Call jobs, released titles, the lines people left.
+    // The tier chip in the hero comes from this.
+    {
+      id: 'profile-record', key: 'record', label: 'Track record', show: Boolean(crewRecord),
+      render: () => (
+        <section id="profile-record" className="profile-section">
+          <div className="profile-section-label">Track record</div>
+          <div className="crew-cardview">
+            <div className="crew-pmeta"><TierChip person={crewRecord} /><span>{crewRecord.tier === 'new' ? 'First month on Studio Tapa' : crewRecord.tier === 'veteran' ? `${crewRecord.done} jobs and titles confirmed` : 'Building a record'}</span></div>
+            <div className="crew-record">
+              <div className="n"><b>{crewRecord.jobs}</b><small>jobs confirmed on Crew Call</small></div>
+              <div className="n"><b>{crewRecord.titles}</b><small>released titles</small></div>
+              <div className="n"><b>{crewRecord.posted}</b><small>calls posted · {crewRecord.filled} filled</small></div>
+              <div className="n"><b>{crewRecord.wouldAgain}</b><small>“would work again”</small></div>
+              {(crewRecord.cameThrough > 0 || crewRecord.noShows > 0) && <div className="n"><b>{crewRecord.cameThrough}</b><small>came through on urgent calls{crewRecord.noShows ? ` · ${crewRecord.noShows} no-show${crewRecord.noShows === 1 ? '' : 's'}` : ''}</small></div>}
+            </div>
+            {crewRecord.recentJobs.length > 0 && (
+              <div className="crew-cardview-block">
+                <h4>Recent jobs</h4>
+                <div className="crew-jobs">
+                  {crewRecord.recentJobs.map((j) => (
+                    <div key={j.id} className="crew-job">
+                      <span>{j.role} · <Link href={`/crew/calls/${j.callId}`}>{j.title}</Link>{j.projectTitle ? ` (${j.projectTitle})` : ''} <small>· {j.when ? new Date(`${j.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} · for <Link href={j.forPath}>{j.forName}</Link></small></span>
+                      <span className="crew-chip ok">confirmed</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {crewRecord.endorsements.length > 0 && (
+              <div className="crew-cardview-block">
+                <h4>What people said</h4>
+                <div className="crew-lines">
+                  {crewRecord.endorsements.map((e, i) => (
+                    <div key={i}>“{e.line}” — <Link href={e.fromPath}>{e.fromName}</Link>, {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <span className="crew-mono">Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</span>
+          </div>
+        </section>
+      )
+    },
+    // Locations (migration 086): places they host, shoots they hosted or
+    // did, the lines people left.
+    {
+      id: 'profile-locations', key: 'places', label: 'Locations', show: hasLocations,
+      render: () => (
+        <section id="profile-locations" className="profile-section">
+          <div className="profile-section-label">Locations</div>
+          <div className="crew-cardview">
+            {locations.hosted > 0 && <div className="crew-pmeta"><span className="crew-chip olive">Hosted {locations.hosted}</span><span>{locations.hosted === 1 ? 'shoot' : 'shoots'} that went as agreed{locations.lines.length ? ` · ${locations.lines.length} ${locations.lines.length === 1 ? 'line' : 'lines'} from people` : ''}</span></div>}
+            {locations.listings.length > 0 && (
+              <div className="crew-cardview-block">
+                <h4>Places to shoot</h4>
+                <div className="loc-prof-grid">
+                  {locations.listings.map((l) => (
+                    <Link key={l.id} href={`/locations/${l.id}`} className="loc-prof-card">
+                      <span className="loc-prof-ph" style={l.coverUrl ? { backgroundImage: cssUrl(l.coverUrl) } : undefined} />
+                      <span className="loc-prof-t">{l.title}</span>
+                      <span className="crew-mono">{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            {locations.shotAt.length > 0 && (
+              <div className="crew-cardview-block">
+                <h4>Shot at</h4>
+                <div className="crew-jobs">
+                  {locations.shotAt.map((s, i) => (
+                    <div key={i} className="crew-job">
+                      <span>{s.live ? <Link href={`/locations/${s.locationId}`}>{s.title}</Link> : s.title}{s.project ? ` · ${s.project}` : ''} <small>· {s.when ? new Date(`${s.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</small></span>
+                      <span className="crew-chip ok">as agreed</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {locations.lines.length > 0 && (
+              <div className="crew-cardview-block">
+                <h4>What people said</h4>
+                <div className="crew-lines">
+                  {locations.lines.map((e, i) => (
+                    <div key={i}>“{e.line}” — <Link href={e.fromPath}>{e.fromName}</Link>, {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {isOwnProfile && <span className="crew-mono"><Link href="/locations/mine">Your places →</Link></span>}
+          </div>
+        </section>
+      )
+    },
+    {
+      id: 'profile-latest', key: 'posts', label: 'Latest post', show: Boolean(latestPost),
+      render: () => (
+        <section id="profile-latest" className="profile-section">
+          <div className="profile-section-label">Latest post</div>
+          <div className="profile-latest-post">
+            {renderPostTile(latestPost, 0, 'posts')}
+            {latestPost.caption && <p className="profile-latest-caption">{latestPost.caption}</p>}
+          </div>
+        </section>
+      )
+    },
+    {
+      id: 'profile-posts', key: 'posts', label: 'Posts', show: olderPosts.length > 0,
+      render: () => (
+        <section id="profile-posts" className="profile-section">
+          <div className="profile-section-label">Posts</div>
+          <div className="profile-posts-grid">
+            {olderPosts.map((post, i) => renderPostTile(post, i + 1, 'posts'))}
+          </div>
+        </section>
+      )
+    },
+    // Only the viewer's own — see isOwnProfile gating in lib/profileHub.js,
+    // which skips fetching this list entirely for anyone else. Liking a
+    // snippet (the heart in PostViewerModal's action rail) is what saves it
+    // here, same as Instagram's own Saved collection doubling up the like.
+    {
+      id: 'profile-saved', key: 'saved', label: 'Saved', show: isOwnProfile && savedSnippets.length > 0,
+      render: () => (
+        <section id="profile-saved" className="profile-section">
+          <div className="profile-section-label">Saved Snippets</div>
+          <div className="profile-posts-grid">
+            {savedSnippets.map((post, i) => renderPostTile(post, i, 'saved'))}
+          </div>
+        </section>
+      )
+    },
+    {
+      id: 'profile-tagged', key: 'work', label: 'Tagged in', show: true,
+      render: () => (
+        <section id="profile-tagged" className="profile-section">
+          <div className="profile-section-label">Tagged in</div>
+          {creditedWork.length === 0 ? (
+            <div className="poster-empty">
+              Nothing tagged here yet &mdash; this fills in once {profile.displayName} is credited on something.
+            </div>
+          ) : (
+            <div className="profile-work-grid">
+              {creditedWork.map((item) => (
+                <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
+                  <div className="profile-work-poster" style={item.poster ? { backgroundImage: cssUrl(item.poster) } : undefined} />
+                  <div className="profile-work-title">{item.title}</div>
+                  <div className="profile-work-type">{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )
+    },
+    {
+      id: 'profile-pitches', key: 'pitches', label: 'Pitches', show: pitches.length > 0,
+      render: () => (
+        <section id="profile-pitches" className="profile-section">
+          <div className="profile-section-label">Pitch Room projects</div>
+          <div className="pitch-grid">
+            {pitches.map((p) => (
+              <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
+                <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
+                  {p.tag && <span className="pitch-tag">{p.tag}</span>}
+                </div>
+                <div className="pitch-info">
+                  <h4>{p.title}</h4>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )
+    },
+    {
+      id: 'profile-backed', key: 'backed', label: 'Backed', show: backedPitches.length > 0,
+      render: () => (
+        <section id="profile-backed" className="profile-section">
+          <div className="profile-section-label">Projects backed</div>
+          <div className="pitch-grid">
+            {backedPitches.map((p) => (
+              <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
+                <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
+                  {p.tag && <span className="pitch-tag">{p.tag}</span>}
+                </div>
+                <div className="pitch-info">
+                  <h4>{p.title}</h4>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )
+    }
+  ].filter((sec) => sec.show), types.main, (sec) => sec.key);
+
   return (
     <>
       <Head>
@@ -347,6 +583,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                 {/* The "Not for AI training" seal (lib/aiPolicyRules.js). */}
                 {aiSeal && <AiSealChip />}
               </div>
+              {typeLine && <div className="profile-types">{typeLine}</div>}
               {profile.handle && <div className="profile-handle">@{profile.handle}</div>}
               {joinedLabel && <div className="profile-joined">On {SITE.name} since {joinedLabel}</div>}
               {(creditedWork.length > 0 || totalViews > 0 || followerCount > 0) && (
@@ -432,218 +669,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
 
           {/* Center: the latest post big, then everything else in order. */}
           <div className="profile-content">
-            <section id="profile-about" className="profile-section">
-              <div className="profile-section-label">About</div>
-              {profile.bio ? (
-                <p className="profile-bio">{profile.bio}</p>
-              ) : (
-                <p className="profile-bio profile-bio-empty">
-                  {isOwnProfile ? 'Add a line or two about what you make in your account settings.' : `${profile.displayName} hasn’t written a bio yet.`}
-                </p>
-              )}
-              {knownForGenres.length > 0 && (
-                <div className="profile-genre-tags">
-                  <span className="profile-genre-tags-label">Known for</span>
-                  {knownForGenres.map((g) => <span key={g} className="profile-genre-tag">{g}</span>)}
-                </div>
-              )}
-            </section>
-
-            {/* Crew Call working card (migration 079). Hidden on other
-                people's profiles until they set one up; the owner sees
-                the prompt. */}
-            {(crewCard || isOwnProfile) && (
-              <section id="profile-crew" className="profile-section">
-                <div className="profile-section-label">Working card</div>
-                {crewCard ? (
-                  <CrewCardView card={crewCard} creditedWork={creditedWork} isOwn={isOwnProfile} />
-                ) : (
-                  <p className="profile-bio profile-bio-empty">
-                    Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Link href="/crew/card">Set up your card</Link>.
-                  </p>
-                )}
-              </section>
-            )}
-
-            {/* Track record (migration 082): what this person has actually
-                done — confirmed Crew Call jobs, released titles, the lines
-                people left. The tier chip in the hero comes from this. */}
-            {crewRecord && (
-              <section id="profile-record" className="profile-section">
-                <div className="profile-section-label">Track record</div>
-                <div className="crew-cardview">
-                  <div className="crew-pmeta"><TierChip person={crewRecord} /><span>{crewRecord.tier === 'new' ? 'First month on Studio Tapa' : crewRecord.tier === 'veteran' ? `${crewRecord.done} jobs and titles confirmed` : 'Building a record'}</span></div>
-                  <div className="crew-record">
-                    <div className="n"><b>{crewRecord.jobs}</b><small>jobs confirmed on Crew Call</small></div>
-                    <div className="n"><b>{crewRecord.titles}</b><small>released titles</small></div>
-                    <div className="n"><b>{crewRecord.posted}</b><small>calls posted · {crewRecord.filled} filled</small></div>
-                    <div className="n"><b>{crewRecord.wouldAgain}</b><small>“would work again”</small></div>
-                    {(crewRecord.cameThrough > 0 || crewRecord.noShows > 0) && <div className="n"><b>{crewRecord.cameThrough}</b><small>came through on urgent calls{crewRecord.noShows ? ` · ${crewRecord.noShows} no-show${crewRecord.noShows === 1 ? '' : 's'}` : ''}</small></div>}
-                  </div>
-                  {crewRecord.recentJobs.length > 0 && (
-                    <div className="crew-cardview-block">
-                      <h4>Recent jobs</h4>
-                      <div className="crew-jobs">
-                        {crewRecord.recentJobs.map((j) => (
-                          <div key={j.id} className="crew-job">
-                            <span>{j.role} · <Link href={`/crew/calls/${j.callId}`}>{j.title}</Link>{j.projectTitle ? ` (${j.projectTitle})` : ''} <small>· {j.when ? new Date(`${j.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} · for <Link href={j.forPath}>{j.forName}</Link></small></span>
-                            <span className="crew-chip ok">confirmed</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {crewRecord.endorsements.length > 0 && (
-                    <div className="crew-cardview-block">
-                      <h4>What people said</h4>
-                      <div className="crew-lines">
-                        {crewRecord.endorsements.map((e, i) => (
-                          <div key={i}>“{e.line}” — <Link href={e.fromPath}>{e.fromName}</Link>, {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <span className="crew-mono">Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</span>
-                </div>
-              </section>
-            )}
-
-            {/* Locations (migration 086): places they host, shoots they
-                hosted or did, the lines people left. */}
-            {hasLocations && (
-              <section id="profile-locations" className="profile-section">
-                <div className="profile-section-label">Locations</div>
-                <div className="crew-cardview">
-                  {locations.hosted > 0 && <div className="crew-pmeta"><span className="crew-chip olive">Hosted {locations.hosted}</span><span>{locations.hosted === 1 ? 'shoot' : 'shoots'} that went as agreed{locations.lines.length ? ` · ${locations.lines.length} ${locations.lines.length === 1 ? 'line' : 'lines'} from people` : ''}</span></div>}
-                  {locations.listings.length > 0 && (
-                    <div className="crew-cardview-block">
-                      <h4>Places to shoot</h4>
-                      <div className="loc-prof-grid">
-                        {locations.listings.map((l) => (
-                          <Link key={l.id} href={`/locations/${l.id}`} className="loc-prof-card">
-                            <span className="loc-prof-ph" style={l.coverUrl ? { backgroundImage: cssUrl(l.coverUrl) } : undefined} />
-                            <span className="loc-prof-t">{l.title}</span>
-                            <span className="crew-mono">{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</span>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {locations.shotAt.length > 0 && (
-                    <div className="crew-cardview-block">
-                      <h4>Shot at</h4>
-                      <div className="crew-jobs">
-                        {locations.shotAt.map((s, i) => (
-                          <div key={i} className="crew-job">
-                            <span>{s.live ? <Link href={`/locations/${s.locationId}`}>{s.title}</Link> : s.title}{s.project ? ` · ${s.project}` : ''} <small>· {s.when ? new Date(`${s.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</small></span>
-                            <span className="crew-chip ok">as agreed</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {locations.lines.length > 0 && (
-                    <div className="crew-cardview-block">
-                      <h4>What people said</h4>
-                      <div className="crew-lines">
-                        {locations.lines.map((e, i) => (
-                          <div key={i}>“{e.line}” — <Link href={e.fromPath}>{e.fromName}</Link>, {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {isOwnProfile && <span className="crew-mono"><Link href="/locations/mine">Your places →</Link></span>}
-                </div>
-              </section>
-            )}
-
-            {latestPost && (
-              <section id="profile-latest" className="profile-section">
-                <div className="profile-section-label">Latest post</div>
-                <div className="profile-latest-post">
-                  {renderPostTile(latestPost, 0, 'posts')}
-                  {latestPost.caption && <p className="profile-latest-caption">{latestPost.caption}</p>}
-                </div>
-              </section>
-            )}
-
-            {olderPosts.length > 0 && (
-              <section id="profile-posts" className="profile-section">
-                <div className="profile-section-label">Posts</div>
-                <div className="profile-posts-grid">
-                  {olderPosts.map((post, i) => renderPostTile(post, i + 1, 'posts'))}
-                </div>
-              </section>
-            )}
-
-            {/* Only the viewer's own — see isOwnProfile gating in
-                lib/profileHub.js, which skips fetching this list entirely
-                for anyone else. Liking a snippet (the heart in
-                PostViewerModal's action rail) is what saves it here, same
-                as Instagram's own Saved collection doubling up the like. */}
-            {isOwnProfile && savedSnippets.length > 0 && (
-              <section id="profile-saved" className="profile-section">
-                <div className="profile-section-label">Saved Snippets</div>
-                <div className="profile-posts-grid">
-                  {savedSnippets.map((post, i) => renderPostTile(post, i, 'saved'))}
-                </div>
-              </section>
-            )}
-
-            <section id="profile-tagged" className="profile-section">
-              <div className="profile-section-label">Tagged in</div>
-              {creditedWork.length === 0 ? (
-                <div className="poster-empty">
-                  Nothing tagged here yet &mdash; this fills in once {profile.displayName} is credited on something.
-                </div>
-              ) : (
-                <div className="profile-work-grid">
-                  {creditedWork.map((item) => (
-                    <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
-                      <div className="profile-work-poster" style={item.poster ? { backgroundImage: cssUrl(item.poster) } : undefined} />
-                      <div className="profile-work-title">{item.title}</div>
-                      <div className="profile-work-type">{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {pitches.length > 0 && (
-              <section id="profile-pitches" className="profile-section">
-                <div className="profile-section-label">Pitch Room projects</div>
-                <div className="pitch-grid">
-                  {pitches.map((p) => (
-                    <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
-                        {p.tag && <span className="pitch-tag">{p.tag}</span>}
-                      </div>
-                      <div className="pitch-info">
-                        <h4>{p.title}</h4>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {backedPitches.length > 0 && (
-              <section id="profile-backed" className="profile-section">
-                <div className="profile-section-label">Projects backed</div>
-                <div className="pitch-grid">
-                  {backedPitches.map((p) => (
-                    <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
-                        {p.tag && <span className="pitch-tag">{p.tag}</span>}
-                      </div>
-                      <div className="pitch-info">
-                        <h4>{p.title}</h4>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
+            {sections.map((sec) => <Fragment key={sec.id}>{sec.render()}</Fragment>)}
           </div>
 
           {/* Right rail: the numbers, then links. */}
