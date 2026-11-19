@@ -14,7 +14,7 @@
 // nothing given, a box opened over a page ends on that page unless a
 // redirect is set in Clerk's own settings.
 //
-//   1. A button mid-task (Tip, Own, See plans, "Sign in to post a call")
+//   1. A button mid-task (Tip, Own, See plans, Crew Call's Sign in)
 //      hands Clerk the page the person is on for both outcomes, and Tip,
 //      Own and the plans leave a mark.
 //   2. Back on that page signed in, the task carries on once: the Tip
@@ -26,6 +26,7 @@
 //
 //   node dev/test-rig/checks/sign-in-here.mjs
 import { IDS, USERS, SIGNED_OUT, BASE, ok, section, runCheck, session, browser, goto, rows, q, sql } from './lib.mjs';
+import { CREW_WORDS } from '../../../lib/crewDirectoryRules.js';
 
 const VIEWER = session(USERS.viewer);
 
@@ -166,13 +167,21 @@ await runCheck('sign-in-here', async () => {
     // ---- SignInHere -------------------------------------------------------------------
     section('5. the other buttons mid-task');
     const s = await open(b, SIGNED_OUT);
-    // Crew Call's "Post a call" is the round + in the title row since
-    // Crew Call, simpler (2026-11-18): found by its label, not its text.
-    for (const [pathname, label] of [['/crew?urgent=1', 'Post a call'], ['/locations', 'Sign in to list a place'], ['/productions', 'Sign in to start one']]) {
+    // Since Crew Call, simpler (2026-11-18) /crew/calls is a 307 to /crew,
+    // and the old board's "Sign in to post a call" is gone. Signed out, the
+    // Calls tab draws the nudge "You’re not on the board yet" with its
+    // Sign in button, and the title row's round + (labelled, its words hidden
+    // on a phone). Both words come from lib/crewDirectoryRules.js.
+    const crewButtons = [
+      ['/crew?urgent=1', CREW_WORDS.nudge.signIn, (pg) => pg.locator('.ccx-nudge button.ccx-nudge-btn', { hasText: CREW_WORDS.nudge.signIn })],
+      ['/crew?urgent=1', CREW_WORDS.postCall, (pg) => pg.locator(`button[aria-label="${CREW_WORDS.postCall}"]`)]
+    ];
+    const byText = (label) => (pg) => pg.locator('button', { hasText: label });
+    for (const [pathname, label, find] of [...crewButtons, ['/locations', 'Sign in to list a place', byText('Sign in to list a place')], ['/productions', 'Sign in to start one', byText('Sign in to start one')]]) {
       await goto(s.page, pathname);
       await clerkReady(s.page);
       await s.page.evaluate(() => { window.__clerkCalls = []; });
-      const btn = (label === 'Post a call' ? s.page.locator(`button[aria-label="${label}"]`) : s.page.locator('button', { hasText: label })).first();
+      const btn = find(s.page).first();
       if ((await btn.count()) === 0) { ok(`${pathname}: “${label}” is there`, false); continue; }
       await btn.click();
       await s.page.waitForFunction(() => (window.__clerkCalls || []).length > 0, null, { timeout: 10000 }).catch(() => {});
