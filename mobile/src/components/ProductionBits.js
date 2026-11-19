@@ -63,7 +63,10 @@ export function ProductionCard({ p, roles = null, onOpen }) {
 }
 
 // Start / edit a production. `onSubmit(body)` does the request.
-export function ProductionForm({ initial = null, projects = [], busy, error, onSubmit, onCancel }) {
+// `ownerFields`: who sees it and what it grew out of are the owner's
+// (2026-11-19, lib/productionDashRules.js) — a listed producer's form
+// leaves them out and never sends them, as the website's does.
+export function ProductionForm({ initial = null, projects = [], busy, error, onSubmit, onCancel, ownerFields = true }) {
   const [form, setForm] = useState({
     title: initial ? initial.title : '',
     logline: initial ? initial.logline : '',
@@ -78,7 +81,9 @@ export function ProductionForm({ initial = null, projects = [], busy, error, onS
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const submit = () => {
     const [type, id] = form.project ? form.project.split(':') : [null, null];
-    onSubmit({ ...form, project: type ? { type, id } : null });
+    const body = { ...form, project: type ? { type, id } : null };
+    if (!ownerFields) { delete body.visibility; delete body.project; }
+    onSubmit(body);
   };
   return (
     <>
@@ -99,7 +104,7 @@ export function ProductionForm({ initial = null, projects = [], busy, error, onS
         <Text style={[crew.label, { marginTop: 6 }]}>Home base</Text>
         <PlaceBox value={form.place} onChange={(p) => set({ place: p })} placeholder="City (pick from the suggestions)" />
       </View>
-      {projects.length > 0 ? (
+      {ownerFields && projects.length > 0 ? (
         <View style={crew.panel}>
           <Text style={crew.label}>Grew out of (optional)</Text>
           <View style={crew.chips}>
@@ -109,9 +114,13 @@ export function ProductionForm({ initial = null, projects = [], busy, error, onS
         </View>
       ) : null}
       <View style={crew.panel}>
-        <Text style={crew.label}>Who sees it</Text>
-        <View style={crew.chips}>{Object.entries(VISIBILITY).map(([k, v]) => <Chip key={k} label={v} on={form.visibility === k} onPress={() => set({ visibility: k })} />)}</View>
-        <Text style={[crew.label, { marginTop: 6 }]}>Notes for the crew</Text>
+        {ownerFields ? (
+          <>
+            <Text style={crew.label}>Who sees it</Text>
+            <View style={crew.chips}>{Object.entries(VISIBILITY).map(([k, v]) => <Chip key={k} label={v} on={form.visibility === k} onPress={() => set({ visibility: k })} />)}</View>
+          </>
+        ) : null}
+        <Text style={[crew.label, ownerFields && { marginTop: 6 }]}>Notes for the crew</Text>
         <TextInput style={[crew.input, { minHeight: 90, textAlignVertical: 'top' }]} value={form.notes} onChangeText={(v) => set({ notes: v })} placeholder="How the shoot runs, comms, who to call. The crew sees this; the public doesn’t." placeholderTextColor={colors.inkFaint} multiline maxLength={4000} />
       </View>
       {error ? <Text style={crew.error}>{error}</Text> : null}

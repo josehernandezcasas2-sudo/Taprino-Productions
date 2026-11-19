@@ -1,6 +1,6 @@
 import { useAuth } from '../../lib/stableAuth';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,10 +8,14 @@ import { openCheckout, appReturnAddress } from '../../lib/inAppBrowser';
 import BackItGlyph from '../../components/BackItGlyph';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost, freshToken, pathId } from '../../lib/api';
-import { colors, fonts, absoluteFill } from '../../lib/theme';
+import { colors, fonts, absoluteFill, brassTint } from '../../lib/theme';
 import { TAX_NOTE } from '../../lib/salesTaxRules';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
+import { CallCard } from '../../components/CrewBits';
+import { hrefToRoute } from '../../components/PushListener';
+import StartSheet from '../../components/productions/StartSheet';
+import { DASH_WORDS, PITCH_WORDS, crewNeededHead, pitchOwnerAction, pitchProductionCard } from '../../lib/productionDashRules';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 const DONATION_PRESETS = [10, 25, 50];
@@ -94,6 +98,15 @@ export default function PitchDetail() {
   const [donationError, setDonationError] = useState(null);
   const [donationSuccess, setDonationSuccess] = useState(false);
   const [currentTotalRaisedCents, setCurrentTotalRaisedCents] = useState(null);
+  // The start sheet (2026-11-19): Start the production from this pitch.
+  const [starting, setStarting] = useState(false);
+  // Read again when the screen comes back (a production just started from
+  // here shows "Open its dashboard" then, not Start).
+  const focusedOnce = useRef(false);
+  useFocusEffect(useCallback(() => {
+    if (focusedOnce.current) setReloadKey((k) => k + 1);
+    focusedOnce.current = true;
+  }, []));
 
   useEffect(() => {
     if (!id) return undefined;
@@ -276,8 +289,22 @@ export default function PitchDetail() {
     );
   }
 
-  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorAvatarPosition = null, creatorAvatarZoom = null, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null, backingTaxed = false } = state.data;
+  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorAvatarPosition = null, creatorAvatarZoom = null, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null, backingTaxed = false, production = null, productionLink = null, crewCalls = [], today = null } = state.data;
   const creatorName = pitch.creator_name || creatorDisplayName;
+  // The production it grew into (2026-11-19; lib/productionDashRules.js,
+  // the website's file word for word): the pill on the art, the card above
+  // the backing, Start / Open its dashboard for the person running it, and
+  // Crew needed with the production's open calls and the pitch's own.
+  const productionCard = pitchProductionCard(production, today);
+  const ownerAction = pitchOwnerAction({ isPitchOwner, production: productionLink, canManage: Boolean(productionLink && productionLink.canManage) });
+  const calls = Array.isArray(crewCalls) ? crewCalls : [];
+  const crewHead = crewNeededHead(calls.length, production);
+  function follow(href) {
+    const where = hrefToRoute(href);
+    if (!where) return;
+    if (where.route) router.push(where.route);
+    else Linking.openURL(where.url).catch(() => {});
+  }
 
   const raisedForPct = pitch.funding_enabled ? (currentTotalRaisedCents || 0) / 100 : (pitch.funding_raised || 0);
   const pct = pitch.funding_goal ? Math.min(100, Math.round((raisedForPct / pitch.funding_goal) * 100)) : null;
@@ -441,6 +468,12 @@ export default function PitchDetail() {
           </View>
 
           <View style={styles.heroContent}>
+            {productionCard ? (
+              <View style={styles.prodPill}>
+                <View style={styles.prodPillDot} />
+                <Text style={styles.prodPillText}>{productionCard.pill}</Text>
+              </View>
+            ) : null}
             <View style={styles.heroChips}>
               {pitch.tag ? <View style={styles.tagChip}><Text style={styles.tagChipText}>{pitch.tag}</Text></View> : null}
               <Text style={styles.heroEyebrow}>Pitch Room</Text>
@@ -475,6 +508,25 @@ export default function PitchDetail() {
               <Text style={styles.loglineText}>{pitch.logline}</Text>
             </View>
           ) : null}
+
+          {productionCard ? (
+            <Pressable style={({ pressed }) => [styles.prodCard, pressed && styles.prodCardPressed]} onPress={() => follow(productionCard.link.href)} accessibilityRole="link" accessibilityLabel={`${productionCard.title}. ${productionCard.line}. ${productionCard.link.label}`}>
+              <View style={styles.prodCardText}>
+                <Text style={styles.prodCardTitle}>{productionCard.title}</Text>
+                <Text style={styles.prodCardLine}>{productionCard.line}</Text>
+              </View>
+              <Text style={styles.prodCardGo}>{productionCard.link.label} ›</Text>
+            </Pressable>
+          ) : null}
+          {ownerAction ? (ownerAction.kind === 'start' ? (
+            <Pressable style={({ pressed }) => [styles.prodStart, pressed && styles.prodPressed]} onPress={() => setStarting(true)} accessibilityRole="button">
+              <Text style={styles.prodStartText}>{ownerAction.label}</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={({ pressed }) => [styles.prodOpen, pressed && styles.prodPressed]} onPress={() => follow(ownerAction.href)} accessibilityRole="link">
+              <Text style={styles.prodOpenText}>{ownerAction.label} ›</Text>
+            </Pressable>
+          )) : null}
 
           {hasFundingCard ? (
             <View style={styles.fundCard}>
@@ -559,6 +611,27 @@ export default function PitchDetail() {
                   </Text>
                 </View>
               )}
+            </View>
+          ) : null}
+
+          {calls.length > 0 || isPitchOwner ? (
+            <View style={styles.crewCard}>
+              <View style={styles.crewHead}>
+                <Text style={styles.crewTitle} accessibilityRole="header">{crewHead.title}</Text>
+                {crewHead.all ? (
+                  <Pressable onPress={() => follow(crewHead.all.href)} hitSlop={6} style={styles.crewAll} accessibilityRole="link">
+                    <Text style={styles.crewAllText}>{crewHead.all.label} ›</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {calls.map((c) => <CallCard key={c.id} c={c} onOpen={() => router.push(`/crew/calls/${c.id}`)} />)}
+              {calls.length === 0 ? <Text style={styles.crewNote}>{PITCH_WORDS.noCalls}</Text> : null}
+              {crewHead.note && calls.length > 0 ? <Text style={styles.crewNote}>{crewHead.note}</Text> : null}
+              {isPitchOwner ? (
+                <Pressable style={({ pressed }) => [styles.smallSecondaryBtn, styles.crewPost, pressed && styles.prodPressed]} onPress={() => follow(production ? `/crew/calls/new?production=${production.id}` : `/crew/calls/new?project=pitch:${pitch.id}`)} accessibilityRole="button">
+                  <Text style={styles.smallSecondaryBtnText}>{DASH_WORDS.postCall}</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 
@@ -685,6 +758,7 @@ export default function PitchDetail() {
           ) : null}
         </View>
       </ScrollView>
+      <StartSheet visible={starting} pitch={{ id: pitch.id, title: pitch.title, logline: pitch.logline, tag: pitch.tag }} backers={backerCount || 0} onClose={() => setStarting(false)} />
     </View>
   );
 }
@@ -773,6 +847,30 @@ const styles = StyleSheet.create({
   amountDollar: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.inkFaint },
   amountInput: { flex: 1, color: colors.ink, fontFamily: fonts.displayBold, fontSize: 14, paddingVertical: 10, paddingLeft: 3 },
   finePrint: { color: colors.inkFaint, fontFamily: fonts.body, fontSize: 11.5, marginTop: 12, lineHeight: 16, textAlign: 'center' },
+
+  // In production (2026-11-19; the website's .pitch-prod-*): the pill on
+  // the art, the card above the backing, Start / Open its dashboard.
+  prodPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 28, paddingHorizontal: 12, marginBottom: 10, borderRadius: 999, backgroundColor: colors.brass },
+  prodPillDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.onBrass },
+  prodPillText: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: colors.onBrass },
+  prodCard: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 12, borderRadius: 14, backgroundColor: brassTint(0.08), borderWidth: 1, borderColor: brassTint(0.4) },
+  prodCardPressed: { backgroundColor: brassTint(0.16) },
+  prodCardText: { flex: 1, minWidth: 0, gap: 3 },
+  prodCardTitle: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.ink },
+  prodCardLine: { fontFamily: fonts.display, fontSize: 12, lineHeight: 17, color: colors.inkDim },
+  prodCardGo: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.brass },
+  prodStart: { minHeight: 46, borderRadius: 12, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, marginBottom: 12 },
+  prodStartText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.onBrass },
+  prodOpen: { minHeight: 44, borderRadius: 12, borderWidth: 1, borderColor: brassTint(0.6), alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, marginBottom: 12 },
+  prodOpenText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.brass },
+  prodPressed: { opacity: 0.8 },
+  crewCard: { backgroundColor: colors.surface1, borderRadius: 20, borderWidth: 1, borderColor: colors.hairline, padding: 14, marginTop: 16, gap: 4 },
+  crewHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 4 },
+  crewTitle: { flexShrink: 1, fontFamily: fonts.displayBold, fontSize: 16, color: colors.ink },
+  crewAll: { minHeight: 44, justifyContent: 'center' },
+  crewAllText: { fontFamily: fonts.display, fontSize: 12.5, color: colors.brass },
+  crewNote: { fontFamily: fonts.display, fontSize: 12, lineHeight: 17, color: colors.inkFaint, marginBottom: 6 },
+  crewPost: { minHeight: 44, justifyContent: 'center', marginTop: 4 },
 
   // Sections
   sectionLabel: { fontFamily: fonts.monoMedium, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', color: colors.olive, marginTop: 32, marginBottom: 14 },

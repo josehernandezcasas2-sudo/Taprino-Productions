@@ -30,12 +30,15 @@ export function absoluteUrl(path) {
 
 // A failed request's body. A 403 { suspended } (middleware.js, migration
 // 102) is reported so the gate shows at once, whatever screen asked. The
-// error carries the status (a 409 refusal reloads the admin deck).
+// error carries the status (a 409 refusal reloads the admin deck) and the
+// answer itself (`data`: a 409 { code: 'exists', dashboardHref } from
+// starting a pitch's production names the one it already has).
 async function failed(res) {
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data && data.suspended) reportSuspension(data.suspended);
   const err = new Error((data && data.error) || `Request failed (${res.status})`);
   err.status = res.status;
+  err.data = data && typeof data === 'object' ? data : {};
   return err;
 }
 

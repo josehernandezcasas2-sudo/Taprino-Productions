@@ -15,7 +15,7 @@ export default function EditProduction() {
   const { id: rawId } = useLocalSearchParams();
   const id = pathId(rawId);
   const { getToken } = useAuth();
-  const [state, setState] = useState({ loading: true, error: null, production: null, projects: [] });
+  const [state, setState] = useState({ loading: true, error: null, production: null, projects: [], canOwn: true });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -26,10 +26,13 @@ export default function EditProduction() {
         const token = await freshToken(getToken);
         const [d, p] = await Promise.all([apiGet(`/api/productions/${id}`, token), apiGet('/api/crew/my-projects', token).catch(() => ({ projects: [] }))]);
         if (!alive) return;
-        if (!d.canEdit) setState({ loading: false, error: 'That production isn’t yours to edit.', production: null, projects: [] });
-        else setState({ loading: false, error: null, production: d.production, projects: p.projects || [] });
+        // A listed producer edits the details; who sees it and what it grew
+        // out of stay the owner's (2026-11-19), so their form leaves those out.
+        const canOwn = d.canOwn !== undefined ? Boolean(d.canOwn) : Boolean(d.isOwner);
+        if (!d.canEdit) setState({ loading: false, error: 'That production isn’t yours to edit.', production: null, projects: [], canOwn });
+        else setState({ loading: false, error: null, production: d.production, projects: canOwn ? p.projects || [] : [], canOwn });
       } catch (err) {
-        if (alive) setState({ loading: false, error: err.message, production: null, projects: [] });
+        if (alive) setState({ loading: false, error: err.message, production: null, projects: [], canOwn: true });
       }
     })();
     return () => { alive = false; };
@@ -56,7 +59,7 @@ export default function EditProduction() {
         <Text style={crew.h1}>Edit details</Text>
         {state.loading ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : null}
         {state.error ? <Text style={crew.error}>{state.error}</Text> : null}
-        {state.production ? <ProductionForm initial={state.production} projects={state.projects} busy={busy} error={error} onSubmit={submit} onCancel={() => router.back()} /> : null}
+        {state.production ? <ProductionForm initial={state.production} projects={state.projects} ownerFields={state.canOwn} busy={busy} error={error} onSubmit={submit} onCancel={() => router.back()} /> : null}
         {state.production ? <Text style={[crew.muted, { marginTop: 12 }]}>Status, crew, shoot days and the release link live on the production page itself.</Text> : null}
       </ScrollView>
     </SafeAreaView>

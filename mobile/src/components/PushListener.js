@@ -87,6 +87,11 @@ const SHOW_EDIT = new RegExp(`^/creator/show/${SHOW_ID}/edit$`);
 // rows) keeps the tab it was asked to open on.
 const CREATOR_TITLE = /^\/creator\/title\/[A-Za-z0-9_-]{1,160}$/;
 const TITLE_KEEP = { tab: /^(overview|details|artwork|video|selling|channels)$/ };
+// A production's dashboard (2026-11-19: the ☰ menu's Running now, Your
+// productions, the pitch page's Open its dashboard) keeps the tab it was
+// asked to open on (lib/productionDashRules.js dashHref).
+const PRODUCTION_DASH = /^\/productions\/[^/]+\/dashboard$/;
+const DASH_KEEP = { tab: /^(overview|crew|calls|days|money|release)$/ };
 
 function queryOf(href) {
   const at = href.indexOf('?');
@@ -154,7 +159,12 @@ const SCREEN_KEEP = {
   // keep their filter (lib/crewDirectoryRules.js tabFromQuery /
   // filtersFromQuery): ?free=1 People with Free now on, ?urgent=1,
   // ?production=<id> and ?kind= on Calls.
-  '/crew': { tab: /^(calls|people|cast|gear)$/, free: /^1$/, urgent: /^1$/, production: /^[0-9a-f-]{36}$/i, kind: /^(crew|cast)$/ }
+  '/crew': { tab: /^(calls|people|cast|gear)$/, free: /^1$/, urgent: /^1$/, production: /^[0-9a-f-]{36}$/i, kind: /^(crew|cast)$/ },
+  // Your productions opens on its tab (2026-11-19); posting a call keeps
+  // the production or the pitch it is for (the dashboard's Post a call,
+  // the pitch page's + Post a call), which the call form picks up.
+  '/productions/mine': { tab: /^(running|crew|done)$/ },
+  '/crew/calls/new': { production: /^[0-9a-f-]{36}$/i, project: /^pitch:[0-9a-f-]{36}$/i }
 };
 
 function keptQuery(href, keep = PUBLIC_KEEP) {
@@ -182,6 +192,7 @@ export function hrefToRoute(href) {
   if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
   if (PODCAST_SHOW.test(target)) return { route: `${target}${keptQuery(href, PODCAST_KEEP)}` };
   if (CREATOR_TITLE.test(target)) return { route: `${target}${keptQuery(href, TITLE_KEEP)}` };
+  if (PRODUCTION_DASH.test(target)) return { route: `${target}${keptQuery(href, DASH_KEEP)}` };
   if (Object.prototype.hasOwnProperty.call(SCREEN_KEEP, target)) return { route: `${target}${keptQuery(href, SCREEN_KEEP[target])}` };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };
   return { url: `${API_BASE_URL}${href}` };

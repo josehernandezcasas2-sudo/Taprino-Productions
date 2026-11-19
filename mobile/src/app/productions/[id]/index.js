@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
 import { apiGet, apiPost, apiPatch, apiPut, apiDelete, freshToken, pathId } from '../../../lib/api';
-import { colors } from '../../../lib/theme';
+import { brassTint, colors, fonts } from '../../../lib/theme';
+import { DASH_WORDS, MANAGER_STATUSES, PITCH_WORDS, isProducerRole, productionFundingCard } from '../../../lib/productionDashRules';
 import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
+import { hrefToRoute } from '../../../components/PushListener';
 import { crew, Chip, Avatar, TierChip, CallCard } from '../../../components/CrewBits';
 import { StatusPill, DayForm, OWNER_STATUSES, STATUS, fmtRange, prod } from '../../../components/ProductionBits';
 import { startConversation } from '../../../components/messages/MessageBits';
+import AddMember from '../../../components/productions/AddMember';
+import { Bar } from '../../../components/productions/DashBits';
 
 // One production (pages/productions/<id> on the web): what it is, who's
-// on it, the shoot days, the open calls, the release. The owner runs it
-// from here; the crew open the call sheet from here.
+// on it, the shoot days, the open calls, the release. The people running
+// it (its owner, a crew member listed as a producer, full admins:
+// `canManage` / `canEdit`) run it from here, and get "Dashboard ›" at the
+// top (2026-11-19); the owner keeps archiving, the release link and
+// distribution (`canOwn`). The crew open the call sheet from here. When it
+// grew out of a pitch, everyone who can see it gets the small Funding card
+// (lib/productionDashRules.js productionFundingCard).
 export default function ProductionScreen() {
   const router = useRouter();
   const { id: rawId } = useLocalSearchParams();
@@ -34,7 +43,8 @@ export default function ProductionScreen() {
       tokenRef.current = signedIn ? await freshToken(getToken) : null;
       const data = await apiGet(`/api/productions/${id}`, tokenRef.current);
       setState({ loading: false, error: null, data });
-      if (data.isOwner && tokenRef.current) {
+      // A listed producer attaches the places they booked themselves too.
+      if ((data.isOwner || data.canManage) && tokenRef.current) {
         try { const m = await apiGet('/api/productions/mine', tokenRef.current); setExtras({ releases: m.releases || [], bookedPlaces: m.bookedPlaces || [] }); } catch (err) { /* optional */ }
       }
     } catch (err) {
@@ -66,19 +76,44 @@ export default function ProductionScreen() {
   const byDept = {};
   if (data) for (const m of data.members) (byDept[m.department] = byDept[m.department] || []).push(m);
   // Messages from the production (2026-11-18): the people on it write to
-  // each other about it — the owner to anyone on the crew list, someone on
-  // the crew to the producer. The conversation says it is about this
-  // production and links back here (lib/messageContext.js checks both
-  // are on it).
-  const canMessage = (m) => Boolean(signedIn && data && data.isOwner && !m.mine && m.person && m.person.userId && m.person.userId !== userId);
+  // each other about it — whoever runs it to anyone on the crew list,
+  // someone on the crew to the producer. The conversation says it is about
+  // this production and links back here (lib/messageContext.js checks both
+  // are on it). Since the review of 2026-11-19, as on the website, the
+  // Message buttons on the crew rows are for someone running it who is ON
+  // it (the owner, a listed producer): a full admin who isn't gets none.
+  const canMessage = (m) => Boolean(signedIn && data && (data.isOwner || data.isMember) && data.canEdit && !m.mine && m.person && m.person.userId && m.person.userId !== userId);
   const canMessageProducer = Boolean(signedIn && data && !data.isOwner && data.isMember && p && p.owner && p.owner.userId && p.owner.userId !== userId);
   const messageAbout = (to) => startConversation(router, { to, kind: 'production', ref: p.id, label: p.title });
+  // What only the owner (and full admins) do; an older server without
+  // canOwn answers for its owner alone.
+  const canOwn = Boolean(data && (data.canOwn !== undefined ? data.canOwn : data.isOwner));
+  // A listed producer moves it between prep and released; only the owner
+  // archives it, or reopens an archived one.
+  const statusChoices = canOwn ? OWNER_STATUSES : [...MANAGER_STATUSES, ...(p && !MANAGER_STATUSES.includes(p.status) ? [p.status] : [])];
+  const statusLocked = Boolean(p && !canOwn && ['archived', 'removed'].includes(p.status));
+  // The owner's row, and a producer's, come off only by the owner's hand.
+  const canRemove = (m) => canOwn || (m.person && p && p.owner && m.person.userId !== p.owner.userId && !isProducerRole(m.role));
+  const fundingCard = data ? productionFundingCard(data.funding) : null;
+  function follow(href) {
+    const where = hrefToRoute(href);
+    if (!where) return;
+    if (where.route) router.push(where.route);
+    else Linking.openURL(where.url).catch(() => {});
+  }
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView contentContainerStyle={crew.stage} keyboardShouldPersistTaps="handled">
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/productions'))} hitSlop={8}><Text style={crew.mono}>‹ Productions</Text></Pressable>
+        <View style={pr.crumbs}>
+          <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/productions'))} hitSlop={8}><Text style={crew.mono}>‹ Productions</Text></Pressable>
+          {data && data.dashboardHref ? (
+            <Pressable onPress={() => follow(data.dashboardHref)} hitSlop={8} style={pr.dashLink} accessibilityRole="link">
+              <Text style={pr.dashLinkText}>{DASH_WORDS.link} ›</Text>
+            </Pressable>
+          ) : null}
+        </View>
         {state.loading ? <ActivityIndicator color={colors.brass} style={{ marginTop: 32 }} /> : null}
         {state.error ? <Text style={crew.error}>{state.error}</Text> : null}
         {p ? (
@@ -104,15 +139,30 @@ export default function ProductionScreen() {
 
             {note ? <Text style={[crew.error, note.startsWith('✓') && { color: colors.ok }]}>{note}</Text> : null}
 
+            {/* The pitch it grew out of, still taking backing (2026-11-19). */}
+            {fundingCard ? (
+              <View style={[crew.panel, pr.funding]} accessibilityLabel={PITCH_WORDS.fundingCard}>
+                <View style={[crew.row, { justifyContent: 'space-between' }]}>
+                  <Text style={[crew.mono, { flexShrink: 1 }]}>{fundingCard.kicker}</Text>
+                  {fundingCard.percent != null ? <Text style={pr.fundingPct}>{fundingCard.percent}%</Text> : null}
+                </View>
+                <Text style={pr.fundingLine}>{fundingCard.line}</Text>
+                <Bar percent={fundingCard.percent} />
+                <Pressable style={[crew.btn, fundingCard.button.primary && crew.btnPrimary, { alignSelf: 'flex-start', minHeight: 44 }]} onPress={() => follow(fundingCard.button.href)} accessibilityRole="link">
+                  <Text style={[crew.btnText, fundingCard.button.primary && crew.btnPrimaryText]}>{fundingCard.button.label} ›</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
             {data.canEdit ? (
               <View style={[crew.panel, { marginTop: 10 }]}>
                 <Text style={crew.label}>Status</Text>
-                <View style={crew.chips}>{OWNER_STATUSES.map((s) => <Chip key={s} label={STATUS[s]} on={p.status === s} onPress={() => p.status !== s && act((t) => apiPatch(`/api/productions/${id}`, { status: s }, t))} />)}</View>
+                <View style={crew.chips}>{statusChoices.map((s) => <Chip key={s} label={STATUS[s]} on={p.status === s} onPress={statusLocked ? undefined : () => p.status !== s && act((t) => apiPatch(`/api/productions/${id}`, { status: s }, t))} />)}</View>
                 <View style={[crew.row, { flexWrap: 'wrap', marginTop: 4 }]}>
                   <Pressable style={crew.btn} onPress={() => router.push(`/productions/${id}/edit`)}><Text style={crew.btnText}>Edit details</Text></Pressable>
                   <Pressable style={[crew.btn, crew.btnPrimary]} onPress={() => router.push({ pathname: '/crew/calls/new', params: { production: id } })}><Text style={[crew.btnText, crew.btnPrimaryText]}>+ Post a call</Text></Pressable>
                   <Pressable style={crew.btn} onPress={() => router.push('/locations')}><Text style={crew.btnText}>Book a place</Text></Pressable>
-                  <Pressable style={crew.btn} onPress={() => router.push(`/productions/${id}/distribution`)}><Text style={crew.btnText}>Distribution & screeners</Text></Pressable>
+                  {canOwn ? <Pressable style={crew.btn} onPress={() => router.push(`/productions/${id}/distribution`)}><Text style={crew.btnText}>Distribution & screeners</Text></Pressable> : null}
                   <Pressable style={crew.btn} onPress={() => router.push({ pathname: '/resources', params: { kind: 'paperwork' } })}><Text style={crew.btnText}>Paperwork templates</Text></Pressable>
                 </View>
               </View>
@@ -124,7 +174,7 @@ export default function ProductionScreen() {
                 <Text style={crew.h3}>Crew · {data.members.length}</Text>
                 <Text style={crew.mono}>{data.members.filter((m) => m.worked).length} confirmed worked</Text>
               </View>
-              {data.members.length === 0 ? <Text style={crew.muted}>Nobody on it yet.{data.isOwner ? ' Book people through a call posted for this production, or add them below.' : ''}</Text> : null}
+              {data.members.length === 0 ? <Text style={crew.muted}>Nobody on it yet.{data.canEdit ? ' Book people through a call posted for this production, or add them below.' : ''}</Text> : null}
               {data.isOwner || data.isMember ? <Pressable onPress={() => router.push({ pathname: '/resources', params: { kind: 'paperwork' } })}><Text style={crew.mono}>Release forms, deal memos, NDAs, location agreements: Paperwork & legal in Resources ›</Text></Pressable> : null}
               {Object.entries(byDept).map(([dept, list]) => (
                 <View key={dept} style={{ gap: 6 }}>
@@ -145,7 +195,7 @@ export default function ProductionScreen() {
                         <View style={{ gap: 4 }}>
                           {canMessage(m) ? <Pressable style={crew.btnSm} onPress={() => messageAbout(m.person.userId)} accessibilityRole="button" accessibilityLabel={`Message ${m.person.displayName}`}><Text style={crew.btnSmText}>Message</Text></Pressable> : null}
                           {data.canEdit && !m.worked && !m.mine && data.canConfirm ? <Pressable style={[crew.btnSm, { backgroundColor: colors.brass, borderColor: colors.brass }]} disabled={busy} onPress={() => act((t) => apiPatch(`/api/productions/${id}/members`, { memberId: m.id, worked: true }, t), '✓ Confirmed.')}><Text style={[crew.btnSmText, { color: colors.onBrass }]}>Worked it</Text></Pressable> : null}
-                          {data.canEdit ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => Alert.alert('Remove from the crew list?', m.person.displayName, [{ text: 'Keep' }, { text: 'Remove', style: 'destructive', onPress: () => act((t) => apiDelete(`/api/productions/${id}/members`, { memberId: m.id }, t)) }])}><Text style={crew.btnSmText}>Remove</Text></Pressable> : null}
+                          {data.canEdit && canRemove(m) ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => Alert.alert('Remove from the crew list?', m.person.displayName, [{ text: 'Keep' }, { text: 'Remove', style: 'destructive', onPress: () => act((t) => apiDelete(`/api/productions/${id}/members`, { memberId: m.id }, t)) }])}><Text style={crew.btnSmText}>Remove</Text></Pressable> : null}
                         </View>
                       ) : null}
                     </View>
@@ -167,7 +217,7 @@ export default function ProductionScreen() {
             {/* ---- shoot days ---- */}
             <View style={crew.panel}>
               <Text style={crew.h3}>Shoot days · {data.days.length}</Text>
-              {data.days.length === 0 ? <Text style={crew.muted}>No shoot days on the sheet yet.{data.isOwner ? ' Add them below, or book a place under this production and its dates land here.' : ''}</Text> : null}
+              {data.days.length === 0 ? <Text style={crew.muted}>No shoot days on the sheet yet.{data.canEdit ? ' Add them below, or book a place under this production and its dates land here.' : ''}</Text> : null}
               {data.days.map((d) => (
                 <Pressable key={d.id} style={[prod.day, d.past && { opacity: 0.7 }]} disabled={!inside} onPress={() => router.push(`/productions/${id}/day/${d.dayNo}`)}>
                   <View style={[crew.row, { justifyContent: 'space-between' }]}>
@@ -200,10 +250,10 @@ export default function ProductionScreen() {
                   <Text style={crew.muted}>Out on Studio Tapa as <Text style={{ color: colors.ink }}>{p.release.title}</Text>. Everyone confirmed above has it on their profile with their role.</Text>
                   <View style={crew.row}>
                     <Pressable style={crew.btn} onPress={() => router.push(p.release.type === 'series' ? `/series/${p.release.id}` : `/episode/${p.release.id}`)}><Text style={crew.btnText}>▶ Open it</Text></Pressable>
-                    {data.isOwner ? <Pressable style={[crew.btn, crew.btnGhost]} disabled={busy} onPress={() => Alert.alert('Unlink the release?', 'The crew’s credits for it come off their profiles until you link it again.', [{ text: 'Keep' }, { text: 'Unlink', style: 'destructive', onPress: () => act((t) => apiPatch(`/api/productions/${id}`, { release: null }, t)) }])}><Text style={[crew.btnText, { color: colors.inkDim }]}>Unlink</Text></Pressable> : null}
+                    {canOwn ? <Pressable style={[crew.btn, crew.btnGhost]} disabled={busy} onPress={() => Alert.alert('Unlink the release?', 'The crew’s credits for it come off their profiles until you link it again.', [{ text: 'Keep' }, { text: 'Unlink', style: 'destructive', onPress: () => act((t) => apiPatch(`/api/productions/${id}`, { release: null }, t)) }])}><Text style={[crew.btnText, { color: colors.inkDim }]}>Unlink</Text></Pressable> : null}
                   </View>
                 </>
-              ) : data.isOwner ? (
+              ) : canOwn ? (
                 extras.releases.length === 0
                   ? <Text style={crew.muted}>When the finished title is live on Studio Tapa (uploaded by you and approved), it shows up here to link — and everyone confirmed on the crew gets the credit.</Text>
                   : (
@@ -218,7 +268,7 @@ export default function ProductionScreen() {
 
             <View style={[crew.row, { flexWrap: 'wrap' }]}>
               {signedIn && !data.isOwner ? <ReportSheet targetType="production" targetId={p.id} title={p.title} /> : null}
-              {data.isOwner && p.status !== 'archived' ? <Pressable style={[crew.btn, crew.btnGhost]} disabled={busy} onPress={() => Alert.alert('Archive this production?', 'It leaves the public list; you keep it.', [{ text: 'Keep' }, { text: 'Archive', onPress: () => act((t) => apiPatch(`/api/productions/${id}`, { status: 'archived' }, t)) }])}><Text style={[crew.btnText, { color: colors.inkDim }]}>Archive</Text></Pressable> : null}
+              {canOwn && p.status !== 'archived' ? <Pressable style={[crew.btn, crew.btnGhost]} disabled={busy} onPress={() => Alert.alert('Archive this production?', 'It leaves the public list; you keep it.', [{ text: 'Keep' }, { text: 'Archive', onPress: () => act((t) => apiPatch(`/api/productions/${id}`, { status: 'archived' }, t)) }])}><Text style={[crew.btnText, { color: colors.inkDim }]}>Archive</Text></Pressable> : null}
             </View>
           </>
         ) : null}
@@ -227,46 +277,11 @@ export default function ProductionScreen() {
   );
 }
 
-function AddMember({ id, busy, onDone, act }) {
-  const [q, setQ] = useState('');
-  const [role, setRole] = useState('');
-  const [picked, setPicked] = useState(null);
-  const [people, setPeople] = useState([]);
-  const timer = useRef(null);
-
-  useEffect(() => {
-    clearTimeout(timer.current);
-    if (picked || q.trim().length < 2 || q.trim().startsWith('@')) { setPeople([]); return undefined; }
-    timer.current = setTimeout(async () => {
-      try { const d = await apiGet(`/api/crew/people?q=${encodeURIComponent(q.trim())}`); setPeople((d.people || []).slice(0, 6)); } catch (err) { /* nothing */ }
-    }, 250);
-    return () => clearTimeout(timer.current);
-  }, [q, picked]);
-
-  const submit = () => act((t) => apiPost(`/api/productions/${id}/members`, picked ? { userId: picked.userId, role } : { handle: q.trim(), role }, t)).then((r) => { if (r) onDone(r); });
-
-  return (
-    <View style={[crew.panel, { borderStyle: 'dashed', marginBottom: 0 }]}>
-      <Text style={crew.label}>Who</Text>
-      <TextInput style={crew.input} value={picked ? picked.displayName : q} onChangeText={(v) => { setPicked(null); setQ(v); }} placeholder="Name on Crew Call, or @handle" placeholderTextColor={colors.inkFaint} autoCapitalize="none" autoCorrect={false} />
-      {people.length > 0 && !picked ? (
-        <View style={crew.suggest}>
-          {people.map((x) => (
-            <Pressable key={x.userId} style={[crew.suggestRow, crew.row]} onPress={() => { setPicked({ userId: x.userId, displayName: x.displayName }); setPeople([]); }}>
-              <Avatar userId={x.userId} name={x.displayName} src={x.avatarUrl} position={x.avatarPosition} zoom={x.avatarZoom || 1} size={26} />
-              <Text style={crew.suggestText}>{x.displayName}{x.handle ? <Text style={crew.handle}> @{x.handle}</Text> : null}</Text>
-              <Text style={[crew.mono, { flex: 1, textAlign: 'right' }]}>{(x.roles || []).slice(0, 2).join(', ')}</Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-      <Text style={[crew.label, { marginTop: 6 }]}>Role</Text>
-      <TextInput style={crew.input} value={role} onChangeText={setRole} placeholder="Gaffer" placeholderTextColor={colors.inkFaint} maxLength={40} />
-      <View style={[crew.row, { marginTop: 4 }]}>
-        <Pressable style={[crew.btn, crew.btnPrimary, (busy || (!picked && q.trim().length < 2) || role.trim().length < 2) && { opacity: 0.6 }]} disabled={busy || (!picked && q.trim().length < 2) || role.trim().length < 2} onPress={submit}><Text style={[crew.btnText, crew.btnPrimaryText]}>Add</Text></Pressable>
-        <Pressable style={[crew.btn, crew.btnGhost]} onPress={() => onDone(null)}><Text style={[crew.btnText, { color: colors.inkDim }]}>Cancel</Text></Pressable>
-      </View>
-      <Text style={crew.mono}>They get a notification and can take themselves off.</Text>
-    </View>
-  );
-}
+const pr = StyleSheet.create({
+  crumbs: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  dashLink: { minHeight: 44, justifyContent: 'center' },
+  dashLinkText: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.brass },
+  funding: { marginTop: 10, borderColor: brassTint(0.4) },
+  fundingPct: { fontFamily: fonts.displayBold, fontSize: 13, color: colors.mint },
+  fundingLine: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink }
+});

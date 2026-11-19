@@ -8,10 +8,13 @@ import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip } from '../../components/CrewBits';
 import { ProductionCard, KINDS, STATUS } from '../../components/ProductionBits';
+import { MINE_PATH, MINE_WORDS } from '../../lib/productionDashRules';
 
 // Productions (pages/productions on the web, migration 104): who's making
 // what. Fed by /api/productions; a signed-in person's own productions
-// and the ones they're crew on sit at the top (/api/productions/mine).
+// and the ones they're crew on sit at the top (/api/productions/mine);
+// the full list with the dashboards is Your productions (2026-11-19,
+// productions/mine.js), one tap from here.
 const PUBLIC_STATUSES = ['prep', 'shooting', 'post', 'released'];
 
 export default function ProductionsScreen() {
@@ -77,6 +80,7 @@ export default function ProductionsScreen() {
         <Text style={crew.lead}>The shoots happening on Studio Tapa. Crew calls, location bookings and the call sheet live here — and when it’s released, everyone who worked it gets the credit.</Text>
         <View style={[crew.row, { marginBottom: 14, flexWrap: 'wrap' }]}>
           <Pressable style={[crew.btn, crew.btnPrimary]} onPress={() => router.push(signedIn ? '/productions/new' : '/account')}><Text style={[crew.btnText, crew.btnPrimaryText]}>{signedIn ? '+ Start a production' : 'Sign in to start one'}</Text></Pressable>
+          {signedIn ? <Pressable style={crew.btn} onPress={() => router.push(MINE_PATH)} accessibilityRole="link"><Text style={crew.btnText}>{MINE_WORDS.title} ›</Text></Pressable> : null}
           <Pressable style={crew.btn} onPress={() => router.push('/crew')}><Text style={crew.btnText}>Calls</Text></Pressable>
           <Pressable style={crew.btn} onPress={() => router.push('/locations')}><Text style={crew.btnText}>Locations</Text></Pressable>
         </View>

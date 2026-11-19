@@ -98,6 +98,11 @@ export default function RootLayout() {
           <Stack.Screen name="productions/[id]/edit" options={{ headerShown: false }} />
           <Stack.Screen name="productions/[id]/distribution" options={{ headerShown: false }} />
           <Stack.Screen name="productions/[id]/day/[n]" options={{ headerShown: false }} />
+          {/* Productions from pitches (2026-11-19): Your productions and a
+              production's dashboard draw the site header and their own
+              Back pill. */}
+          <Stack.Screen name="productions/mine" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/[id]/dashboard" options={{ headerShown: false }} />
           <Stack.Screen name="resources/index" options={{ headerShown: false }} />
           <Stack.Screen name="messages/index" options={{ headerShown: false }} />
           <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />

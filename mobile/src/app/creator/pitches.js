@@ -4,15 +4,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
-import { colors, fonts } from '../../lib/theme';
+import { brassTint, colors, fonts, inkTint } from '../../lib/theme';
+import { pitchBox } from '../../lib/productionDashRules';
 import TopNav from '../../components/TopNav';
 import PayoutsCard from '../../components/PayoutsCard';
 import DashboardTabs from '../../components/dashboard/DashboardTabs';
+import { hrefToRoute } from '../../components/PushListener';
+import StartSheet from '../../components/productions/StartSheet';
 
 // Your pitches (pages/creator/pitch/dashboard.js on the web): the Payouts
 // card (components/PayoutsCard.js), every project you've submitted with
 // its status, what each has earned, and a quick "post an update". Data
-// from /api/creator/pitches.
+// from /api/creator/pitches. Since 2026-11-19 an approved pitch also
+// carries "Ready to shoot it?" with Start the production (the start
+// sheet), or "In production · Open its dashboard ›" once it has one
+// (lib/productionDashRules.js pitchBox, the PitchDash board); when the
+// productions couldn't be read (`productions` null) the box is left out
+// rather than offering a second production.
 const PAPER = '#241a05';
 
 const money = (cents) => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -82,6 +90,7 @@ export default function YourPitches() {
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [openUpdateFor, setOpenUpdateFor] = useState(null);
   const [postedFlash, setPostedFlash] = useState(null);
+  const [starting, setStarting] = useState(null);
 
   const load = useCallback(async () => {
     if (!isLoaded) return;
@@ -119,7 +128,11 @@ export default function YourPitches() {
     );
   }
 
-  const { pitches, earnings } = state.data;
+  const { pitches, earnings, productions = null, backers = {}, today = null } = state.data;
+  function openDashboard(href) {
+    const where = hrefToRoute(href);
+    if (where && where.route) router.push(where.route);
+  }
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
@@ -152,6 +165,26 @@ export default function YourPitches() {
             </View>
             {p.logline ? <Text style={styles.cardBody}>{p.logline}</Text> : null}
             {p.status === 'approved' && (p.funding_enabled || earnings[p.id]) ? <Earnings pitch={p} earnings={earnings[p.id]} /> : null}
+            {productions ? (() => {
+              const box = pitchBox({ pitch: p, production: productions[p.id] || null, today });
+              if (!box) return null;
+              return box.kind === 'start' ? (
+                <View style={styles.ready}>
+                  <Text style={styles.readyTitle}>{box.title}</Text>
+                  <Text style={styles.readyLine}>{box.line}</Text>
+                  <Pressable style={({ pressed }) => [styles.readyGo, pressed && styles.pressed]} onPress={() => setStarting(p)} accessibilityRole="button" accessibilityLabel={`${box.button.label}: ${p.title}`}>
+                    <Text style={styles.readyGoText}>{box.button.label}</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={[styles.ready, styles.readyRunning]}>
+                  <Text style={styles.readyLine}><Text style={styles.readyPill}>{box.pill}</Text>{'  '}{box.line}</Text>
+                  <Pressable style={({ pressed }) => [styles.readyOpen, pressed && styles.pressed]} onPress={() => openDashboard(box.button.href)} accessibilityRole="link" accessibilityLabel={`${box.button.label}: ${p.title}`}>
+                    <Text style={styles.readyOpenText}>{box.button.label} ›</Text>
+                  </Pressable>
+                </View>
+              );
+            })() : null}
             {p.status === 'approved' ? (
               openUpdateFor === p.id ? (
                 <UpdateForm pitchId={p.id} getToken={getToken} onPosted={() => { setOpenUpdateFor(null); setPostedFlash(p.id); }} />
@@ -166,6 +199,7 @@ export default function YourPitches() {
           </View>
         ))}
       </ScrollView>
+      <StartSheet visible={Boolean(starting)} pitch={starting ? { id: starting.id, title: starting.title, logline: starting.logline, tag: starting.tag } : null} backers={starting ? backers[starting.id] || 0 : 0} onClose={() => setStarting(null)} />
     </SafeAreaView>
   );
 }
@@ -204,5 +238,16 @@ const styles = StyleSheet.create({
   earnNum: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.ink },
   earnLabel: { fontFamily: fonts.body, fontSize: 11.5, color: colors.inkDim, marginTop: 2 },
   earnRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingVertical: 5, borderBottomWidth: 1, borderColor: 'rgba(251,232,211,0.06)' },
-  earnRowText: { fontFamily: fonts.body, fontSize: 13, color: colors.ink }
+  earnRowText: { fontFamily: fonts.body, fontSize: 13, color: colors.ink },
+  // Ready to shoot it? / In production (the website's .pitch-ready*).
+  pressed: { opacity: 0.8 },
+  ready: { marginTop: 12, borderRadius: 14, backgroundColor: brassTint(0.08), borderWidth: 1, borderColor: brassTint(0.4), padding: 12, gap: 8 },
+  readyRunning: { backgroundColor: colors.surface2, borderColor: inkTint(0.12) },
+  readyTitle: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.ink },
+  readyLine: { fontFamily: fonts.display, fontSize: 13, lineHeight: 19, color: colors.inkDim },
+  readyPill: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: colors.brass },
+  readyGo: { minHeight: 46, borderRadius: 12, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  readyGoText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.onBrass },
+  readyOpen: { minHeight: 44, borderRadius: 10, borderWidth: 1, borderColor: brassTint(0.5), alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  readyOpenText: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.brass }
 });

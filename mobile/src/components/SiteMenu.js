@@ -60,6 +60,10 @@ const SIDE_TINT = { connect: TINTS.mint, stream: TINTS.gold };
 // MENU_COUNTS_MAX_AGE_MS), the genres, the plan line, and which sections
 // are open.
 let countsCache = { counts: null, at: NaN };
+// "Running now" (2026-11-19, /api/productions/running): the same two
+// minutes, kept for one account only (another sign-in reads again) and
+// dropped when the menu opens signed out.
+let runningCache = { running: null, at: NaN, who: null };
 let genresCache = null;
 let genresPromise = null;
 let membershipCache = { at: 0, isSubscriber: null };
@@ -180,9 +184,11 @@ function MenuFrame({ anim, drag, onClose, side, settings, ownProfile }) {
 function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, insets }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isSignedIn, getToken, signOut } = useAuth();
+  const { isSignedIn, getToken, signOut, userId } = useAuth();
   const role = useAdminRole();
   const signedIn = Boolean(isSignedIn);
+  const runningWho = signedIn ? userId || null : null;
+  const [running, setRunning] = useState(signedIn && runningCache.who === runningWho ? runningCache.running : null);
   const [side, setSide] = useState(startSide === 'stream' ? 'stream' : 'connect');
   const [counts, setCounts] = useState(countsCache.counts);
   const [genres, setGenres] = useState(genresCache || []);
@@ -215,7 +221,8 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     settings: settings || null,
     counts,
     displayName,
-    profileHref
+    profileHref,
+    running
   });
 
   // Which sections are open (kept for the app's session); only the ones
@@ -245,6 +252,24 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     loadMembership(getToken).then((m) => { if (alive && m.at) setMembership(m.isSubscriber); });
     return () => { alive = false; };
   }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // "Running now": the productions this person runs, read as the menu
+  // opens (signed in), at most every two minutes. A failed read leaves
+  // the card as it was (not there the first time).
+  useEffect(() => {
+    if (!signedIn) { runningCache = { running: null, at: NaN, who: null }; setRunning(null); return undefined; }
+    if (runningCache.who === runningWho && countsFresh(runningCache.at)) { setRunning(runningCache.running); return undefined; }
+    let alive = true;
+    (async () => {
+      const token = await freshToken(getToken);
+      if (!token) return;
+      const d = await apiGet('/api/productions/running', token).catch(() => null);
+      if (!d || !Array.isArray(d.items)) return;
+      runningCache = { running: d, at: Date.now(), who: runningWho };
+      if (alive) setRunning(d);
+    })();
+    return () => { alive = false; };
+  }, [signedIn, runningWho]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The genres, once the Stream side is asked for.
   useEffect(() => {
@@ -387,6 +412,40 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
             </View>
           </View>
         )}
+
+        {menu.running ? (
+          <View style={[styles.card, styles.running]} accessibilityLabel={menu.running.title}>
+            <View style={styles.runningHead}>
+              <Text style={styles.runningTitle} accessibilityRole="header">{menu.running.title}</Text>
+              <Text style={styles.runningCount}>{menu.running.count}</Text>
+            </View>
+            {menu.running.items.map((r, i) => (
+              <View key={r.id} style={[styles.runningRow, i > 0 && styles.runningRowNext]}>
+                <View style={styles.textCol}>
+                  <Text style={styles.runningName}>{r.title}</Text>
+                  {r.line || r.needs ? (
+                    <Text style={styles.runningLine}>
+                      {r.line}
+                      {r.needs ? <Text style={styles.runningNeeds}>{r.line ? ' · ' : ''}{r.needs}</Text> : null}
+                    </Text>
+                  ) : null}
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.runningOpen, r.primary && styles.runningOpenPrimary, pressed && styles.joinPressed]}
+                  onPress={() => follow(r.href)}
+                  hitSlop={4}
+                  accessibilityRole="link"
+                  accessibilityLabel={`${r.open} ${r.title}`}
+                >
+                  <Text style={[styles.runningOpenText, r.primary && styles.runningOpenTextPrimary]}>{r.open}</Text>
+                </Pressable>
+              </View>
+            ))}
+            <Pressable style={({ pressed }) => [styles.runningAll, pressed && styles.pressedText]} onPress={() => follow(menu.running.all.href)} accessibilityRole="link">
+              <Text style={styles.runningAllText}>{menu.running.all.label} ›</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         <View style={styles.sides} accessibilityLabel={MENU_WORDS.sides}>
           {['connect', 'stream'].map((s) => {
@@ -586,6 +645,22 @@ const styles = StyleSheet.create({
   outBtnPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
   outBtnPrimaryText: { fontFamily: fonts.displayBold, fontSize: 14, color: colors.onBrass },
   outBtnText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink },
+  // Running now (the website's .sm-running*).
+  running: { borderRadius: 18, padding: 14, gap: 10, backgroundColor: brassTint(0.08), borderColor: brassTint(0.4) },
+  runningHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 },
+  runningTitle: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase', color: colors.brass },
+  runningCount: { fontFamily: fonts.display, fontSize: 12, color: colors.inkDim },
+  runningRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  runningRowNext: { paddingTop: 10, borderTopWidth: 1, borderTopColor: inkTint(0.08) },
+  runningName: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.ink },
+  runningLine: { fontFamily: fonts.display, fontSize: 12, lineHeight: 17, color: colors.inkDim },
+  runningNeeds: { fontFamily: fonts.displayBold, color: colors.brass },
+  runningOpen: { minHeight: 40, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.22), alignItems: 'center', justifyContent: 'center' },
+  runningOpenPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
+  runningOpenText: { fontFamily: fonts.display, fontSize: 13, color: colors.ink },
+  runningOpenTextPrimary: { fontFamily: fonts.displayBold, color: colors.onBrass },
+  runningAll: { alignSelf: 'flex-start', minHeight: 40, marginVertical: -6, justifyContent: 'center' },
+  runningAllText: { fontFamily: fonts.display, fontSize: 13, color: colors.inkDim },
   // Connect / Stream.
   sides: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 999, backgroundColor: inkTint(0.05), borderWidth: 1, borderColor: inkTint(0.08) },
   side: { flex: 1, height: 36, borderRadius: 999, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
