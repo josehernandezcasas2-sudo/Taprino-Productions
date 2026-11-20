@@ -21,6 +21,7 @@ export default function StartSheet({ pitch, backers = 0, onClose }) {
   const [error, setError] = useState(null);
   const [existing, setExisting] = useState(null);
   const backRef = useRef(null);
+  const sheetRef = useRef(null);
   const bodyRef = useRef(null);
   const firstRef = useRef(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -29,7 +30,18 @@ export default function StartSheet({ pitch, backers = 0, onClose }) {
   useEffect(() => {
     const before = typeof document !== 'undefined' ? document.activeElement : null;
     if (firstRef.current) firstRef.current.focus();
-    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
+    // Escape closes; Tab stays inside the sheet (it is aria-modal).
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
+      if (e.key !== 'Tab' || !sheetRef.current) return;
+      const items = [...sheetRef.current.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')].filter((el) => el.offsetParent !== null);
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      else if (!sheetRef.current.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    };
     document.addEventListener('keydown', onKey);
     const releaseBody = keepScrollInside(bodyRef.current);
     const releaseBack = keepScrollInside(backRef.current);
@@ -71,7 +83,7 @@ export default function StartSheet({ pitch, backers = 0, onClose }) {
   const node = (
     <div className="pst-root">
       <div ref={backRef} className="pst-back" onClick={onClose} aria-hidden="true" />
-      <form className="pst-sheet" role="dialog" aria-modal="true" aria-labelledby="pst-title" onSubmit={submit}>
+      <form ref={sheetRef} className="pst-sheet" role="dialog" aria-modal="true" aria-labelledby="pst-title" onSubmit={submit}>
         <span className="pst-grab" aria-hidden="true" />
         <div className="pst-head">
           <span className="pst-kicker">{sheet.kicker}</span>

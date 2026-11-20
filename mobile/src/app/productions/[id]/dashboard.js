@@ -313,9 +313,10 @@ export default function ProductionDashboard() {
         style={s.scrollView}
         contentContainerStyle={s.scroll}
         keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brass} colors={[colors.brass]} />}
       >
-        <BackPill label={head.back.label} onPress={() => follow(head.back.href)} />
+        <BackPill label={head.back.label} onPress={() => router.dismissTo(head.back.href)} />
 
         <View style={s.headMain}>
           <Text style={s.kicker}>{head.kicker}</Text>

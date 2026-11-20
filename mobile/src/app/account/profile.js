@@ -34,10 +34,15 @@ export default function AccountProfile() {
   const types = useAccountTypes();
   const [typesOpen, setTypesOpen] = useState(false);
   const { types: typesParam } = useLocalSearchParams();
+  // A moment later, so the ☰ menu's Modal has finished closing: iOS won't
+  // present a sheet while another Modal on the screen is still going away,
+  // and the sheet then never came up (2026-11-20 review).
   useEffect(() => {
-    if (typesParam !== '1' || types.status !== 'ok' || !types.state) return;
+    if (typesParam !== '1' || types.status !== 'ok' || !types.state) return undefined;
     router.setParams({ types: undefined });
-    if (types.state.available !== false) setTypesOpen(true);
+    if (types.state.available === false) return undefined;
+    const t = setTimeout(() => setTypesOpen(true), 400);
+    return () => clearTimeout(t);
   }, [typesParam, types.status]); // eslint-disable-line react-hooks/exhaustive-deps
   // The sheet's creator note opens /apply (closing the sheet first).
   function openFromSheet(href) {

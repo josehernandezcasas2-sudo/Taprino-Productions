@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await setBlockedDays(userId, String(req.query.id || ''), (req.body || {}).days));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('locations blocked-days:', err.message);
     return res.status(500).json({ error: 'Could not save those days.' });
   }

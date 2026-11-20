@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'PUT, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('productions/[id]/days:', err.message);
     return res.status(500).json({ error: 'Could not save that day right now.' });
   }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TIER_INFO, DISPLAY_ORDER, isPaidTier, tierLabel } from '../lib/membershipTiers';
 import { SITE } from '../lib/siteConfig';
 import { TAX_NOTE } from '../lib/salesTaxRules';
-import { BILLING_WORDS, billingSwitch, joinLabel, planCardPrice, renewLine } from '../lib/yearlyPlanRules';
+import { BILLING_WORDS, billingSwitch, joinLabel, moneyText, planCardPrice, renewLine } from '../lib/yearlyPlanRules';
 
 // The Membership card's plan picker on /account (mockups/membership-tiers.html,
 // signed off 2026-10-12): Basic plus every plan on sale in Stripe
@@ -68,7 +68,11 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
           const info = TIER_INFO[t];
           const plan = byTier[t] || null;
           const current = t === tier;
-          const card = plan ? planCardPrice(plan, interval) : null;
+          // Your plan shows what you pay, whichever billing the switch is on
+          // (2026-11-20 review: a monthly member saw "$79 a year" beside
+          // "Renews … · monthly").
+          const paying = current && subscriptionDetails && Number(subscriptionDetails.amount) > 0;
+          const card = paying ? { available: true, price: moneyText(subscriptionDetails.amount, subscriptionDetails.currency || (plan && plan.currency)), per: subscriptionDetails.interval === 'year' ? BILLING_WORDS.aYear : BILLING_WORDS.perMonth, sub: null } : plan ? planCardPrice(plan, interval) : null;
           const unavailable = Boolean(card && !card.available) && t !== 'basic';
           const cls = ['mp-plan', current && 'current', t === 'premium' && !current && 'featured', t === 'sponsor' && 'sponsor', unavailable && !current && 'unavailable'].filter(Boolean).join(' ');
           const flag = current ? 'Your plan' : info.flag;

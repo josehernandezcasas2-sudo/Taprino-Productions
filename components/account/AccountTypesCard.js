@@ -59,7 +59,15 @@ export default function AccountTypesCard({ initial, isCreator = false }) {
     setOpen(false);
     // Drop #types from the address so the menu's link opens it again.
     if (typeof window !== 'undefined' && window.location.hash === '#types') {
-      try { window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`); } catch (err) { /* old browsers */ }
+      // Next keeps the address in its own history entry too (as / url):
+      // drop the hash there as well, or Back from the next page comes back
+      // to #types and the sheet opens by itself (2026-11-20 review).
+      try {
+        const st = window.history.state;
+        const strip = (v) => (typeof v === 'string' ? v.split('#')[0] : v);
+        const next = st && typeof st === 'object' ? { ...st, as: strip(st.as), url: strip(st.url) } : st;
+        window.history.replaceState(next, '', `${window.location.pathname}${window.location.search}`);
+      } catch (err) { /* old browsers */ }
     }
     if (changeRef.current) changeRef.current.focus();
   }, []);

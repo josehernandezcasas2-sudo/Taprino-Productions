@@ -185,7 +185,7 @@ export default async function handler(req, res) {
         ...(bannerZoom !== undefined || removeBanner ? { bannerZoom: removeBanner ? null : normalizeZoom(bannerZoom) } : {})
       });
     } catch (err) {
-      if (err.status) return res.status(err.status).json({ error: err.message });
+      if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
       // A database message names tables and columns; the person gets a
       // plain one and the log keeps the real one.
       console.error('account/profile save:', err.message);

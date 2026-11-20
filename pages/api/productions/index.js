@@ -29,7 +29,10 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    // A pitch that has its production already: the 409 names it, as the
+    // edit route's does (lib/productions.js).
+    if (err.status === 409 && err.extra && err.extra.code === 'exists') return res.status(409).json({ error: err.message, code: 'exists', productionId: err.extra.productionId || null });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('productions:', err.message);
     return res.status(500).json({ error: 'Could not load productions right now.' });
   }

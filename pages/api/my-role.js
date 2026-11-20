@@ -2,7 +2,7 @@ import { getRoleContext } from '../../lib/roles';
 import { getOwnProfile } from '../../lib/userProfiles';
 import { getSuspensionFor } from '../../lib/suspensions';
 import { applyCors } from '../../lib/cors';
-import { accountTypesFromRow } from '../../lib/accountTypes';
+import { accountTypesFromRow, readAccountTypes } from '../../lib/accountTypes';
 
 // Self-fetched by MobileTabBar so it can gate "My Work" to creators/admins
 // without requiring every single page that renders <MobileTabBar /> to
@@ -42,7 +42,10 @@ export default async function handler(req, res) {
       avatar = { url: profile.avatar_url, position: profile.avatar_position || null, zoom: profile.avatar_zoom ? Number(profile.avatar_zoom) : null };
     }
     displayName = profile && profile.display_name ? profile.display_name : null;
-    const t = accountTypesFromRow(profile);
+    // No profile in hand (no row yet, or the read failed): ask for the types
+    // on their own, which tells a missing row from a database without 126
+    // or a failed read (2026-11-20 review: those offered "+ Add a type").
+    const t = profile ? accountTypesFromRow(profile) : await readAccountTypes(userId);
     accountTypes = t.available ? { types: t.types, main: t.main, asked: t.asked } : null;
   }
   return res.status(200).json({

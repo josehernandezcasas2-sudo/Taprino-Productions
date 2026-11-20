@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     });
     return res.status(200).json(out);
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('beta/request error:', err.message);
     return res.status(500).json({ error: 'Something went wrong. Try again in a moment.' });
   }

@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     if (!account.userId) return res.status(401).json({ error: 'Sign in to see the call sheet.' });
     return res.status(200).json(await getCallSheet(id, Number(req.query.day) || 1, { viewerId: account.userId, isAdmin: account.isAdmin }));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('productions/[id]/sheet:', err.message);
     return res.status(500).json({ error: 'Could not load the call sheet right now.' });
   }

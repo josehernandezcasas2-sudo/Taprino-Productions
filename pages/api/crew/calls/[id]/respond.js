@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     if (req.method === 'PATCH') return res.status(200).json(await updateSelfTape(userId, callId, body));
     return res.status(201).json(await respondToCall(userId, callId, body.message, body));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('crew/calls/respond:', err.message);
     return res.status(500).json({ error: 'Could not send that right now.' });
   }

@@ -15853,3 +15853,17 @@ a, button, input, select, textarea, label, summary, [role="button"] { touch-acti
   .show-ed-stepper input { font-size: 1.1rem !important; }
   .sell-price input { font-size: 1.2rem !important; }
 }
+
+/* Touch targets of the yearly switch, the Your types and start-production
+   sheets and the production pages (2026-11-20 review): 44px on a touch
+   screen, as everywhere else; a mouse keeps the slimmer sizes. */
+@media (pointer: coarse) {
+  .mp-billing button,
+  .pitch-ready-open,
+  .prod-dash-link { min-height: 44px; }
+  .prod-dash-link { height: auto; }
+  .atp-x,
+  .pst-close { width: 44px; height: 44px; }
+  .pst-close { top: 6px; }
+  .pd-status { height: 44px; }
+}

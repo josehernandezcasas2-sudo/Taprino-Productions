@@ -390,15 +390,21 @@ function headOf(facts) {
   };
 }
 
+// A full admin who doesn't run the production can't post a call or ask
+// for a place under it (the call and request forms take only productions
+// the poster runs), so those two aren't offered to them (2026-11-20 review:
+// the form opened with the production silently dropped).
 function actionsOf(facts) {
   const id = facts.production.id;
+  const v = facts.viewer || {};
+  const adminOnly = Boolean(v.isAdmin) && !v.isOwner && !v.isProducer;
   return [
-    { id: 'call', label: DASH_WORDS.actions.call, href: `/crew/calls/new?production=${id}`, primary: true },
+    adminOnly ? null : { id: 'call', label: DASH_WORDS.actions.call, href: `/crew/calls/new?production=${id}`, primary: true },
     { id: 'day', label: DASH_WORDS.actions.day, href: `${dashHref(id, 'days')}#add-day`, tab: 'days' },
-    { id: 'place', label: DASH_WORDS.actions.place, href: '/locations' },
+    adminOnly ? null : { id: 'place', label: DASH_WORDS.actions.place, href: '/locations' },
     { id: 'message', label: DASH_WORDS.actions.message, href: dashHref(id, 'crew'), tab: 'crew' },
     { id: 'edit', label: DASH_WORDS.actions.edit, href: `/productions/${id}/edit`, quiet: true }
-  ];
+  ].filter(Boolean);
 }
 
 const onList = (facts) => ((facts && facts.members) || []).filter((m) => m && !m.offList);
@@ -470,7 +476,11 @@ export function needsYou(facts) {
   const pitch = facts.pitch;
   if (pitch && pitch.isOwner && num(pitch.backers)) {
     const since = str(pitch.lastUpdateAt) || str(pitch.firstBackedAt);
-    const quiet = since ? daysBetween(since.slice(0, 10), today) : null;
+    // Whole days from the moment itself (2026-11-20: the date part of a UTC
+    // time against today's Pacific date was a day short every evening).
+    const nowMs = Date.parse(str(facts.now));
+    const sinceMs = Date.parse(since);
+    const quiet = !since ? null : Number.isFinite(nowMs) && Number.isFinite(sinceMs) ? Math.floor((nowMs - sinceMs) / 86400000) : daysBetween(since.slice(0, 10), today);
     if (quiet != null && quiet >= QUIET_BACKERS_DAYS) {
       out.push({ id: 'backers-quiet', text: `Your backers haven’t heard from you in ${quiet} days`, link: { href: `${dashHref(id, 'money')}#update`, label: DASH_WORDS.postUpdate, short: 'Post' }, short: 'Backers to update' });
     }

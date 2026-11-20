@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await revealCode(userId || null, id, { productionId: (req.body || {}).productionId }));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('partners/reveal:', err.message);
     return res.status(500).json({ error: 'Could not open that code right now.' });
   }

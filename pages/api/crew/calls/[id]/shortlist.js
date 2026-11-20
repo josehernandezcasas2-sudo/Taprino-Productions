@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await setShortlist(userId, callId, responseId, { shortlisted, callbackAt }));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('crew/calls/shortlist:', err.message);
     return res.status(500).json({ error: 'Could not update that right now.' });
   }

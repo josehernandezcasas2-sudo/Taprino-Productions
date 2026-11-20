@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, alreadyRefunded: Boolean(out.alreadyRefunded) });
   } catch (err) {
     if (err instanceof PurchaseError) return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('purchases/refund error:', err.message);
     return res.status(500).json({ error: 'The refund didn’t go through. Try again, or email us.' });
   }

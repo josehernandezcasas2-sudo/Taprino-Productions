@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     }
     return res.status(200).json(result);
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('crew/calls/outcome:', err.message);
     return res.status(500).json({ error: 'Could not save that right now.' });
   }

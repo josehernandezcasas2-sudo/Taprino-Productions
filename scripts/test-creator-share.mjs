@@ -56,6 +56,27 @@ test('invoice shapes: product, subscription, charge and payment intent in old an
   assert.equal(invoiceSubscriptionId({ lines: { data: [] } }), null);
 });
 
+test('invoiceProductId: a plan switch is the plan paid for, not the old plan\'s credit', () => {
+  // Standard monthly → Premium yearly: Stripe lists the unused-time credit first.
+  const sw = { lines: { data: [
+    { amount: -500, proration: true, price: { product: 'prod_standard' } },
+    { amount: 12900, proration: false, price: { product: 'prod_premium' } }
+  ] } };
+  assert.equal(invoiceProductId(sw), 'prod_premium');
+  // 2025+ lines say proration under parent.
+  const modern = { lines: { data: [
+    { amount: -500, parent: { subscription_item_details: { proration: true } }, pricing: { price_details: { product: 'prod_standard' } } },
+    { amount: 12900, parent: { subscription_item_details: { proration: false } }, pricing: { price_details: { product: 'prod_premium' } } }
+  ] } };
+  assert.equal(invoiceProductId(modern), 'prod_premium');
+  // Prorations only: the line that charges something.
+  const only = { lines: { data: [
+    { amount: -300, proration: true, price: { product: 'prod_standard' } },
+    { amount: 900, proration: true, price: { product: 'prod_premium' } }
+  ] } };
+  assert.equal(invoiceProductId(only), 'prod_premium');
+});
+
 test('tierForInvoice: the plan on sale, else the stamped tier, else premium', () => {
   const plans = [{ tier: 'standard', productId: 'prod_s' }, { tier: 'premium', productId: 'prod_p' }];
   assert.equal(tierForInvoice({ lines: { data: [{ price: { product: 'prod_s' } }] } }, plans, { tier: 'premium' }), 'standard');

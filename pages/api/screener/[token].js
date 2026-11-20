@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     const data = await openScreener(String(req.query.token || ''), { countView: false, viewKey });
     return res.status(200).json({ src: data.src, expiresAt: data.expiresAt, signed: data.signed });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('screener src:', err.message);
     return res.status(500).json({ error: 'Could not refresh the screener.' });
   }

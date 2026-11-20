@@ -43,11 +43,18 @@ export default function Start() {
   const [busy, setBusy] = useState(null); // 'save' | 'skip'
   const [error, setError] = useState(null);
   const left = useRef(false);
+  // A save that finishes after the person went Back must not move them
+  // from wherever they are now (2026-11-20 review).
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   // On to `next`: back down the stack to it when it is there, else in this
   // screen's place (dismissTo = React Navigation's POP_TO).
   const goOn = useCallback(() => {
-    if (left.current) return;
+    if (left.current || !mounted.current) return;
     left.current = true;
     setPhase('leaving');
     try {

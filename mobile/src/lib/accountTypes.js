@@ -22,7 +22,12 @@ export async function readAccountTypes(getToken) {
     err.status = 401;
     throw err;
   }
-  return apiGet('/api/account/types', token);
+  const state = await apiGet('/api/account/types', token);
+  // Every read keeps the ☰ menu's copy current (2026-11-20 review: it was
+  // read once a session, so a change made on the website was undone by the
+  // next switch from the app's menu).
+  if (state && state.available !== false) setRoleAccountTypes(forMenu(state));
+  return state;
 }
 
 // What the menu's copy holds: the types, the main and whether it was asked.
@@ -46,16 +51,23 @@ export async function saveAccountTypes(getToken, body) {
 
 // The ☰ menu's chips: the main changes at once in the menu's copy, the
 // save follows, and a failure puts the old state back (and throws).
+//
+// The types sent are read fresh first, so a type added elsewhere since the
+// menu's copy was read (on the website, another phone) is kept.
 export async function switchMainType(getToken, state, type) {
   const before = state;
-  const next = makeMain(state, type);
-  setRoleAccountTypes({ ...forMenu(before), types: next.types, main: next.main });
+  const shown = makeMain(state, type);
+  setRoleAccountTypes({ ...forMenu(before), types: shown.types, main: shown.main });
   try {
+    const token = await freshToken(getToken);
+    const fresh = token ? await apiGet('/api/account/types', token).catch(() => null) : null;
+    const base = fresh && fresh.available !== false && Array.isArray(fresh.types) ? fresh : state;
+    const next = makeMain(base, type);
     return await saveAccountTypes(getToken, { types: next.types, main: next.main });
   } catch (err) {
     const role = currentRole();
     // Only put it back when nothing newer landed meanwhile.
-    if (role && role.accountTypes && role.accountTypes.main === next.main) setRoleAccountTypes(forMenu(before));
+    if (role && role.accountTypes && role.accountTypes.main === shown.main) setRoleAccountTypes(forMenu(before));
     throw err;
   }
 }

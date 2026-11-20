@@ -448,6 +448,19 @@ async function switches() {
   ok('the year’s invoice delivered again → still no month-1 lines', ev.json.delivery.status < 300 && ledgerOf(year2.id).length === 0, ledgerOf(year2.id));
   r = await cron();
   ok('…and the daily catch-up writes none either', r.status === 200 && ledgerOf(year2.id).length === 0 && paymentByInvoice(up2.id).months_credited === 1, r.json && r.json.stripeCatchup);
+
+  section('Standard monthly → Premium yearly: the year is the plan paid for, not the old plan’s credit line (review, 2026-11-20)');
+  const u = await member('yrtierup');
+  await pick(u, USERS.mara);
+  ({ sid } = await checkout(u, {}));
+  await pay(sid);
+  sub = await subscriptionOf(u.id);
+  const PREMIUM_YEARLY = { id: 'price_rigPremiumYearly', object: 'price', product: 'prod_rigPremium', unit_amount: 12900, recurring: { interval: 'year', interval_count: 1 } };
+  const tierUp = portalInvoice(sub, 'tierup', { reason: 'subscription_update', paid: 12500, lines: [{ price: PRICE.monthly, amount: -400, proration: true }, { price: PREMIUM_YEARLY, amount: 12900 }] });
+  ev = await stripeHook('/__event', { method: 'POST', body: { type: 'invoice.paid', object: tierUp } });
+  const tu = rows(`select tier, share_cents, months, months_credited from public.member_payments where stripe_invoice_id = ${q(tierUp.id)}`)[0];
+  const stdShare = paymentOf(u.id)[0].share_cents;
+  ok('recorded as a Premium year, at Premium’s share (more than Standard’s)', ev.json.delivery.status < 300 && tu && tu.tier === 'premium' && tu.months === 12 && tu.share_cents > stdShare, [tu, stdShare]);
 }
 
 async function artistSupportNote(m) {
@@ -569,13 +582,24 @@ async function noYearlyTier() {
 // Before migration 127: a yearly invoice is recorded as a monthly one.
 async function before127({ simulated }) {
   section(`Before migration 127${simulated ? ' (its four columns renamed for a moment)' : ''}`);
+  // Yearly plans aren't on sale until the database can schedule their
+  // months (review, 2026-11-20).
+  await freshPlans();
   const m = await member('yrpre');
   await pick(m, USERS.mara);
+  const d = await call('/api/account/dashboard-info', { who: m });
+  const plans = (d.json && d.json.plans) || [];
+  ok('the plans offer no yearly price yet', plans.length > 0 && plans.every((p) => p.yearly === null && p.monthly), plans.map((p) => [p.tier, p.yearly]));
+  const yr = await checkout(m, { interval: 'year' });
+  ok('…and a yearly Checkout is refused with the line', yr.r.status === 400 && /no yearly price yet/.test(yr.r.json && yr.r.json.error), `${yr.r.status} ${yr.r.text.slice(0, 160)}`);
+  // A year bought anyway (a portal switch): recorded as a monthly payment.
+  await pay((await checkout(m, {})).sid);
+  const msub = await subscriptionOf(m.id);
   const from = logSize();
-  const { sid } = await checkout(m, { interval: 'year' });
-  const paid = await pay(sid);
-  ok('a yearly Checkout completes; every webhook 2xx', paid.status === 200 && paid.deliveries.every((d) => d.status >= 200 && d.status < 300), paid.deliveries.map((d) => `${d.type} ${d.status}`));
-  const pays = rows(`select id, amount_cents, share_cents, status from public.member_payments where user_id = ${q(m.id)}`);
+  const up = portalInvoice(msub, 'pre', { reason: 'subscription_update', paid: 7900, lines: [{ price: PRICE.yearly, amount: 7900 }] });
+  const ev = await stripeHook('/__event', { method: 'POST', body: { type: 'invoice.paid', object: up } });
+  ok('a yearly invoice (the portal) → 2xx', ev.json && ev.json.delivery && ev.json.delivery.status < 300, ev.json && ev.json.delivery);
+  const pays = rows(`select id, amount_cents, share_cents, status, stripe_charge_id from public.member_payments where stripe_invoice_id = ${q(up.id)}`);
   ok('the payment is recorded ($79)', pays.length === 1 && pays[0].amount_cents === 7900 && pays[0].status === 'split', pays);
   const lines = pays[0] ? rows(`select creator_id, cents from public.creator_ledger where payment_id = ${q(pays[0].id)}`) : [];
   ok('month 1 only: one $2.00 line for Mara', lines.length === 1 && lines[0].creator_id === USERS.mara && lines[0].cents === 200, lines);
@@ -591,9 +615,10 @@ async function before127({ simulated }) {
   ok('the cron’s yearly step finds nothing to do', r.status === 200 && r.json && r.json.yearlyMonths && r.json.yearlyMonths.skipped === 'migration 127 not run', r.json && r.json.yearlyMonths);
   const money = await call('/api/admin/money', { who: ADMIN });
   ok('Studio money answers, nothing ahead', money.status === 200 && money.json.obligations.yearlySharesAheadCents === 0, money.status);
-  const ref = await stripeApi('/refunds', { method: 'POST', params: { charge: rows(`select stripe_charge_id from public.member_payments where user_id = ${q(m.id)}`)[0].stripe_charge_id } });
-  const done = await waitFor(() => rows(`select status from public.member_payments where user_id = ${q(m.id)}`)[0].status === 'reversed');
-  ok('a full refund still reverses it', ref.status === 200 && done, rows(`select status from public.member_payments where user_id = ${q(m.id)}`));
+  const first = rows(`select stripe_charge_id from public.member_payments where user_id = ${q(m.id)} and stripe_invoice_id <> ${q(up.id)}`)[0];
+  const ref = first ? await stripeApi('/refunds', { method: 'POST', params: { charge: first.stripe_charge_id } }) : { status: 0 };
+  const done = await waitFor(() => rows(`select status from public.member_payments where user_id = ${q(m.id)} and stripe_invoice_id <> ${q(up.id)}`)[0].status === 'reversed');
+  ok('a full refund still reverses a payment', ref.status === 200 && done, rows(`select status from public.member_payments where user_id = ${q(m.id)}`));
 }
 
 async function renameColumns(back) {
@@ -632,6 +657,7 @@ await runCheck('yearly-plans', async () => {
       } finally {
         await renameColumns(true);
         renamed = false;
+        await freshPlans();
       }
     }
   } finally {

@@ -121,7 +121,9 @@ export default function PitchDetail() {
         setCommentList(data.comments);
         setCurrentTotalRaisedCents(data.totalRaisedCents);
       } catch (err) {
-        if (!cancelled) setState({ loading: false, error: err.message, data: null });
+        // A re-read that fails (coming back to the screen) keeps the page
+        // that loaded; only a first load shows the error.
+        if (!cancelled) setState((s) => (s.data ? { ...s, loading: false } : { loading: false, error: err.message, data: null }));
       }
     }
     load();

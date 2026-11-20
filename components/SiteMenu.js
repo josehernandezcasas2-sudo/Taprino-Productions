@@ -105,27 +105,44 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
   const savedTypes = useRef(accountTypes);
   const typesTimer = useRef(null);
   const typesPending = useRef(null);
-  const typesSeq = useRef(0);
+  const typesInFlight = useRef(false);
+  const typesQueued = useRef(null);
   const typesBusy = useRef(false);
   useEffect(() => {
     if (typesBusy.current) return;
     savedTypes.current = accountTypes;
     setTypes(accountTypes);
   }, [accountTypes]);
-  const sendTypes = (want, seq) => {
+  // One save at a time, the latest choice next (2026-11-20 review: two in
+  // flight could land in either order, and the screen then said one main
+  // while the database kept the other). Every answer that saved moves the
+  // last-saved copy, so a failure puts back what the database really has.
+  const sendTypes = (want) => {
+    typesInFlight.current = true;
     postAccountTypes({ types: orderedTypes(want.types, want.main), main: want.main }).then((r) => {
-      if (seq !== typesSeq.current) return; // a later switch is on its way
-      typesBusy.current = false;
+      typesInFlight.current = false;
       if (r.ok) {
         const st = r.state || {};
-        const done = { types: orderedTypes(st.types, st.main), main: st.main || null, asked: true };
-        savedTypes.current = done;
-        announceAccountTypes(done);
+        savedTypes.current = { types: orderedTypes(st.types, st.main), main: st.main || null, asked: true };
+      }
+      const next = typesQueued.current;
+      if (next) {
+        typesQueued.current = null;
+        sendTypes(next);
+        return;
+      }
+      typesBusy.current = false;
+      if (r.ok) {
+        announceAccountTypes(savedTypes.current);
       } else {
         setTypes(savedTypes.current);
         setTypesError(TYPE_WORDS.failed);
       }
     });
+  };
+  const saveTypes = (want) => {
+    if (typesInFlight.current) typesQueued.current = want;
+    else sendTypes(want);
   };
   const pickMain = (type) => {
     if (!types) return;
@@ -133,17 +150,15 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
     setTypes(want);
     setTypesError(null);
     typesBusy.current = true;
-    typesSeq.current += 1;
-    const seq = typesSeq.current;
     clearTimeout(typesTimer.current);
-    typesPending.current = { want, seq };
-    typesTimer.current = setTimeout(() => { typesTimer.current = null; typesPending.current = null; sendTypes(want, seq); }, 350);
+    typesPending.current = want;
+    typesTimer.current = setTimeout(() => { typesTimer.current = null; typesPending.current = null; saveTypes(want); }, 350);
   };
   // Closing the menu with a switch still waiting sends it at once.
   useEffect(() => () => {
     clearTimeout(typesTimer.current);
     const p = typesPending.current;
-    if (p) { typesPending.current = null; sendTypes(p.want, p.seq); }
+    if (p) { typesPending.current = null; saveTypes(p); }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const mt = isSignedIn && types ? menuTypes(types) : null;
   useEffect(() => { setOpenIds(keptOpen(readOpen(), menu.sections)); }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps

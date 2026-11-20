@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   runningOpenPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
   runningOpenText: { fontFamily: fonts.display, fontSize: 13, color: colors.ink },
   runningOpenTextPrimary: { fontFamily: fonts.displayBold, color: colors.onBrass },
-  runningAll: { alignSelf: 'flex-start', minHeight: 40, marginVertical: -6, justifyContent: 'center' },
+  runningAll: { alignSelf: 'flex-start', minHeight: 44, marginVertical: -6, justifyContent: 'center' },
   runningAllText: { fontFamily: fonts.display, fontSize: 13, color: colors.inkDim },
   // Connect / Stream.
   sides: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 999, backgroundColor: inkTint(0.05), borderWidth: 1, borderColor: inkTint(0.08) },

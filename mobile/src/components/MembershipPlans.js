@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts } from '../lib/theme';
 import { TAX_NOTE } from '../lib/salesTaxRules';
-import { BILLING_WORDS, billingSwitch, joinLabel, planCardPrice, renewLine } from '../lib/yearlyPlanRules';
+import { BILLING_WORDS, billingSwitch, joinLabel, moneyText, planCardPrice, renewLine } from '../lib/yearlyPlanRules';
 
 // The Account screen's plan picker — the app's twin of
 // components/MembershipPlans.js (mockups/membership-tiers.html, section 3):
@@ -58,7 +58,9 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
           const flagColor = current ? colors.ok : t === 'sponsor' ? colors.brass : colors.olive;
           const sub = current && subscriptionDetails;
           const accent = t === 'sponsor' ? 'brass' : t === 'premium' ? 'primary' : null;
-          const card = plan ? planCardPrice(plan, interval) : null;
+          // Your plan shows what you pay, whichever billing the switch is on.
+          const paying = current && subscriptionDetails && Number(subscriptionDetails.amount) > 0;
+          const card = paying ? { available: true, price: moneyText(subscriptionDetails.amount, subscriptionDetails.currency || (plan && plan.currency)), per: subscriptionDetails.interval === 'year' ? BILLING_WORDS.aYear : BILLING_WORDS.perMonth, sub: null } : plan ? planCardPrice(plan, interval) : null;
           const unavailable = Boolean(card && !card.available) && t !== 'basic';
           return (
             <View key={t} style={[styles.plan, current && styles.planCurrent, t === 'premium' && !current && styles.planFeatured, t === 'sponsor' && styles.planSponsor, unavailable && !current && styles.planOff]}>
@@ -107,7 +109,7 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
 const styles = StyleSheet.create({
   lede: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.inkDim, marginBottom: 6 },
   billing: { flexDirection: 'row', alignSelf: 'flex-start', maxWidth: '100%', padding: 3, borderRadius: 999, backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', marginTop: 8 },
-  billingBtn: { minHeight: 34, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', flexShrink: 1 },
+  billingBtn: { minHeight: 44, paddingHorizontal: 14, borderRadius: 999, justifyContent: 'center', flexShrink: 1 },
   billingBtnOn: { backgroundColor: colors.ink },
   billingText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.inkDim },
   billingTextOn: { fontFamily: fonts.displayBold, color: colors.surface0 },

@@ -30,7 +30,7 @@ export default async function handler(req, res) {
     }
     return res.status(400).json({ error: 'Unknown action.' });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('admin/purchases error:', err.message);
     return sendError(res, err, 'admin/purchases');
   }

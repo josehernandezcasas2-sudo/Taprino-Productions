@@ -53,6 +53,21 @@ export default function ProductionDashboard({ initialFacts, initialTab = 'overvi
   const id = facts.production.id;
 
   useEffect(() => { setFacts(initialFacts); }, [initialFacts]);
+  // A link to this same page with another tab (Needs you's "Confirm who
+  // worked it", "Post") gives new props without remounting: follow them,
+  // then go to the part of the tab the address names (#update, #add-day).
+  useEffect(() => { setTab(dashTab(initialTab)); }, [initialTab]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const target = window.location.hash.slice(1);
+    if (!target) return;
+    if (target === 'add-day') setAddingDay(true);
+    const t = setTimeout(() => {
+      const el = document.getElementById(target);
+      if (el) el.scrollIntoView({ block: 'start' });
+    }, 0);
+    return () => clearTimeout(t);
+  }, [tab]);
 
   // The line after the start sheet, once; the tab from the address; the
   // add-a-day form when the address asks for it.

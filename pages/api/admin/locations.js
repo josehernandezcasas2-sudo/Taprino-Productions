@@ -107,7 +107,7 @@ export async function handleLocationsAdmin(req, res, account) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     if (isMissingLocationsTable(err)) return res.status(503).json({ error: 'Locations aren’t set up yet — run migration 086.' });
     console.error('admin/locations:', err.message);
     return sendError(res, err, 'admin/locations');

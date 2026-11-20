@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await reportThread(userId, threadId, reason));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('messages/report:', err.message);
     return res.status(500).json({ error: 'Could not send that report right now.' });
   }

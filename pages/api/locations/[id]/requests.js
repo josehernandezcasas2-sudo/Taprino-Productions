@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   try {
     return res.status(201).json({ request: await createRequest(userId, String(req.query.id || ''), req.body || {}) });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
     console.error('location request:', err.message);
     return res.status(500).json({ error: 'Could not send that request right now.' });
   }
