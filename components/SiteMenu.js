@@ -39,6 +39,17 @@ const ICONS = {
   vertical: <><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M10.5 9v5l4-2.5z" /></>,
   'vertical-discover': <><rect x="7" y="3" width="10" height="18" rx="2" /><path d="M10.5 9v5l4-2.5z" /></>,
   downloads: <><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5" /><path d="M5 19.5h14" /></>,
+  // The Production side (2026-11-20).
+  'my-productions': <><rect x="3.5" y="9" width="17" height="11" rx="1.5" /><path d="M3.5 9l2-5 15 3-1 2" /><path d="M8.5 5.2l2 3.3M13.5 6.2l2 3" /></>,
+  dashboard: <><rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="5" rx="1" /><rect x="13" y="11" width="7" height="9" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /></>,
+  'my-work': <><rect x="3.5" y="6" width="17" height="12" rx="1.5" /><path d="M10.5 9.5v5l4-2.5z" /></>,
+  'working-card': <><rect x="3.5" y="5" width="17" height="14" rx="2" /><circle cx="9" cy="11" r="2.2" /><path d="M5.8 16c.6-1.6 1.8-2.4 3.2-2.4s2.6.8 3.2 2.4M14 10h4M14 13.5h3" /></>,
+  'my-pitches': <><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" /></>,
+  submit: <><path d="M12 20V9M7.5 13.5L12 9l4.5 4.5" /><path d="M5 4.5h14" /></>,
+  money: <><circle cx="12" cy="12" r="8.5" /><path d="M14.6 9.4c-.5-.9-1.5-1.4-2.6-1.4-1.4 0-2.5.8-2.5 1.9 0 2.6 5.1 1.4 5.1 4.1 0 1.1-1.1 2-2.6 2-1.1 0-2.1-.5-2.6-1.4M12 6.5V8M12 16v1.5" /></>,
+  numbers: <><path d="M4.5 19.5h15" /><path d="M7 16v-4M11 16V8M15 16v-6M19 16V5" /></>,
+  'my-places': <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></>,
+  'place-requests': <><rect x="3.5" y="5" width="17" height="15" rx="1.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></>,
   yours: <><path d="M4 8l8-4 8 4v8l-8 4-8-4z" /><path d="M4 8l8 4 8-4M12 12v8" /></>,
   creator: <><rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="5" rx="1" /><rect x="13" y="11" width="7" height="9" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /></>,
   team: <path d="M12 3.5l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9v-5z" />,
@@ -58,7 +69,11 @@ const TINT = {
   'pitch-room': 'gold', resources: 'gold', series: 'gold', 'my-list': 'gold',
   locations: 'mint', university: 'mint', podcasts: 'mint', team: 'mint', continue: 'mint',
   productions: 'sky', shop: 'sky', 'my-recs': 'sky', downloads: 'sky', vertical: 'sky', 'vertical-discover': 'sky',
-  live: 'red'
+  live: 'red',
+  dashboard: 'brass', submit: 'brass', 'working-card': 'brass',
+  'my-work': 'gold', 'my-pitches': 'gold',
+  'my-places': 'mint', money: 'mint', numbers: 'mint',
+  'my-productions': 'sky', 'place-requests': 'sky'
 };
 
 // Read at most once per MENU_COUNTS_MAX_AGE_MS while the tab stays open.
@@ -82,6 +97,10 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
   const [running, setRunning] = useState(isSignedIn && runningCache.who === runningWho ? runningCache.running : null);
   const [genres, setGenres] = useState(mainGenres && mainGenres.length ? mainGenres : genresCache);
   const [showMore, setShowMore] = useState(false);
+  // The person's account types (the you card below; they order the
+  // Production side's tiles).
+  const [types, setTypes] = useState(accountTypes);
+  const [typesError, setTypesError] = useState(null);
   const menu = siteMenu({
     side,
     signedIn: Boolean(isSignedIn),
@@ -91,7 +110,8 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
     counts,
     displayName: ownProfile ? ownProfile.displayName : null,
     profileHref,
-    running
+    running,
+    types: isSignedIn && types ? types : null
   });
   const [openIds, setOpenIds] = useState([]);
 
@@ -100,8 +120,6 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
   // switch shows at once and is saved a moment later (arrow keys move
   // through the chips the way radio buttons do, so only where they stop is
   // sent); a failed save puts the last saved main back and says so.
-  const [types, setTypes] = useState(accountTypes);
-  const [typesError, setTypesError] = useState(null);
   const savedTypes = useRef(accountTypes);
   const typesTimer = useRef(null);
   const typesPending = useRef(null);
@@ -349,9 +367,10 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
             </section>
           )}
 
-          <div className="sm-sides" role="group" aria-label={MENU_WORDS.sides}>
-            <button type="button" className={`sm-side connect${side === 'connect' ? ' on' : ''}`} aria-pressed={side === 'connect'} onClick={() => { setSide('connect'); setShowMore(false); }}>{MENU_WORDS.connect}</button>
-            <button type="button" className={`sm-side stream${side === 'stream' ? ' on' : ''}`} aria-pressed={side === 'stream'} onClick={() => { setSide('stream'); setShowMore(false); }}>{MENU_WORDS.stream}</button>
+          <div className={`sm-sides n${menu.sides.length}`} role="group" aria-label={MENU_WORDS.sides}>
+            {menu.sides.map((x) => (
+              <button key={x.id} type="button" className={`sm-side ${x.id}${menu.side === x.id ? ' on' : ''}`} aria-pressed={menu.side === x.id} onClick={() => { setSide(x.id); setShowMore(false); }}>{x.label}</button>
+            ))}
           </div>
           <Link href={menu.home.href} className="sm-home" onClick={go}>{menu.home.label} <span aria-hidden="true">→</span></Link>
 

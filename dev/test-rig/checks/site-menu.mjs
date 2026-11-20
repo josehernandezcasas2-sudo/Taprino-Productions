@@ -98,16 +98,23 @@ await runCheck('site-menu', async () => {
       ok('See more adds the rest', more.length > 6 && more.includes('swipe'), more);
       ok('…and says See less', (await pg.$eval('.sm-more', (e) => e.textContent.trim())) === 'See less');
       const secs = await sectionsOf(pg);
-      ok('a creator has Your things, Creator, Settings & account and Help & legal', secs.join('|') === 'yours|creator|account|help', secs);
+      ok('a creator has Settings & account and Help & legal (their things are the Production side)', secs.join('|') === 'account|help', secs);
       ok('…and no Make films? card', !(await pg.$('.sm-apply')));
-      const yours = pg.locator('.sm-section[data-section="yours"] .sm-section-head');
-      await yours.tap();
-      const rowsYours = await pg.$$eval('.sm-section[data-section="yours"] .sm-row', (els) => els.map((e) => e.textContent.trim()));
-      ok('Your things opens in place with its rows', rowsYours.join('|') === 'My working card|My locations|Location requests|Your productions', rowsYours);
-      ok('…and says it is open', (await yours.getAttribute('aria-expanded')) === 'true');
-      const creatorRows = async () => { await pg.locator('.sm-section[data-section="creator"] .sm-section-head').tap(); return pg.$$eval('.sm-section[data-section="creator"] .sm-row', (els) => els.map((e) => e.textContent.trim())); };
-      const cr = await creatorRows();
-      ok('Creator: Dashboard, Your work, Submit, numbers, Money', cr.join('|') === 'Dashboard|Your work|Submit your work|Your numbers|Money', cr);
+      // The Production side (2026-11-20): a third choice, signed in.
+      const sides = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => e.textContent.trim()));
+      ok('three sides: Connect, Stream, Production', sides.join('|') === 'Connect|Stream|Production', sides);
+      const sideBoxes = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => ({ sw: e.scrollWidth, cw: e.clientWidth })));
+      ok('…each label fits its button', sideBoxes.every((x) => x.sw <= x.cw + 1), sideBoxes);
+      await pg.locator('.sm-side.production').tap();
+      const work = await tilesOf(pg);
+      ok('Production: Your productions, Dashboard, Your work, Working card, Your pitches, Submit', work.join('|') === 'my-productions|dashboard|my-work|working-card|my-pitches|submit', work);
+      const hrefs = await pg.$$eval('.sm-grid .sm-tile', (els) => els.map((e) => e.getAttribute('href')));
+      ok('…each goes to their own page, never a directory', hrefs.join('|') === '/productions/mine|/creator/dashboard|/creator/my-work|/crew/card|/creator/pitch/dashboard|/creator/submit', hrefs);
+      ok('…the home link is Your productions', (await pg.$eval('.sm-home', (e) => e.getAttribute('href'))) === '/productions/mine');
+      await pg.locator('.sm-more').tap();
+      const allWork = await tilesOf(pg);
+      ok('…See more: Money, Your numbers, Your places, Place requests', allWork.slice(6).join('|') === 'money|numbers|my-places|place-requests', allWork);
+      await pg.locator('.sm-section[data-section="account"] .sm-section-head').tap();
       // The list scrolls by itself; the page behind never moves.
       const body = await box(pg, '.sm-body');
       const sh = await pg.$eval('.sm-body', (e) => ({ sh: e.scrollHeight, ch: e.clientHeight }));
@@ -118,15 +125,16 @@ await runCheck('site-menu', async () => {
       ok('Log out is the last thing and can be reached', logout.text === 'Log out' && logout.bottom <= logout.viewH && logout.onTop, logout);
       ok('the page behind did not move', (await pg.evaluate(() => window.scrollY)) === startY);
       ok('no sideways scroll with the menu open', (await overflowPx(pg)) <= 0, await overflowPx(pg));
-      // A row navigates and closes the menu.
-      await pg.locator('.sm-section[data-section="yours"] .sm-row', { hasText: 'My locations' }).tap();
+      // A tile navigates and closes the menu.
+      await pg.locator('.sm-tile[data-tile="my-places"]').tap();
       await pg.waitForURL(/\/locations\/mine/, { timeout: 60000 });
       await pg.waitForTimeout(600);
-      ok('a row goes to its page and the menu closes', !(await pg.$('.site-menu')), pg.url());
-      // The sections opened stay open the next time.
+      ok('a tile goes to its page and the menu closes', !(await pg.$('.site-menu')), pg.url());
+      // The sections opened stay open the next time; a work page opens on Production.
       await open(pg, true);
       const kept = await pg.$$eval('.sm-section.open', (els) => els.map((e) => e.getAttribute('data-section')));
-      ok('the sections opened stay open on the next page', kept.includes('yours') && kept.includes('creator'), kept);
+      ok('the sections opened stay open on the next page', kept.includes('account'), kept);
+      ok('on one of your work pages it opens on Production', (await pg.$eval('.sm-side.on', (e) => e.textContent.trim())) === 'Production');
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();
       void body;
@@ -144,10 +152,12 @@ await runCheck('site-menu', async () => {
       await pg.waitForSelector('.sm-genres .sm-chip', { timeout: 15000 }).catch(() => {});
       ok('Browse by genre has chips', (await pg.$$('.sm-genres .sm-chip')).length > 0);
       const secs = await sectionsOf(pg);
-      ok('a viewer has Your things, Settings & account and Help & legal', secs.join('|') === 'yours|account|help', secs);
+      ok('a viewer has Settings & account and Help & legal', secs.join('|') === 'account|help', secs);
       ok('…and the Make films? card', Boolean(await pg.$('.sm-apply[href="/apply"]')));
       const plan = await pg.$eval('.sm-you-plan', (e) => e.textContent.trim());
       ok('the plan line and Join Tapa + for someone without a plan', /Free account/.test(plan) && /Join Tapa \+/.test(plan), plan);
+      await pg.locator('.sm-side.production').tap();
+      ok('a viewer’s Production side: their productions, working card and places', (await tilesOf(pg)).join('|') === 'my-productions|working-card|my-places|place-requests', await tilesOf(pg));
       await pg.locator('.sm-side.connect').tap();
       ok('the switch moves to Connect tiles', (await tilesOf(pg))[0] === 'crew');
       ok('…and the home link follows it', (await pg.$eval('.sm-home', (e) => e.getAttribute('href'))) === '/');
@@ -170,6 +180,7 @@ await runCheck('site-menu', async () => {
       ok('…with Sign in and Create account', (await pg.$$eval('.sm-out .sm-btn', (els) => els.map((e) => e.textContent.trim()))).join('|') === 'Sign in|Create account');
       const secs = await sectionsOf(pg);
       ok('only Help & legal', secs.join('|') === 'help', secs);
+      ok('two sides, no Production', (await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => e.textContent.trim()))).join('|') === 'Connect|Stream');
       ok('no Log out', !(await pg.$('.sm-logout')));
       ok('Make films? is there', Boolean(await pg.$('.sm-apply')));
       ok('no page errors', errors.length === 0, errors);
@@ -187,7 +198,7 @@ await runCheck('site-menu', async () => {
       const m = await box(pg, '.site-menu');
       ok('a 440px drawer from the left, the screen tall', m && m.left === 0 && Math.abs(m.width - 440) <= 1 && Math.abs(m.bottom - m.viewH) <= 1, m);
       const secs = await sectionsOf(pg);
-      ok('an admin has Creator and Team', secs.includes('creator') && secs.includes('team'), secs);
+      ok('an admin has Team', secs.includes('team') && !secs.includes('creator'), secs);
       await pg.locator('.sm-section[data-section="team"] .sm-section-head').click();
       const team = await pg.$$eval('.sm-section[data-section="team"] .sm-row', (els) => els.map((e) => e.textContent.trim()));
       ok('Team: Admin Portal and Channel scheduler', team.join('|') === 'Admin Portal|Channel scheduler', team);
@@ -219,7 +230,10 @@ await runCheck('site-menu', async () => {
       ok('there is no tab bar here', !(await pg.$('.tabbar')));
       await open(pg, true);
       const secs = await sectionsOf(pg);
-      ok('a sub-admin: Creator (the Dashboard) and Team (Admin Portal)', secs.includes('creator') && secs.includes('team'), secs);
+      ok('a sub-admin: Team (Admin Portal)', secs.includes('team'), secs);
+      await pg.locator('.sm-side.production').tap();
+      const subWork = await tilesOf(pg);
+      ok('…and the Dashboard on the Production side, without the creator pages', subWork.includes('dashboard') && !subWork.includes('my-work') && !subWork.includes('submit'), subWork);
       await pg.locator('.sm-section[data-section="team"] .sm-section-head').tap();
       const team = await pg.$$eval('.sm-section[data-section="team"] .sm-row', (els) => els.map((e) => e.textContent.trim()));
       ok('…Team is Admin Portal only', team.join('|') === 'Admin Portal', team);

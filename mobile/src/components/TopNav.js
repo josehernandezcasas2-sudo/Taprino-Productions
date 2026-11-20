@@ -12,7 +12,7 @@ import { rememberStayInStream } from '../lib/stayInStream';
 import { useNotifications } from '../lib/useUnread';
 import { hrefToRoute } from './PushListener';
 import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
-import { MENU_WORDS } from '../lib/siteMenuRules';
+import { MENU_WORDS, menuSideFor } from '../lib/siteMenuRules';
 import SiteMenu, { forgetMenuMembership } from './SiteMenu';
 
 // The mobile routes that count as the Stream half of the site — the same
@@ -284,7 +284,7 @@ export default function TopNav() {
       <SiteMenu
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
-        side={stream ? 'stream' : 'connect'}
+        side={menuSideFor({ inStream: stream, pathname, signedIn: Boolean(isSignedIn) })}
         settings={settings}
         ownProfile={ownProfile}
       />

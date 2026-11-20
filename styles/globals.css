@@ -14718,6 +14718,11 @@ a.tabbar-item { text-decoration: none; }
 }
 .sm-side.connect.on { color: var(--mint); background: color-mix(in srgb, var(--mint) 16%, transparent); border-color: color-mix(in srgb, var(--mint) 55%, transparent); }
 .sm-side.stream.on { color: var(--olive); background: rgba(var(--olive-rgb), 0.16); border-color: rgba(var(--olive-rgb), 0.55); }
+/* The Production side (2026-11-20): three sides share the row, so the
+   letters sit a little closer; the brass is the person's own work. */
+.sm-side.production.on { color: var(--brass); background: rgba(var(--brass-rgb), 0.14); border-color: rgba(var(--brass-rgb), 0.55); }
+.sm-sides.n3 .sm-side { letter-spacing: 0.1em; padding: 0 4px; min-width: 0; }
+@media (max-width: 359px) { .sm-sides.n3 .sm-side { letter-spacing: 0.04em; font-size: 0.66rem; } }
 .sm-home { align-self: flex-start; margin: -2px 2px 0; font-size: 0.82rem; color: var(--ink-dim); text-decoration: none; }
 .sm-home:hover { color: var(--brass); }
 .sm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

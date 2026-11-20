@@ -25,9 +25,10 @@ const siteMenu = async (pg) => {
   for (const head of await pg.$$('.site-menu .sm-section-head[aria-expanded="false"]')) await head.click();
   const items = await pg.$$eval('.site-menu a, .site-menu .sm-btn, .site-menu .sm-logout', (els) => els.map((e) => (e.querySelector('.sm-tile-label, .sm-section-title') || e).textContent.trim()));
   const sections = await pg.$$eval('.site-menu .sm-section', (els) => els.map((e) => e.getAttribute('data-section')));
+  const sides = await pg.$$eval('.site-menu .sm-side', (els) => els.map((e) => e.textContent.trim()));
   await pg.keyboard.press('Escape').catch(() => {});
   await pg.waitForTimeout(200);
-  return { items, sections };
+  return { items, sections, sides };
 };
 
 const tabMenu = async (pg, label) => {
@@ -96,7 +97,7 @@ await runCheck('menu-rows', async () => {
       ok('no Become a creator for a creator', !t.includes('Become a creator'), t);
       const menu = await siteMenu(pg);
       ok('the ☰ menu has My List and My Recs, and Log out', menu.items.includes('My List') && menu.items.includes('My Recs') && menu.items.includes('Log out'), menu.items);
-      ok('…and the Creator section, without Make films?', menu.sections.includes('creator') && !menu.items.includes('Make films?'), menu);
+      ok('…its own pages on the Production side, without Make films?', menu.sides.includes('Production') && !menu.sections.includes('creator') && !menu.items.includes('Make films?'), menu);
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();
     }

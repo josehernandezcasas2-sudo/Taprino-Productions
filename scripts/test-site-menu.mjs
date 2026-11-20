@@ -89,29 +89,76 @@ t('sections: signed out has only Help & legal', () => {
   assert.equal(s[0].summary, 'About, Contact, Terms, Privacy, Cookies, AI policy');
 });
 
-t('sections: a viewer gets their things and settings, no creator or team', () => {
+t('sections: a viewer gets settings, no team; their things are the Production side', () => {
   const s = R.menuSections({ signedIn: true, roles: {} });
-  assert.deepEqual(ids(s), ['yours', 'account', 'help']);
+  assert.deepEqual(ids(s), ['account', 'help']);
   const account = s.find((x) => x.id === 'account');
   assert.ok(account.rows.some((r) => r.label === 'Join Tapa +' && r.href === '/account/membership'));
   const member = R.menuSections({ signedIn: true, isSubscriber: true }).find((x) => x.id === 'account');
   assert.ok(member.rows.some((r) => r.label === 'Membership'));
 });
 
-t('sections: a creator, an admin, a sub-admin and a scheduler', () => {
-  const creator = R.menuSections({ signedIn: true, roles: { isCreator: true } });
-  assert.deepEqual(ids(creator), ['yours', 'creator', 'account', 'help']);
-  assert.deepEqual(creator[1].rows.map((r) => r.label), ['Dashboard', 'Your work', 'Submit your work', 'Your numbers', 'Money']);
+t('sections: an admin, a sub-admin and a scheduler get Team; a creator none extra', () => {
+  assert.deepEqual(ids(R.menuSections({ signedIn: true, roles: { isCreator: true } })), ['account', 'help']);
   const admin = R.menuSections({ signedIn: true, roles: { isAdmin: true, canAccessAdmin: true } });
-  assert.deepEqual(ids(admin), ['yours', 'creator', 'team', 'account', 'help']);
-  assert.deepEqual(admin[1].rows.map((r) => r.label), ['Dashboard', 'Your work', 'Submit your work', 'Money']);
-  assert.deepEqual(admin[2].rows.map((r) => r.label), ['Admin Portal', 'Channel scheduler']);
+  assert.deepEqual(ids(admin), ['team', 'account', 'help']);
+  assert.deepEqual(admin[0].rows.map((r) => r.label), ['Admin Portal', 'Channel scheduler']);
   const sub = R.menuSections({ signedIn: true, roles: { canAccessAdmin: true } });
-  assert.deepEqual(sub.find((x) => x.id === 'creator').rows.map((r) => r.label), ['Dashboard']);
   assert.deepEqual(sub.find((x) => x.id === 'team').rows.map((r) => r.label), ['Admin Portal']);
   const sched = R.menuSections({ signedIn: true, roles: { isCreator: true, isContentScheduler: true } });
   assert.deepEqual(sched.find((x) => x.id === 'team').rows.map((r) => r.label), ['Channel scheduler']);
-  assert.equal(admin[2].summary, 'Admin Portal, Channel scheduler');
+  assert.equal(admin[0].summary, 'Admin Portal, Channel scheduler');
+});
+
+t('Production: a third side signed in only; signed out it opens on Connect', () => {
+  assert.deepEqual(R.siteMenu({ signedIn: true }).sides.map((x) => x.label), ['Connect', 'Stream', 'Production']);
+  assert.deepEqual(R.siteMenu({ signedIn: false }).sides.map((x) => x.id), ['connect', 'stream']);
+  const out = R.siteMenu({ side: 'production', signedIn: false });
+  assert.equal(out.side, 'connect');
+  const m = R.siteMenu({ side: 'production', signedIn: true });
+  assert.deepEqual(m.home, { href: '/productions/mine', label: 'Go to Your productions' });
+  assert.equal(m.genres, false);
+});
+
+t('Production: a viewer has their productions, working card and places, never a directory', () => {
+  const m = R.siteMenu({ side: 'production', signedIn: true, roles: {} });
+  assert.deepEqual(m.tiles.map((t) => [t.id, t.href]), [
+    ['my-productions', '/productions/mine'],
+    ['working-card', '/crew/card'],
+    ['my-places', '/locations/mine'],
+    ['place-requests', '/locations/requests']
+  ]);
+  assert.deepEqual(m.more, []);
+});
+
+t('Production: a creator with no types — productions first, then the creator pages', () => {
+  const m = R.siteMenu({ side: 'production', signedIn: true, roles: { isCreator: true } });
+  assert.deepEqual([...m.tiles, ...m.more].map((t) => t.id), ['my-productions', 'dashboard', 'my-work', 'working-card', 'my-pitches', 'submit', 'money', 'numbers', 'my-places', 'place-requests']);
+  assert.equal(m.tiles.length, 6);
+});
+
+t('Production: the main type leads — creator, crew, cast, studio', () => {
+  const ord = (types, roles = { isCreator: true }) => [...R.menuTiles('production', { signedIn: true, roles, types })].map((t) => t.id);
+  assert.deepEqual(ord({ types: ['creator'], main: 'creator' }).slice(0, 6), ['dashboard', 'my-work', 'my-productions', 'my-pitches', 'submit', 'money']);
+  assert.deepEqual(ord({ types: ['crew', 'creator'], main: 'crew' }).slice(0, 3), ['working-card', 'my-productions', 'dashboard']);
+  assert.deepEqual(ord({ types: ['studio'], main: 'studio' }, {}), ['my-productions', 'my-places', 'place-requests', 'working-card']);
+  const cast = R.menuTiles('production', { signedIn: true, roles: {}, types: { types: ['cast'], main: 'cast' } });
+  assert.equal(cast[0].id, 'working-card');
+  assert.equal(cast[0].line, 'Headshots and reel');
+  // A main that isn't ticked, or junk, is ignored.
+  assert.deepEqual(ord({ types: ['nope'], main: 'nope' }, {}), ['my-productions', 'working-card', 'my-places', 'place-requests']);
+});
+
+t('Production: who gets the creator pages; the live line on Your productions', () => {
+  const ids2 = (roles) => R.menuTiles('production', { signedIn: true, roles }).map((t) => t.id);
+  assert.ok(ids2({ canAccessAdmin: true }).includes('dashboard') && !ids2({ canAccessAdmin: true }).includes('my-work'));
+  assert.ok(ids2({ isAdmin: true }).includes('submit') && !ids2({ isAdmin: true }).includes('numbers'));
+  const t = R.menuTiles('production', { signedIn: true, running: { items: [{ id: 'a' }], total: 3 } })[0];
+  assert.equal(t.line, '3 running now');
+  assert.equal(t.live, true);
+  const off = R.menuTiles('production', { signedIn: true, running: { items: [], total: 0 } })[0];
+  assert.equal(off.line, 'Shoots you run or work on');
+  assert.deepEqual(R.menuTiles('production', { signedIn: false }), []);
 });
 
 t('you at the top: name, profile link and plan', () => {
@@ -131,9 +178,9 @@ t('Make films? for everyone but creators and admins; Log out only signed in', ()
 });
 
 t('sections kept open: only ids the menu has', () => {
-  const sections = R.menuSections({ signedIn: true, roles: { isCreator: true } });
-  assert.deepEqual(R.keptOpen(['yours', 'team', 7, 'creator'], sections), ['yours', 'creator']);
-  assert.deepEqual(R.keptOpen('yours', sections), []);
+  const sections = R.menuSections({ signedIn: true, roles: { isAdmin: true } });
+  assert.deepEqual(R.keptOpen(['yours', 'team', 7, 'account'], sections), ['team', 'account']);
+  assert.deepEqual(R.keptOpen('team', sections), []);
 });
 
 t('counts are read again after two minutes', () => {
@@ -141,12 +188,6 @@ t('counts are read again after two minutes', () => {
   assert.equal(R.countsFresh(now - 60_000, now), true);
   assert.equal(R.countsFresh(now - 3 * 60_000, now), false);
   assert.equal(R.countsFresh(undefined, now), false);
-});
-
-t('Your things: Your productions goes to /productions/mine', () => {
-  const yours = R.menuSections({ signedIn: true }).find((x) => x.id === 'yours');
-  assert.deepEqual(yours.rows.map((r) => r.label), ['My working card', 'My locations', 'Location requests', 'Your productions']);
-  assert.equal(yours.rows[3].href, '/productions/mine');
 });
 
 t('Running now: two productions, their lines and what needs you; only signed in, only with one', () => {
@@ -180,6 +221,13 @@ t('Running now: two productions, their lines and what needs you; only signed in,
 t('the side follows the page', () => {
   assert.equal(R.menuSide(true), 'stream');
   assert.equal(R.menuSide(false), 'connect');
+  // Your own work pages open on Production (signed in), the website's paths and the app's.
+  for (const p of ['/productions/mine', '/productions/abc/dashboard?tab=crew', '/creator/dashboard', '/creator/my-work', '/account/my-work', '/crew/card', '/locations/mine', '/locations/requests/123']) {
+    assert.equal(R.menuSideFor({ pathname: p, signedIn: true }), 'production', p);
+  }
+  assert.equal(R.menuSideFor({ pathname: '/creator/dashboard', signedIn: false }), 'connect');
+  for (const p of ['/productions', '/productions/abc', '/crew', '/locations', '/creatorx']) assert.equal(R.menuSideFor({ pathname: p, signedIn: true }), 'connect', p);
+  assert.equal(R.menuSideFor({ pathname: '/stream', inStream: true, signedIn: true }), 'stream');
 });
 
 console.log(`\n${n} checks passed`);

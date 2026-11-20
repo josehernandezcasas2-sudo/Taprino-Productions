@@ -6,6 +6,8 @@ import { apiGet, freshToken } from './api';
 // sub-admin), from the site's /api/my-role. Cached for the app session
 // so BottomNav doesn't refetch on every route change.
 let cache = null;
+// When /api/my-role was last read (refreshAdminRole).
+let readAt = 0;
 const listeners = new Set();
 
 function publish(next) {
@@ -29,7 +31,7 @@ export function useAdminRole() {
     (async () => {
       const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
       const r = await apiGet('/api/my-role', token).catch(() => null);
-      if (!cancelled && r) publish(r);
+      if (!cancelled && r) { readAt = Date.now(); publish(r); }
     })();
     return () => { cancelled = true; };
   }, [isSignedIn]);
@@ -66,6 +68,15 @@ export async function readAdminRole(getToken) {
   if (!token) return null;
   const r = await apiGet('/api/my-role', token).catch(() => null);
   if (!r || !r.isSignedIn) return null;
+  readAt = Date.now();
   publish(r);
   return r;
+}
+
+// The ☰ menu reads who this is again as it opens, at most this often
+// (2026-11-20: the copy was read once a session, so account types saved on
+// the website, or before the copy was held, never reached the menu's card).
+export async function refreshAdminRole(getToken, maxAgeMs = 30000) {
+  if (cache && cache.isSignedIn && Date.now() - readAt < maxAgeMs) return cache;
+  return readAdminRole(getToken);
 }

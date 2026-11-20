@@ -8,7 +8,7 @@ import { useNotifications } from '../lib/useNotifications';
 import SiteMenu from './SiteMenu';
 import { ACCOUNT_TYPES_EVENT } from './account/AccountTypeBits';
 import SignInHere from './SignInHere';
-import { MENU_WORDS, menuSide } from '../lib/siteMenuRules';
+import { MENU_WORDS, menuSideFor } from '../lib/siteMenuRules';
 import { isStreamPath } from '../lib/streamSection';
 import { SearchIcon, BellIcon, HamburgerMenuIcon, usePlayerIconOverrides, ChatIcon } from './PlayerIcons';
 
@@ -374,7 +374,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             onClose={() => setOpenMenu(null)}
             onSearch={() => setOpenMenu('search')}
             onSignOut={() => { setOpenMenu(null); signOut({ redirectUrl: '/' }); }}
-            initialSide={menuSide(inStreamSection)}
+            initialSide={menuSideFor({ inStream: inStreamSection, pathname: router.asPath, signedIn: Boolean(isSignedIn) })}
             isSignedIn={isSignedIn}
             isSubscriber={isSubscriber}
             roles={{

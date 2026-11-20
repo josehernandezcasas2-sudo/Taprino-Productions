@@ -19,6 +19,7 @@ import { useCaptureBlock } from '../../lib/captureBlock';
 import { useRereadWhenSignedIn } from '../../lib/resumeTask';
 import { mainFirst, orderedTypes } from '../../lib/accountTypeRules';
 import { TypesLine } from '../../components/account/AccountTypeBits';
+import { useAdminRole } from '../../lib/adminRole';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -113,6 +114,10 @@ export default function PublicProfile() {
   // Follow follows and the Tip button opens its sheet — by itself when Tip
   // is what they had pressed (components/TipSheet.js, lib/resumeTask.js).
   const [reloadKey, setReloadKey] = useState(0);
+  // Your own account types as the app last saved or read them (2026-11-20:
+  // a type saved while this screen was open, or a moment ago elsewhere,
+  // showed only after the next read).
+  const role = useAdminRole();
   useRereadWhenSignedIn(state.data, Boolean(state.data && state.data.isSignedIn), () => setReloadKey((k) => k + 1));
 
   useEffect(() => {
@@ -184,8 +189,10 @@ export default function PublicProfile() {
   const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn, tipping, aiSeal, accountTypes } = state.data;
   // Account types (migration 126): what they ticked and their main, which
   // orders the sections below; nothing for someone here to watch.
-  const typesList = accountTypes && Array.isArray(accountTypes.types) ? accountTypes.types : [];
-  const typesMain = orderedTypes(typesList, accountTypes && accountTypes.main)[0] || null;
+  const ownTypes = viewerId && profile && viewerId === profile.userId && role && role.isSignedIn && role.accountTypes && Array.isArray(role.accountTypes.types) ? role.accountTypes : null;
+  const shownTypes = ownTypes || accountTypes;
+  const typesList = shownTypes && Array.isArray(shownTypes.types) ? shownTypes.types : [];
+  const typesMain = orderedTypes(typesList, shownTypes && shownTypes.main)[0] || null;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })

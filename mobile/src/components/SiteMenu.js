@@ -6,7 +6,7 @@ import { useAuth } from '../lib/stableAuth';
 import { apiGet, freshToken } from '../lib/api';
 import { colors, fonts, inkTint, brassTint, oliveTint, dangerTint, mintTint, skyTint, surfaceTint, absoluteFill } from '../lib/theme';
 import { MENU_LIVE_LINES, MENU_WORDS, countsFresh, keptOpen, siteMenu } from '../lib/siteMenuRules';
-import { useAdminRole } from '../lib/adminRole';
+import { refreshAdminRole, useAdminRole } from '../lib/adminRole';
 import { signOutEverywhere } from '../lib/signOut';
 import { hrefToRoute } from './PushListener';
 import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
@@ -45,7 +45,11 @@ const TINT = {
   'pitch-room': 'gold', resources: 'gold', series: 'gold', 'my-list': 'gold',
   locations: 'mint', university: 'mint', podcasts: 'mint', team: 'mint', continue: 'mint',
   productions: 'sky', shop: 'sky', 'my-recs': 'sky', downloads: 'sky', vertical: 'sky', 'vertical-discover': 'sky',
-  live: 'red'
+  live: 'red',
+  dashboard: 'brass', submit: 'brass', 'working-card': 'brass',
+  'my-work': 'gold', 'my-pitches': 'gold',
+  'my-places': 'mint', money: 'mint', numbers: 'mint',
+  'my-productions': 'sky', 'place-requests': 'sky'
 };
 const TINTS = {
   brass: { color: colors.brass, tint: brassTint },
@@ -54,7 +58,7 @@ const TINTS = {
   sky: { color: colors.sky, tint: skyTint },
   red: { color: colors.danger, tint: dangerTint }
 };
-const SIDE_TINT = { connect: TINTS.mint, stream: TINTS.gold };
+const SIDE_TINT = { connect: TINTS.mint, stream: TINTS.gold, production: TINTS.brass };
 
 // Kept for the app's session: the live lines (read at most every
 // MENU_COUNTS_MAX_AGE_MS), the genres, the plan line, and which sections
@@ -189,7 +193,7 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
   const signedIn = Boolean(isSignedIn);
   const runningWho = signedIn ? userId || null : null;
   const [running, setRunning] = useState(signedIn && runningCache.who === runningWho ? runningCache.running : null);
-  const [side, setSide] = useState(startSide === 'stream' ? 'stream' : 'connect');
+  const [side, setSide] = useState(startSide === 'stream' || startSide === 'production' ? startSide : 'connect');
   const [counts, setCounts] = useState(countsCache.counts);
   const [genres, setGenres] = useState(genresCache || []);
   const [membership, setMembership] = useState(membershipCache.at ? membershipCache.isSubscriber : null);
@@ -222,7 +226,8 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     counts,
     displayName,
     profileHref,
-    running
+    running,
+    types: typesState
   });
 
   // Which sections are open (kept for the app's session); only the ones
@@ -250,6 +255,9 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     if (!signedIn) return undefined;
     let alive = true;
     loadMembership(getToken).then((m) => { if (alive && m.at) setMembership(m.isSubscriber); });
+    // Who this is, read again (at most every 30 s): the account types on
+    // the card and the Production side's tiles follow a save made anywhere.
+    refreshAdminRole(getToken).catch(() => {});
     return () => { alive = false; };
   }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -337,7 +345,7 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
   const tileWidth = gridWidth > 0 ? Math.floor((gridWidth - GAP) / 2) : null;
   const tiles = showMore ? [...menu.tiles, ...menu.more] : menu.tiles;
   const p = menu.profile;
-  const sideTint = SIDE_TINT[side];
+  const sideTint = SIDE_TINT[menu.side] || SIDE_TINT.connect;
   const padLeft = 16 + insets.left;
   const padRight = 16 + (drawer ? 0 : insets.right);
 
@@ -448,18 +456,20 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
         ) : null}
 
         <View style={styles.sides} accessibilityLabel={MENU_WORDS.sides}>
-          {['connect', 'stream'].map((s) => {
-            const on = s === side;
-            const t = SIDE_TINT[s];
+          {menu.sides.map((x) => {
+            const on = x.id === menu.side;
+            const t = SIDE_TINT[x.id] || SIDE_TINT.connect;
+            const three = menu.sides.length > 2;
             return (
               <Pressable
-                key={s}
+                key={x.id}
                 style={[styles.side, on && { backgroundColor: t.tint(0.16), borderColor: t.tint(0.55) }]}
-                onPress={() => pickSide(s)}
+                onPress={() => pickSide(x.id)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
+                accessibilityLabel={x.label}
               >
-                <Text style={[styles.sideText, { color: on ? t.color : colors.inkFaint }]}>{s === 'connect' ? MENU_WORDS.connect : MENU_WORDS.stream}</Text>
+                <Text style={[styles.sideText, three && styles.sideTextThree, { color: on ? t.color : colors.inkFaint }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{x.label}</Text>
               </Pressable>
             );
           })}
@@ -665,6 +675,8 @@ const styles = StyleSheet.create({
   sides: { flexDirection: 'row', gap: 4, padding: 4, borderRadius: 999, backgroundColor: inkTint(0.05), borderWidth: 1, borderColor: inkTint(0.08) },
   side: { flex: 1, height: 36, borderRadius: 999, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   sideText: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' },
+  // Three sides share the row (2026-11-20): the letters sit closer.
+  sideTextThree: { letterSpacing: 1 },
   home: { alignSelf: 'flex-start', paddingVertical: 2, paddingHorizontal: 2, marginTop: -2 },
   homeText: { fontFamily: fonts.displaySemi, fontSize: 13.5 },
   // The tiles.

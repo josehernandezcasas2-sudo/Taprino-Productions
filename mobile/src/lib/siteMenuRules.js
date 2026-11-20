@@ -57,11 +57,41 @@ export const MENU_WORDS = {
   sides: 'Which half of the site',
   runningNow: 'Running now',
   runningOpen: 'Open',
-  allProductions: 'All your productions'
+  allProductions: 'All your productions',
+  production: 'Production',
+  productionHome: 'Go to Your productions'
 };
 
 export function menuSide(inStream) {
   return inStream ? 'stream' : 'connect';
+}
+
+// The Production side (Jose, 2026-11-20: "a production tab … where users/
+// creators and crew type users can find the pages to their work … goes
+// directly to their work instead of their discover page"): a third choice
+// beside Connect and Stream for anyone signed in. The menu opens on it from
+// one of those pages (the website's paths and the app's own, where they
+// differ).
+export const MENU_SIDES = ['connect', 'stream', 'production'];
+const WORK_PATHS = [
+  /^\/productions\/mine(\/|$)/,
+  /^\/productions\/[^/]+\/dashboard(\/|$)/,
+  /^\/creator(\/|$)/,
+  /^\/account\/my-work(\/|$)/,
+  /^\/crew\/card(\/|$)/,
+  /^\/locations\/mine(\/|$)/,
+  /^\/locations\/requests(\/|$)/
+];
+export function menuSides(signedIn) {
+  return signedIn ? MENU_SIDES : MENU_SIDES.slice(0, 2);
+}
+export function menuSideFor({ inStream = false, pathname = '', signedIn = false } = {}) {
+  const path = String(pathname || '').split(/[?#]/)[0];
+  if (signedIn && WORK_PATHS.some((re) => re.test(path))) return 'production';
+  return menuSide(inStream);
+}
+export function sideLabel(side) {
+  return side === 'stream' ? MENU_WORDS.stream : side === 'production' ? MENU_WORDS.production : MENU_WORDS.connect;
 }
 
 function plural(n, one, many) {
@@ -95,13 +125,58 @@ function placesLine(counts) {
   return places ? plural(places, 'place to shoot', 'places to shoot') : null;
 }
 
+// The Production side's tiles: the person's own pages, never a directory.
+// Who gets which: the creator pages for a creator or an admin (the
+// Dashboard for a sub-admin too, as the bottom bar's tab); everyone signed
+// in has their productions, their working card and their places. The order
+// follows their account types (lib/accountTypeRules.js; `types` is
+// { types, main }), the main first: a creator's titles, a crew member's or
+// a performer's working card, a studio's productions and places; then the
+// rest in the usual order. `running` is /api/productions/running's answer
+// (the live line on Your productions).
+const WORK_GROUPS = {
+  creator: ['dashboard', 'my-work', 'my-productions', 'my-pitches', 'submit', 'money', 'numbers'],
+  crew: ['working-card', 'my-productions'],
+  cast: ['working-card', 'my-productions'],
+  studio: ['my-productions', 'my-places', 'place-requests']
+};
+const WORK_ORDER = ['my-productions', 'dashboard', 'my-work', 'working-card', 'my-pitches', 'submit', 'money', 'numbers', 'my-places', 'place-requests'];
+function workTiles(tile, { roles = {}, types = null, running = null } = {}) {
+  const isAdmin = Boolean(roles.isAdmin);
+  const isCreator = Boolean(roles.isCreator);
+  const isSubAdmin = !isAdmin && Boolean(roles.canAccessAdmin || roles.isSubAdmin);
+  const makes = isCreator || isAdmin;
+  const list = types && Array.isArray(types.types) ? types.types.filter((t) => typeof t === 'string' && WORK_GROUPS[t]) : [];
+  const main = types && list.includes(types.main) ? types.main : list[0] || null;
+  const ordered = main ? [main, ...list.filter((t) => t !== main)] : list;
+  const items = running && Array.isArray(running.items) ? running.items.length : 0;
+  const total = running ? Math.max(num(running.total), items) : 0;
+  const all = {
+    'my-productions': tile('my-productions', '/productions/mine', 'Your productions', 'Shoots you run or work on', total ? `${total} running now` : null),
+    dashboard: makes || isSubAdmin ? tile('dashboard', '/creator/dashboard', 'Dashboard', 'Titles and earnings') : null,
+    'my-work': makes ? tile('my-work', '/creator/my-work', 'Your work', 'Live, in review, drafts') : null,
+    'working-card': tile('working-card', '/crew/card', 'Working card', main === 'cast' ? 'Headshots and reel' : 'Your roles and gear'),
+    'my-pitches': makes ? tile('my-pitches', '/creator/pitch/dashboard', 'Your pitches', 'Backing and updates') : null,
+    submit: makes ? tile('submit', '/creator/submit', 'Submit a title', 'Films, shows, podcasts') : null,
+    money: makes ? tile('money', '/creator/money', 'Money', 'What you’ve earned') : null,
+    numbers: isCreator ? tile('numbers', '/creator/analytics', 'Your numbers', 'Views and watch time') : null,
+    'my-places': tile('my-places', '/locations/mine', 'Your places', 'Listings and payouts'),
+    'place-requests': tile('place-requests', '/locations/requests', 'Place requests', 'Bookings, both sides')
+  };
+  const order = [];
+  for (const t of ordered) for (const id of WORK_GROUPS[t]) if (!order.includes(id)) order.push(id);
+  for (const id of WORK_ORDER) if (!order.includes(id)) order.push(id);
+  return order.map((id) => all[id]).filter(Boolean);
+}
+
 // Every tile the side can show, in order: the first MENU_TILES_SHOWN are
 // the grid, the rest come out under "See more". `line` is the live line
 // when there is one, else the plain one; `dot` marks something happening
 // now (an urgent call, a broadcast on air).
-export function menuTiles(side, { signedIn = false, settings = null, counts = null, liveLines = MENU_LIVE_LINES } = {}) {
+export function menuTiles(side, { signedIn = false, settings = null, counts = null, liveLines = MENU_LIVE_LINES, roles = {}, types = null, running = null } = {}) {
   const c = liveLines && counts ? counts : {};
   const tile = (id, href, label, plain, live = null, extra = {}) => ({ id, href, label, line: live || plain, live: Boolean(live), dot: false, external: false, ...extra });
+  if (side === 'production') return signedIn ? workTiles(tile, { roles, types, running: liveLines ? running : null }) : [];
   const liveNow = c.liveNow && typeof c.liveNow.title === 'string' && c.liveNow.title.trim() ? c.liveNow.title.trim() : null;
   const live = on(settings, 'liveTvEnabled')
     ? tile('live', '/live', 'Live TV', 'Channels, all day', liveNow ? `On now: ${liveNow}` : null, { dot: Boolean(liveNow) })
@@ -144,37 +219,24 @@ export function menuTiles(side, { signedIn = false, settings = null, counts = nu
 }
 
 export function sideHome(side) {
+  if (side === 'production') return { href: '/productions/mine', label: MENU_WORDS.productionHome };
   return side === 'stream'
     ? { href: '/stream', label: MENU_WORDS.streamHome }
     : { href: '/', label: MENU_WORDS.connectHome };
 }
 
 // The rows that open in place. `roles` is what /api/my-role answers (or
-// the page's own isAdmin / isCreator): a creator, an admin, a sub-admin
-// (canAccessAdmin without isAdmin) and a content scheduler each get their
-// own rows, the same people the header's account menu gave them.
+// the page's own isAdmin / isCreator): an admin, a sub-admin
+// (canAccessAdmin without isAdmin) and a content scheduler get the Team
+// rows. "Your things" and "Creator" became the Production side's tiles
+// (2026-11-20), so they aren't listed twice.
 export function menuSections({ signedIn = false, roles = {}, isSubscriber = false } = {}) {
   const isAdmin = Boolean(roles.isAdmin);
-  const isCreator = Boolean(roles.isCreator);
   const isSubAdmin = !isAdmin && Boolean(roles.canAccessAdmin || roles.isSubAdmin);
   const isScheduler = Boolean(roles.isContentScheduler || roles.isScheduler);
   const section = (id, title, rows) => ({ id, title, rows, summary: rows.map((r) => r.label).join(', ') });
   const out = [];
   if (signedIn) {
-    out.push(section('yours', 'Your things', [
-      { href: '/crew/card', label: 'My working card' },
-      { href: '/locations/mine', label: 'My locations' },
-      { href: '/locations/requests', label: 'Location requests' },
-      { href: '/productions/mine', label: 'Your productions' }
-    ]));
-    if (isCreator || isAdmin || isSubAdmin) {
-      out.push(section('creator', 'Creator', [
-        { href: '/creator/dashboard', label: 'Dashboard' },
-        ...(isCreator || isAdmin ? [{ href: '/creator/my-work', label: 'Your work' }, { href: '/creator/submit', label: 'Submit your work' }] : []),
-        ...(isCreator ? [{ href: '/creator/analytics', label: 'Your numbers' }] : []),
-        ...(isCreator || isAdmin ? [{ href: '/creator/money', label: 'Money' }] : [])
-      ]));
-    }
     if (isAdmin || isSubAdmin || isScheduler) {
       out.push(section('team', 'Team', [
         ...(isAdmin || isSubAdmin ? [{ href: '/admin', label: 'Admin Portal' }] : []),
@@ -253,10 +315,15 @@ export function menuRunning(running) {
 }
 
 // The whole menu in one call.
-export function siteMenu({ side = 'connect', signedIn = false, roles = {}, isSubscriber = false, settings = null, counts = null, displayName = null, profileHref = null, liveLines = MENU_LIVE_LINES, running = null } = {}) {
-  const all = menuTiles(side, { signedIn, settings, counts, liveLines });
+// `types` is the person's account types ({ types, main }; null when not
+// known), which orders the Production side. Signed out there is no
+// Production side: a menu asked for it opens on Connect.
+export function siteMenu({ side = 'connect', signedIn = false, roles = {}, isSubscriber = false, settings = null, counts = null, displayName = null, profileHref = null, liveLines = MENU_LIVE_LINES, running = null, types = null } = {}) {
+  if (!menuSides(signedIn).includes(side)) side = 'connect';
+  const all = menuTiles(side, { signedIn, settings, counts, liveLines, roles, types, running });
   return {
     side,
+    sides: menuSides(signedIn).map((id) => ({ id, label: sideLabel(id) })),
     home: sideHome(side),
     profile: menuProfile({ signedIn, displayName, profileHref, isSubscriber }),
     running: signedIn ? menuRunning(running) : null,

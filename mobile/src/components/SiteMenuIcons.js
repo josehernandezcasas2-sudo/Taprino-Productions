@@ -72,6 +72,51 @@ const SHAPES = {
     <Path key="a" d="M12 4v11M7.5 10.5L12 15l4.5-4.5" />,
     <Path key="b" d="M5 19.5h14" />
   ],
+  // The Production side (2026-11-20), the website's paths.
+  'my-productions': [
+    <Rect key="a" x="3.5" y="9" width="17" height="11" rx="1.5" />,
+    <Path key="b" d="M3.5 9l2-5 15 3-1 2" />,
+    <Path key="c" d="M8.5 5.2l2 3.3M13.5 6.2l2 3" />
+  ],
+  dashboard: [
+    <Rect key="a" x="4" y="4" width="7" height="7" rx="1" />,
+    <Rect key="b" x="13" y="4" width="7" height="5" rx="1" />,
+    <Rect key="c" x="13" y="11" width="7" height="9" rx="1" />,
+    <Rect key="d" x="4" y="13" width="7" height="7" rx="1" />
+  ],
+  'my-work': [
+    <Rect key="a" x="3.5" y="6" width="17" height="12" rx="1.5" />,
+    <Path key="b" d="M10.5 9.5v5l4-2.5z" />
+  ],
+  'working-card': [
+    <Rect key="a" x="3.5" y="5" width="17" height="14" rx="2" />,
+    <Circle key="b" cx="9" cy="11" r="2.2" />,
+    <Path key="c" d="M5.8 16c.6-1.6 1.8-2.4 3.2-2.4s2.6.8 3.2 2.4M14 10h4M14 13.5h3" />
+  ],
+  'my-pitches': [
+    <Path key="a" d="M9 18h6M10 21h4" />,
+    <Path key="b" d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" />
+  ],
+  submit: [
+    <Path key="a" d="M12 20V9M7.5 13.5L12 9l4.5 4.5" />,
+    <Path key="b" d="M5 4.5h14" />
+  ],
+  money: [
+    <Circle key="a" cx="12" cy="12" r="8.5" />,
+    <Path key="b" d="M14.6 9.4c-.5-.9-1.5-1.4-2.6-1.4-1.4 0-2.5.8-2.5 1.9 0 2.6 5.1 1.4 5.1 4.1 0 1.1-1.1 2-2.6 2-1.1 0-2.1-.5-2.6-1.4M12 6.5V8M12 16v1.5" />
+  ],
+  numbers: [
+    <Path key="a" d="M4.5 19.5h15" />,
+    <Path key="b" d="M7 16v-4M11 16V8M15 16v-6M19 16V5" />
+  ],
+  'my-places': [
+    <Path key="a" d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />,
+    <Circle key="b" cx="12" cy="10" r="2.4" />
+  ],
+  'place-requests': [
+    <Rect key="a" x="3.5" y="5" width="17" height="15" rx="1.5" />,
+    <Path key="b" d="M3.5 9.5h17M8 3v4M16 3v4" />
+  ],
   // The sections.
   yours: [
     <Path key="a" d="M4 8l8-4 8 4v8l-8 4-8-4z" />,
