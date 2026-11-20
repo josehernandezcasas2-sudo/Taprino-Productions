@@ -117,6 +117,64 @@ const SHAPES = {
     <Rect key="a" x="3.5" y="5" width="17" height="15" rx="1.5" />,
     <Path key="b" d="M3.5 9.5h17M8 3v4M16 3v4" />
   ],
+  // The Admin side (2026-11-20), the website's paths.
+  'admin-home': [<Path key="a" d="M12 3.5l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9v-5z" />],
+  'admin-review': [
+    <Rect key="a" x="4.5" y="3.5" width="15" height="17" rx="2" />,
+    <Path key="b" d="M8.5 12l2.5 2.5 4.5-5" />
+  ],
+  'admin-shows': [
+    <Rect key="a" x="3.5" y="6" width="17" height="12" rx="1.5" />,
+    <Path key="b" d="M10.5 9.5v5l4-2.5z" />
+  ],
+  'admin-library': [
+    <Path key="a" d="M5 4.5v15M9.5 4.5v15" />,
+    <Path key="b" d="M13.5 5.5l4-1 3 14.5-4 1z" />
+  ],
+  'admin-flags': [
+    <Path key="a" d="M5.5 21V4" />,
+    <Path key="b" d="M5.5 4.5h11l-2 4 2 4h-11" />
+  ],
+  'admin-applications': [
+    <Rect key="a" x="4" y="3.5" width="16" height="17" rx="1.5" />,
+    <Path key="b" d="M8 3.5v17M16 3.5v17M4 8h4M4 12h4M4 16h4M16 8h4M16 12h4M16 16h4" />
+  ],
+  'admin-accounts': [
+    <Circle key="a" cx="9" cy="8" r="3" />,
+    <Path key="b" d="M3.5 19c.9-3 3-4.5 5.5-4.5s4.6 1.5 5.5 4.5" />,
+    <Circle key="c" cx="17" cy="9" r="2.5" />,
+    <Path key="d" d="M15.5 14.6c2.3.2 4 1.6 4.8 4.4" />
+  ],
+  'admin-money': [
+    <Rect key="a" x="3" y="6.5" width="18" height="11" rx="1.5" />,
+    <Circle key="b" cx="12" cy="12" r="2.6" />,
+    <Path key="c" d="M6.5 9.5v5M17.5 9.5v5" />
+  ],
+  'admin-payouts': [
+    <Circle key="a" cx="12" cy="12" r="8.5" />,
+    <Path key="b" d="M14.6 9.4c-.5-.9-1.5-1.4-2.6-1.4-1.4 0-2.5.8-2.5 1.9 0 2.6 5.1 1.4 5.1 4.1 0 1.1-1.1 2-2.6 2-1.1 0-2.1-.5-2.6-1.4M12 6.5V8M12 16v1.5" />
+  ],
+  'admin-scheduler': [
+    <Rect key="a" x="3.5" y="5" width="17" height="15" rx="1.5" />,
+    <Path key="b" d="M3.5 9.5h17M8 3v4M16 3v4M7 13h4M7 16.5h7" />
+  ],
+  'admin-crew': [
+    <Circle key="a" cx="9" cy="8" r="3" />,
+    <Path key="b" d="M3.5 19c.9-3 3-4.5 5.5-4.5s4.6 1.5 5.5 4.5" />,
+    <Path key="c" d="M16 8.5h5M18.5 6v5" />
+  ],
+  'admin-locations': [
+    <Path key="a" d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />,
+    <Circle key="b" cx="12" cy="10" r="2.4" />
+  ],
+  'admin-security': [
+    <Rect key="a" x="5" y="10.5" width="14" height="10" rx="1.5" />,
+    <Path key="b" d="M8 10.5V8a4 4 0 0 1 8 0v2.5" />
+  ],
+  'admin-settings': [
+    <Circle key="a" cx="12" cy="12" r="3" />,
+    <Path key="b" d="M12 3.5v2.5M12 18v2.5M3.5 12H6M18 12h2.5M6 6l1.8 1.8M16.2 16.2L18 18M18 6l-1.8 1.8M7.8 16.2L6 18" />
+  ],
   // The sections.
   yours: [
     <Path key="a" d="M4 8l8-4 8 4v8l-8 4-8-4z" />,

@@ -49,7 +49,10 @@ const TINT = {
   dashboard: 'brass', submit: 'brass', 'working-card': 'brass',
   'my-work': 'gold', 'my-pitches': 'gold',
   'my-places': 'mint', money: 'mint', numbers: 'mint',
-  'my-productions': 'sky', 'place-requests': 'sky'
+  'my-productions': 'sky', 'place-requests': 'sky',
+  'admin-home': 'sky', 'admin-review': 'brass', 'admin-shows': 'gold', 'admin-library': 'gold', 'admin-flags': 'red',
+  'admin-applications': 'brass', 'admin-accounts': 'mint', 'admin-money': 'mint', 'admin-payouts': 'mint',
+  'admin-scheduler': 'sky', 'admin-crew': 'brass', 'admin-locations': 'mint', 'admin-security': 'sky', 'admin-settings': 'sky'
 };
 const TINTS = {
   brass: { color: colors.brass, tint: brassTint },
@@ -58,7 +61,7 @@ const TINTS = {
   sky: { color: colors.sky, tint: skyTint },
   red: { color: colors.danger, tint: dangerTint }
 };
-const SIDE_TINT = { connect: TINTS.mint, stream: TINTS.gold, production: TINTS.brass };
+const SIDE_TINT = { connect: TINTS.mint, stream: TINTS.gold, production: TINTS.brass, admin: TINTS.sky };
 
 // Kept for the app's session: the live lines (read at most every
 // MENU_COUNTS_MAX_AGE_MS), the genres, the plan line, and which sections
@@ -68,6 +71,9 @@ let countsCache = { counts: null, at: NaN };
 // minutes, kept for one account only (another sign-in reads again) and
 // dropped when the menu opens signed out.
 let runningCache = { running: null, at: NaN, who: null };
+// The Admin side's numbers (/api/admin/queue-counts), the same two
+// minutes, read only while that side is open.
+let adminCountsCache = { counts: null, at: NaN, who: null };
 let genresCache = null;
 let genresPromise = null;
 let membershipCache = { at: 0, isSubscriber: null };
@@ -193,7 +199,8 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
   const signedIn = Boolean(isSignedIn);
   const runningWho = signedIn ? userId || null : null;
   const [running, setRunning] = useState(signedIn && runningCache.who === runningWho ? runningCache.running : null);
-  const [side, setSide] = useState(startSide === 'stream' || startSide === 'production' ? startSide : 'connect');
+  const [side, setSide] = useState(['stream', 'production', 'admin'].includes(startSide) ? startSide : 'connect');
+  const [adminCounts, setAdminCounts] = useState(signedIn && adminCountsCache.who === runningWho ? adminCountsCache.counts : null);
   const [counts, setCounts] = useState(countsCache.counts);
   const [genres, setGenres] = useState(genresCache || []);
   const [membership, setMembership] = useState(membershipCache.at ? membershipCache.isSubscriber : null);
@@ -227,7 +234,8 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     displayName,
     profileHref,
     running,
-    types: typesState
+    types: typesState,
+    adminCounts
   });
 
   // Which sections are open (kept for the app's session); only the ones
@@ -260,6 +268,24 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
     refreshAdminRole(getToken).catch(() => {});
     return () => { alive = false; };
   }, [signedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The Admin side's live lines: the admin nav's own numbers, read when
+  // that side is open, at most every two minutes for the same account.
+  const onAdmin = menu.side === 'admin';
+  useEffect(() => {
+    if (!onAdmin || !signedIn || !MENU_LIVE_LINES) return undefined;
+    if (adminCountsCache.who === runningWho && countsFresh(adminCountsCache.at)) { setAdminCounts(adminCountsCache.counts); return undefined; }
+    let alive = true;
+    (async () => {
+      const token = await freshToken(getToken);
+      if (!token) return;
+      const d = await apiGet('/api/admin/queue-counts', token).catch(() => null);
+      if (!d || typeof d !== 'object') return;
+      adminCountsCache = { counts: d, at: Date.now(), who: runningWho };
+      if (alive) setAdminCounts(d);
+    })();
+    return () => { alive = false; };
+  }, [onAdmin, signedIn, runningWho]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Running now": the productions this person runs, read as the menu
   // opens (signed in), at most every two minutes. A failed read leaves
@@ -459,7 +485,8 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
           {menu.sides.map((x) => {
             const on = x.id === menu.side;
             const t = SIDE_TINT[x.id] || SIDE_TINT.connect;
-            const three = menu.sides.length > 2;
+            const three = menu.sides.length === 3;
+            const four = menu.sides.length > 3;
             return (
               <Pressable
                 key={x.id}
@@ -469,7 +496,7 @@ function MenuBody({ onClose, side: startSide, settings, ownProfile, drawer, inse
                 accessibilityState={{ selected: on }}
                 accessibilityLabel={x.label}
               >
-                <Text style={[styles.sideText, three && styles.sideTextThree, { color: on ? t.color : colors.inkFaint }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{x.label}</Text>
+                <Text style={[styles.sideText, three && styles.sideTextThree, four && styles.sideTextFour, { color: on ? t.color : colors.inkFaint }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{x.label}</Text>
               </Pressable>
             );
           })}
@@ -677,6 +704,8 @@ const styles = StyleSheet.create({
   sideText: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' },
   // Three sides share the row (2026-11-20): the letters sit closer.
   sideTextThree: { letterSpacing: 1 },
+  // Four for the admin team (2026-11-20).
+  sideTextFour: { letterSpacing: 0.3, fontSize: 10 },
   home: { alignSelf: 'flex-start', paddingVertical: 2, paddingHorizontal: 2, marginTop: -2 },
   homeText: { fontFamily: fonts.displaySemi, fontSize: 13.5 },
   // The tiles.

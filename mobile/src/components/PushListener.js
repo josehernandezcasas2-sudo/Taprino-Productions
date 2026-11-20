@@ -34,6 +34,9 @@ const APP_ROUTES = [
   // website. The admin home is the app's Admin tab (every other admin page
   // stays on the website).
   /^\/(crew|pitches|resources|recs|about|admin)$/, /^\/live(\/[^/]+)?$/, /^\/vertical\/discover$/, /^\/genre\/[^/]+$/,
+  // The website's review queue is the app's review deck (the ☰ menu's
+  // Admin side, 2026-11-20).
+  /^\/admin\/review$/,
   /^\/watch\/(series|movies|podcasts|vertical)$/
 ];
 // The website's /creator/analytics is the app's Your numbers, its

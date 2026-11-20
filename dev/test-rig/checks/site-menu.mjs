@@ -198,10 +198,22 @@ await runCheck('site-menu', async () => {
       const m = await box(pg, '.site-menu');
       ok('a 440px drawer from the left, the screen tall', m && m.left === 0 && Math.abs(m.width - 440) <= 1 && Math.abs(m.bottom - m.viewH) <= 1, m);
       const secs = await sectionsOf(pg);
-      ok('an admin has Team', secs.includes('team') && !secs.includes('creator'), secs);
-      await pg.locator('.sm-section[data-section="team"] .sm-section-head').click();
-      const team = await pg.$$eval('.sm-section[data-section="team"] .sm-row', (els) => els.map((e) => e.textContent.trim()));
-      ok('Team: Admin Portal and Channel scheduler', team.join('|') === 'Admin Portal|Channel scheduler', team);
+      ok('an admin has no Team or Creator section (the Admin and Production sides hold them)', !secs.includes('team') && !secs.includes('creator'), secs);
+      // The Admin side (2026-11-20).
+      const adminSides = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => e.textContent.trim()));
+      ok('four sides for an admin: Connect, Stream, Production, Admin', adminSides.join('|') === 'Connect|Stream|Production|Admin', adminSides);
+      await pg.locator('.sm-side.admin').click();
+      const adminTiles = await tilesOf(pg);
+      ok('the Admin side: Admin home, Review queue, Shows, Library, Reports & flags, Applications', adminTiles.join('|') === 'admin-home|admin-review|admin-shows|admin-library|admin-flags|admin-applications', adminTiles);
+      ok('…its home link is the Admin home', (await pg.$eval('.sm-home', (e) => e.getAttribute('href'))) === '/admin');
+      const qc = (await call('/api/admin/queue-counts', { who: ADMIN })).json || {};
+      await pg.waitForFunction(() => { const el = document.querySelector('.sm-tile[data-tile="admin-review"] .sm-tile-line'); return el && el.textContent.trim().length > 0; }, null, { timeout: 15000 }).catch(() => {});
+      await pg.waitForTimeout(800);
+      const reviewLine = await pg.$eval('.sm-tile[data-tile="admin-review"] .sm-tile-line', (e) => e.textContent.trim());
+      ok('…the Review queue tile carries the queue’s own count', qc.review > 0 ? reviewLine === `${qc.review} waiting` : reviewLine === 'Titles waiting on a decision', { reviewLine, qc });
+      await pg.locator('.sm-more').click();
+      const adminAll = await tilesOf(pg);
+      ok('…See more: the money, people, scheduler, security and settings pages', ['admin-accounts', 'admin-money', 'admin-payouts', 'admin-scheduler', 'admin-security', 'admin-settings'].every((id) => adminAll.includes(id)), adminAll);
       // A wheel on the backdrop or past the list's end never moves the page.
       await pg.mouse.move(900, 400);
       for (let i = 0; i < 6; i += 1) await pg.mouse.wheel(0, 400);
@@ -230,13 +242,16 @@ await runCheck('site-menu', async () => {
       ok('there is no tab bar here', !(await pg.$('.tabbar')));
       await open(pg, true);
       const secs = await sectionsOf(pg);
-      ok('a sub-admin: Team (Admin Portal)', secs.includes('team'), secs);
+      ok('a sub-admin has no Team section (the Admin side holds it)', !secs.includes('team'), secs);
+      await pg.waitForFunction(() => document.querySelector('.sm-side.admin'), null, { timeout: 15000 }).catch(() => {});
+      ok('on an admin page it opens on the Admin side', (await pg.$eval('.sm-side.on', (e) => e.textContent.trim())) === 'Admin');
+      const subAdmin = await tilesOf(pg);
+      ok('…with only the pages their capabilities open (review, episodes)', subAdmin.join('|') === 'admin-home|admin-review|admin-shows|admin-library', subAdmin);
+      const subSideFits = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => e.scrollWidth <= e.clientWidth + 1));
+      ok('…the four labels fit at 390', subSideFits.every(Boolean), subSideFits);
       await pg.locator('.sm-side.production').tap();
       const subWork = await tilesOf(pg);
       ok('…and the Dashboard on the Production side, without the creator pages', subWork.includes('dashboard') && !subWork.includes('my-work') && !subWork.includes('submit'), subWork);
-      await pg.locator('.sm-section[data-section="team"] .sm-section-head').tap();
-      const team = await pg.$$eval('.sm-section[data-section="team"] .sm-row', (els) => els.map((e) => e.textContent.trim()));
-      ok('…Team is Admin Portal only', team.join('|') === 'Admin Portal', team);
       ok('Log out is here, where there is no Account tab', Boolean(await pg.$('.sm-logout')));
       ok('no page errors', errors.length === 0, errors);
       await ctx.close();

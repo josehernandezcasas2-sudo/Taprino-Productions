@@ -50,6 +50,21 @@ const ICONS = {
   numbers: <><path d="M4.5 19.5h15" /><path d="M7 16v-4M11 16V8M15 16v-6M19 16V5" /></>,
   'my-places': <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></>,
   'place-requests': <><rect x="3.5" y="5" width="17" height="15" rx="1.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4" /></>,
+  // The Admin side (2026-11-20).
+  'admin-home': <path d="M12 3.5l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9v-5z" />,
+  'admin-review': <><rect x="4.5" y="3.5" width="15" height="17" rx="2" /><path d="M8.5 12l2.5 2.5 4.5-5" /></>,
+  'admin-shows': <><rect x="3.5" y="6" width="17" height="12" rx="1.5" /><path d="M10.5 9.5v5l4-2.5z" /></>,
+  'admin-library': <><path d="M5 4.5v15M9.5 4.5v15" /><path d="M13.5 5.5l4-1 3 14.5-4 1z" /></>,
+  'admin-flags': <><path d="M5.5 21V4" /><path d="M5.5 4.5h11l-2 4 2 4h-11" /></>,
+  'admin-applications': <><rect x="4" y="3.5" width="16" height="17" rx="1.5" /><path d="M8 3.5v17M16 3.5v17M4 8h4M4 12h4M4 16h4M16 8h4M16 12h4M16 16h4" /></>,
+  'admin-accounts': <><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.9-3 3-4.5 5.5-4.5s4.6 1.5 5.5 4.5" /><circle cx="17" cy="9" r="2.5" /><path d="M15.5 14.6c2.3.2 4 1.6 4.8 4.4" /></>,
+  'admin-money': <><rect x="3" y="6.5" width="18" height="11" rx="1.5" /><circle cx="12" cy="12" r="2.6" /><path d="M6.5 9.5v5M17.5 9.5v5" /></>,
+  'admin-payouts': <><circle cx="12" cy="12" r="8.5" /><path d="M14.6 9.4c-.5-.9-1.5-1.4-2.6-1.4-1.4 0-2.5.8-2.5 1.9 0 2.6 5.1 1.4 5.1 4.1 0 1.1-1.1 2-2.6 2-1.1 0-2.1-.5-2.6-1.4M12 6.5V8M12 16v1.5" /></>,
+  'admin-scheduler': <><rect x="3.5" y="5" width="17" height="15" rx="1.5" /><path d="M3.5 9.5h17M8 3v4M16 3v4M7 13h4M7 16.5h7" /></>,
+  'admin-crew': <><circle cx="9" cy="8" r="3" /><path d="M3.5 19c.9-3 3-4.5 5.5-4.5s4.6 1.5 5.5 4.5" /><path d="M16 8.5h5M18.5 6v5" /></>,
+  'admin-locations': <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.4" /></>,
+  'admin-security': <><rect x="5" y="10.5" width="14" height="10" rx="1.5" /><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" /></>,
+  'admin-settings': <><circle cx="12" cy="12" r="3" /><path d="M12 3.5v2.5M12 18v2.5M3.5 12H6M18 12h2.5M6 6l1.8 1.8M16.2 16.2L18 18M18 6l-1.8 1.8M7.8 16.2L6 18" /></>,
   yours: <><path d="M4 8l8-4 8 4v8l-8 4-8-4z" /><path d="M4 8l8 4 8-4M12 12v8" /></>,
   creator: <><rect x="4" y="4" width="7" height="7" rx="1" /><rect x="13" y="4" width="7" height="5" rx="1" /><rect x="13" y="11" width="7" height="9" rx="1" /><rect x="4" y="13" width="7" height="7" rx="1" /></>,
   team: <path d="M12 3.5l7 3v5c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9v-5z" />,
@@ -73,7 +88,10 @@ const TINT = {
   dashboard: 'brass', submit: 'brass', 'working-card': 'brass',
   'my-work': 'gold', 'my-pitches': 'gold',
   'my-places': 'mint', money: 'mint', numbers: 'mint',
-  'my-productions': 'sky', 'place-requests': 'sky'
+  'my-productions': 'sky', 'place-requests': 'sky',
+  'admin-home': 'sky', 'admin-review': 'brass', 'admin-shows': 'gold', 'admin-library': 'gold', 'admin-flags': 'red',
+  'admin-applications': 'brass', 'admin-accounts': 'mint', 'admin-money': 'mint', 'admin-payouts': 'mint',
+  'admin-scheduler': 'sky', 'admin-crew': 'brass', 'admin-locations': 'mint', 'admin-security': 'sky', 'admin-settings': 'sky'
 };
 
 // Read at most once per MENU_COUNTS_MAX_AGE_MS while the tab stays open.
@@ -81,6 +99,9 @@ let countsCache = { counts: null, at: NaN };
 // "Running now" (/api/productions/running), the same two minutes; dropped
 // when the menu opens signed out.
 let runningCache = { running: null, at: NaN, who: null };
+// The Admin side's numbers (/api/admin/queue-counts), the same two
+// minutes, read only while that side is open.
+let adminCountsCache = { counts: null, at: NaN, who: null };
 let genresCache = null;
 
 function readOpen() {
@@ -95,6 +116,7 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
   const [counts, setCounts] = useState(countsCache.counts);
   const runningWho = isSignedIn && ownProfile && ownProfile.userId ? ownProfile.userId : null;
   const [running, setRunning] = useState(isSignedIn && runningCache.who === runningWho ? runningCache.running : null);
+  const [adminCounts, setAdminCounts] = useState(isSignedIn && adminCountsCache.who === runningWho ? adminCountsCache.counts : null);
   const [genres, setGenres] = useState(mainGenres && mainGenres.length ? mainGenres : genresCache);
   const [showMore, setShowMore] = useState(false);
   // The person's account types (the you card below; they order the
@@ -111,7 +133,8 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
     displayName: ownProfile ? ownProfile.displayName : null,
     profileHref,
     running,
-    types: isSignedIn && types ? types : null
+    types: isSignedIn && types ? types : null,
+    adminCounts
   });
   const [openIds, setOpenIds] = useState([]);
 
@@ -200,6 +223,24 @@ export default function SiteMenu({ onClose, onSearch, onSignOut, initialSide, is
       .catch(() => {});
     return () => { live = false; };
   }, []);
+
+  // The Admin side's live lines: the admin nav's own numbers, read when
+  // that side is open, at most every two minutes for the same account.
+  const onAdmin = menu.side === 'admin';
+  useEffect(() => {
+    if (!onAdmin || !isSignedIn || !MENU_LIVE_LINES) return undefined;
+    if (adminCountsCache.who === runningWho && countsFresh(adminCountsCache.at)) { setAdminCounts(adminCountsCache.counts); return undefined; }
+    let live = true;
+    fetch('/api/admin/queue-counts', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || typeof d !== 'object') return;
+        adminCountsCache = { counts: d, at: Date.now(), who: runningWho };
+        if (live) setAdminCounts(d);
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [onAdmin, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // "Running now": the productions this person runs, read as the menu
   // opens (signed in), at most every two minutes.

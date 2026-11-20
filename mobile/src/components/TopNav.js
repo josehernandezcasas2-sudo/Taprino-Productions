@@ -14,6 +14,7 @@ import { hrefToRoute } from './PushListener';
 import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
 import { MENU_WORDS, menuSideFor } from '../lib/siteMenuRules';
 import SiteMenu, { forgetMenuMembership } from './SiteMenu';
+import { useAdminRole } from '../lib/adminRole';
 
 // The mobile routes that count as the Stream half of the site — the same
 // pages lib/streamSection.js's isStreamPath() marks on the website, mapped
@@ -121,6 +122,8 @@ export default function TopNav() {
   const router = useRouter();
   const pathname = usePathname();
   const { isLoaded, isSignedIn } = useUser();
+  // The admin team's ☰ menu opens on its Admin side from an admin screen.
+  const role = useAdminRole();
   const { getToken } = useAuth();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -284,7 +287,7 @@ export default function TopNav() {
       <SiteMenu
         visible={menuOpen}
         onClose={() => setMenuOpen(false)}
-        side={menuSideFor({ inStream: stream, pathname, signedIn: Boolean(isSignedIn) })}
+        side={menuSideFor({ inStream: stream, pathname, signedIn: Boolean(isSignedIn), roles: role || {} })}
         settings={settings}
         ownProfile={ownProfile}
       />

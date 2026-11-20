@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   res.setHeader('Cache-Control', 'private, no-store');
-  const { userId, isAdmin, isCreator, isContentScheduler, canAccessAdmin } = await getRoleContext(req);
+  const { userId, isAdmin, isCreator, isContentScheduler, canAccessAdmin, permissions } = await getRoleContext(req);
   // The tab bar's "View profile" row needs the public URL, which is the
   // @handle when one is set. Same rule as HeaderNav's ownProfileHref.
   let profileHref = null;
@@ -55,6 +55,10 @@ export default async function handler(req, res) {
     isContentScheduler: !!isContentScheduler,
     // Sub-admins too — HeaderNav shows the Admin Portal link on this.
     canAccessAdmin: !!canAccessAdmin,
+    // A sub-admin's own capabilities: the ☰ menu's Admin side shows the
+    // admin pages they can open (lib/siteMenuRules.js). Empty for everyone
+    // else (a full admin opens every page).
+    permissions: canAccessAdmin && !isAdmin && Array.isArray(permissions) ? permissions : [],
     profileHref,
     avatar,
     displayName,

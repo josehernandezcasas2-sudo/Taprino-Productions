@@ -374,14 +374,15 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             onClose={() => setOpenMenu(null)}
             onSearch={() => setOpenMenu('search')}
             onSignOut={() => { setOpenMenu(null); signOut({ redirectUrl: '/' }); }}
-            initialSide={menuSideFor({ inStream: inStreamSection, pathname: router.asPath, signedIn: Boolean(isSignedIn) })}
+            initialSide={menuSideFor({ inStream: inStreamSection, pathname: router.asPath, signedIn: Boolean(isSignedIn), roles: { isAdmin: Boolean(isAdmin || (role && role.isAdmin)), canAccessAdmin: Boolean(role && role.canAccessAdmin) } })}
             isSignedIn={isSignedIn}
             isSubscriber={isSubscriber}
             roles={{
               isAdmin: Boolean(isAdmin || (role && role.isAdmin)),
               isCreator: Boolean(isCreator || (role && role.isCreator)),
               canAccessAdmin: Boolean(role && role.canAccessAdmin),
-              isContentScheduler: Boolean(role && role.isContentScheduler)
+              isContentScheduler: Boolean(role && role.isContentScheduler),
+              permissions: role && Array.isArray(role.permissions) ? role.permissions : []
             }}
             settings={siteSettings}
             ownProfile={ownProfile}

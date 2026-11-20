@@ -98,16 +98,63 @@ t('sections: a viewer gets settings, no team; their things are the Production si
   assert.ok(member.rows.some((r) => r.label === 'Membership'));
 });
 
-t('sections: an admin, a sub-admin and a scheduler get Team; a creator none extra', () => {
+t('sections: Team only for a content scheduler who isn\'t on the admin team', () => {
   assert.deepEqual(ids(R.menuSections({ signedIn: true, roles: { isCreator: true } })), ['account', 'help']);
-  const admin = R.menuSections({ signedIn: true, roles: { isAdmin: true, canAccessAdmin: true } });
-  assert.deepEqual(ids(admin), ['team', 'account', 'help']);
-  assert.deepEqual(admin[0].rows.map((r) => r.label), ['Admin Portal', 'Channel scheduler']);
-  const sub = R.menuSections({ signedIn: true, roles: { canAccessAdmin: true } });
-  assert.deepEqual(sub.find((x) => x.id === 'team').rows.map((r) => r.label), ['Admin Portal']);
+  assert.deepEqual(ids(R.menuSections({ signedIn: true, roles: { isAdmin: true, canAccessAdmin: true } })), ['account', 'help']);
+  assert.deepEqual(ids(R.menuSections({ signedIn: true, roles: { canAccessAdmin: true } })), ['account', 'help']);
   const sched = R.menuSections({ signedIn: true, roles: { isCreator: true, isContentScheduler: true } });
-  assert.deepEqual(sched.find((x) => x.id === 'team').rows.map((r) => r.label), ['Channel scheduler']);
-  assert.equal(admin[0].summary, 'Admin Portal, Channel scheduler');
+  assert.deepEqual(sched.find((x) => x.id === 'team').rows.map((r) => [r.label, r.href]), [['Channel scheduler', '/schedule']]);
+  assert.equal(sched.find((x) => x.id === 'team').summary, 'Channel scheduler');
+});
+
+t('Admin: a fourth side for admins and sub-admins only', () => {
+  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { isAdmin: true } }).sides.map((x) => x.label), ['Connect', 'Stream', 'Production', 'Admin']);
+  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { canAccessAdmin: true } }).sides.map((x) => x.id), ['connect', 'stream', 'production', 'admin']);
+  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { isCreator: true, isContentScheduler: true } }).sides.map((x) => x.id), ['connect', 'stream', 'production']);
+  assert.deepEqual(R.siteMenu({ signedIn: false, roles: { isAdmin: true } }).sides.map((x) => x.id), ['connect', 'stream']);
+  assert.equal(R.siteMenu({ side: 'admin', signedIn: true, roles: { isCreator: true } }).side, 'connect');
+  const m = R.siteMenu({ side: 'admin', signedIn: true, roles: { isAdmin: true } });
+  assert.deepEqual(m.home, { href: '/admin', label: 'Go to the Admin home' });
+  assert.deepEqual(m.tiles.map((t) => t.id), ['admin-home', 'admin-review', 'admin-shows', 'admin-library', 'admin-flags', 'admin-applications']);
+  assert.deepEqual(m.more.map((t) => t.id), ['admin-accounts', 'admin-money', 'admin-payouts', 'admin-scheduler', 'admin-crew', 'admin-locations', 'admin-security', 'admin-settings']);
+});
+
+t('Admin: a sub-admin sees only the pages their capabilities open', () => {
+  const tiles = (permissions, extra = {}) => R.menuTiles('admin', { signedIn: true, roles: { canAccessAdmin: true, permissions, ...extra } }).map((t) => t.id);
+  assert.deepEqual(tiles(['review_submissions']), ['admin-home', 'admin-review', 'admin-shows']);
+  assert.deepEqual(tiles(['handle_flags']), ['admin-home', 'admin-shows', 'admin-flags', 'admin-crew', 'admin-locations']);
+  assert.deepEqual(tiles([]), []);
+  assert.deepEqual(tiles(['manage_schedule']), ['admin-home', 'admin-scheduler']);
+  assert.ok(tiles([], { isContentScheduler: true }).includes('admin-scheduler'));
+  // Nothing full-admin-only reaches a sub-admin, whatever they hold.
+  const all = tiles(['review_submissions', 'manage_artwork', 'manage_deletions', 'handle_flags', 'view_all_content', 'manage_applications', 'manage_schedule', 'manage_episodes']);
+  for (const id of ['admin-accounts', 'admin-money', 'admin-payouts', 'admin-security', 'admin-settings']) assert.ok(!all.includes(id), id);
+});
+
+t('Admin: live lines from the queue counts', () => {
+  const m = R.menuTiles('admin', { signedIn: true, roles: { isAdmin: true }, adminCounts: { review: 4, shows: 2, library: 0, flags: 1 } });
+  const line = (id) => m.find((t) => t.id === id);
+  assert.equal(line('admin-home').line, '4 to review');
+  assert.equal(line('admin-review').line, '4 waiting');
+  assert.equal(line('admin-shows').line, '2 waiting');
+  assert.equal(line('admin-library').line, 'Titles, changes, removals');
+  assert.equal(line('admin-flags').line, '1 flagged');
+  assert.equal(line('admin-flags').dot, true);
+  const off = R.menuTiles('admin', { signedIn: true, roles: { isAdmin: true }, adminCounts: { review: 4 }, liveLines: false });
+  assert.equal(off[0].line, 'Queue, flags and numbers');
+});
+
+t('Admin: each tile\'s capabilities are the admin nav\'s for that page', () => {
+  const nav = readFileSync(new URL('../lib/adminNav.js', import.meta.url), 'utf8');
+  const showCaps = readFileSync(new URL('../lib/showAdminRules.js', import.meta.url), 'utf8').match(/SHOW_ADMIN_CAPS = \[([^\]]*)\]/)[1];
+  const list = (text) => (text || '').split(',').map((x) => x.trim().replace(/^'|'$/g, '')).filter(Boolean);
+  for (const t of R.ADMIN_TILES) {
+    const line = nav.split('\n').find((l) => l.includes(`href: '${t.href}'`));
+    assert.ok(line, `${t.href} is in lib/adminNav.js`);
+    const m = line.match(/caps: (\[[^\]]*\]|SHOW_ADMIN_CAPS)/);
+    const navCaps = !m ? null : m[1] === 'SHOW_ADMIN_CAPS' ? list(showCaps) : list(m[1].slice(1, -1));
+    assert.deepEqual(t.caps || null, navCaps, t.href);
+  }
 });
 
 t('Production: a third side signed in only; signed out it opens on Connect', () => {
@@ -178,7 +225,7 @@ t('Make films? for everyone but creators and admins; Log out only signed in', ()
 });
 
 t('sections kept open: only ids the menu has', () => {
-  const sections = R.menuSections({ signedIn: true, roles: { isAdmin: true } });
+  const sections = R.menuSections({ signedIn: true, roles: { isContentScheduler: true } });
   assert.deepEqual(R.keptOpen(['yours', 'team', 7, 'account'], sections), ['team', 'account']);
   assert.deepEqual(R.keptOpen('team', sections), []);
 });
@@ -228,6 +275,10 @@ t('the side follows the page', () => {
   assert.equal(R.menuSideFor({ pathname: '/creator/dashboard', signedIn: false }), 'connect');
   for (const p of ['/productions', '/productions/abc', '/crew', '/locations', '/creatorx']) assert.equal(R.menuSideFor({ pathname: p, signedIn: true }), 'connect', p);
   assert.equal(R.menuSideFor({ pathname: '/stream', inStream: true, signedIn: true }), 'stream');
+  // An admin page opens on Admin for the admin team; for anyone else it stays Connect.
+  for (const p of ['/admin', '/admin/shows/abc', '/schedule', '/ad-plan/x']) assert.equal(R.menuSideFor({ pathname: p, signedIn: true, roles: { canAccessAdmin: true } }), 'admin', p);
+  assert.equal(R.menuSideFor({ pathname: '/admin', signedIn: true, roles: {} }), 'connect');
+  assert.equal(R.menuSideFor({ pathname: '/adminx', signedIn: true, roles: { isAdmin: true } }), 'connect');
 });
 
 console.log(`\n${n} checks passed`);
