@@ -40,6 +40,12 @@ t('Pacific wall time both ways, across the clock change', () => {
   assert.equal(R.pacificOffsetMinutes(Date.parse('2026-07-01T12:00:00Z')), -420);
 });
 
+t('the Pacific rule agrees with the clock every hour for three years', () => {
+  for (let at = Date.parse('2026-01-01T00:00:00Z'); at < Date.parse('2029-01-01T00:00:00Z'); at += 3600000) {
+    assert.equal(R.pacificOffsetByRule(at), R.pacificOffsetMinutes(at), new Date(at).toISOString());
+  }
+});
+
 t('the quick windows run from now to 11:59 PM Pacific on their last day', () => {
   const w = R.windowFor('2weeks', NOW);
   assert.equal(w.startsAt, new Date(NOW).toISOString());

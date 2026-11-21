@@ -224,11 +224,31 @@ export function agoLabel(v, now = Date.now(), { timeZone = PT } = {}) {
 /* ---------- Pacific wall time ---------- */
 
 // The parts of `t` on the Pacific clock: { y, m, d, hh, mm }.
+// An engine whose date formatting can't be read this way (a phone's, perhaps)
+// falls back to the US Pacific rule itself: daylight time from 2:00 AM on the
+// second Sunday of March to 2:00 AM on the first Sunday of November.
+export function pacificOffsetByRule(t) {
+  const at = ms(t);
+  const y = new Date(at).getUTCFullYear();
+  const sunday = (month, n) => { const first = new Date(Date.UTC(y, month, 1)).getUTCDay(); return 1 + ((7 - first) % 7) + (n - 1) * 7; };
+  const start = Date.UTC(y, 2, sunday(2, 2), 10); // 2:00 AM PST
+  const end = Date.UTC(y, 10, sunday(10, 1), 9);  // 2:00 AM PDT
+  return at >= start && at < end ? -420 : -480;
+}
+
 export function pacificParts(t) {
-  const s = new Date(ms(t)).toLocaleString('en-US', { timeZone: PT, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const at = ms(t);
+  if (!Number.isFinite(at)) return null;
+  let s = '';
+  try {
+    s = new Date(at).toLocaleString('en-US', { timeZone: PT, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  } catch (err) {
+    s = '';
+  }
   const m = /(\d{2})\/(\d{2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})/.exec(s);
-  if (!m) return null;
-  return { y: Number(m[3]), m: Number(m[1]), d: Number(m[2]), hh: Number(m[4]) % 24, mm: Number(m[5]) };
+  if (m) return { y: Number(m[3]), m: Number(m[1]), d: Number(m[2]), hh: Number(m[4]) % 24, mm: Number(m[5]) };
+  const d = new Date(at + pacificOffsetByRule(at) * 60000);
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate(), hh: d.getUTCHours(), mm: d.getUTCMinutes() };
 }
 
 // Minutes the Pacific clock is from UTC at `t` (-480 in winter, -420 in summer).
