@@ -140,6 +140,10 @@ export default function RootLayout() {
               extra's or a vertical title's own page, from Your work and the
               Dashboard's rows). It draws the site header and its Back pill. */}
           <Stack.Screen name="creator/title/[id]" options={{ headerShown: false }} />
+          {/* A private screening link's own screen (2026-11-21, migration
+              128): the site header and the Back pill to the Private
+              screenings tab it came from. */}
+          <Stack.Screen name="creator/screenings/[id]" options={{ headerShown: false }} />
           {/* The show page (the series revamp, slice 5): New show, the
               show page, the episode / draft editor and Edit show draw the
               site header and their own Back pill. */}

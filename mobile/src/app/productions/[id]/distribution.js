@@ -1,19 +1,26 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
-import { apiGet, apiPatch, apiPost, apiDelete, freshToken, API_BASE_URL, pathId } from '../../../lib/api';
+import { apiGet, apiPatch, freshToken, pathId } from '../../../lib/api';
+import { SCREENING_WORDS, screeningHref, screeningText, screeningsList } from '../../../lib/screeningRules';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip } from '../../../components/CrewBits';
+import { hrefToRoute } from '../../../components/PushListener';
+import { Btn, PartsLine, StatePill } from '../../../components/screenings/ScreeningBits';
 
 // A production's distribution page (pages/productions/<id>/distribution
 // on the web, migration 109): the release checklist, the festival
-// tracker, premiere / trailer / press kit, and private screener links.
+// tracker, premiere / trailer / press kit, and the release's private
+// screenings. Since 2026-11-21 (migration 128) screening links are made on
+// the title's own page, under Private screenings: this card lists the
+// release title's links (and the production's older screeners) with their
+// state, Open › for whoever runs the title, and the way to the tab
+// (`screenings: { links, href, canManage }` from the distribution route).
 const FESTIVAL_STATUS = { planning: 'Planning', submitted: 'Submitted', accepted: 'Accepted', declined: 'Declined', screened: 'Screened', skipped: 'Skipped' };
-const DAYS = [3, 7, 14, 30, 60];
+const NO_SCREENINGS = { links: [], href: null, canManage: false };
 const fmtDate = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
 
 export default function DistributionScreen() {
@@ -26,15 +33,12 @@ export default function DistributionScreen() {
   const [note, setNote] = useState(null);
   const [details, setDetails] = useState(null);
   const [fest, setFest] = useState({ name: '', deadline: '', feeCents: '', url: '' });
-  const [scr, setScr] = useState({ episodeId: '', label: '', recipientEmail: '', days: 14, maxViews: '10' });
-  const [newLink, setNewLink] = useState(null);
 
   const load = useCallback(async () => {
     try {
       const d = await apiGet(`/api/productions/${id}/distribution`, await freshToken(getToken));
       setState({ loading: false, error: null, data: d });
       setDetails((cur) => cur || { premiereOn: d.premiereOn || '', premiereNote: d.premiereNote || '', trailerUrl: d.trailerUrl || '', pressKitUrl: d.pressKitUrl || '', notes: d.notes || '' });
-      setScr((s) => ({ ...s, episodeId: s.episodeId || (d.episodes[0] ? d.episodes[0].id : '') }));
     } catch (err) {
       setState((s) => ({ loading: false, error: s.data ? null : err.message, data: s.data }));
     }
@@ -58,6 +62,13 @@ export default function DistributionScreen() {
   }
   const d = state.data;
   const c = d ? d.checklist : null;
+  // The release's screening links (an older server answers none).
+  const scrn = d && d.screenings && Array.isArray(d.screenings.links) ? d.screenings : NO_SCREENINGS;
+  const scrList = screeningsList(scrn.links, Date.now());
+  const scrCards = [...scrList.open, ...scrList.ended];
+  const scrLive = d && d.screenings ? scrList.liveCount : (c && c.screenersLive) || 0;
+  const scrTab = scrn.href ? (hrefToRoute(scrn.href) || {}).route || null : null;
+  const releaseTitle = d ? (d.release && d.release.title) || d.production.title : '';
   const saveFestivals = (list) => act((t) => apiPatch(`/api/productions/${id}/distribution`, { festivals: list }, t));
 
   return (
@@ -84,7 +95,7 @@ export default function DistributionScreen() {
                 ['Trailer', c.trailer, c.trailer ? 'Linked.' : 'Add a link below.'],
                 ['Press kit', c.pressKit, c.pressKit ? 'Linked.' : 'Stills, logline, bios, poster — one folder link.'],
                 ['Shot here', c.shotHere > 0, c.shotHere ? `${c.shotHere} ${c.shotHere === 1 ? 'place credits' : 'places credit'} the title.` : 'Credit the places from their listings.'],
-                ['Screeners', c.screenersLive > 0, c.screenersLive ? `${c.screenersLive} live.` : 'Make a private link below.']
+                [SCREENING_WORDS.tab, scrLive > 0, scrLive ? `${scrLive} live.` : SCREENING_WORDS.distributionLine]
               ].map(([k, on, v]) => (
                 <View key={k} style={styles.check}>
                   <Text style={[styles.checkK, on && { color: colors.ink }]}>{on ? '✓ ' : '○ '}{k}</Text>
@@ -133,43 +144,24 @@ export default function DistributionScreen() {
             </View>
 
             <View style={crew.panel}>
-              <Text style={crew.h3}>Screeners · {d.screeners.filter((s) => s.state === 'live').length} live</Text>
-              <Text style={crew.muted}>A private link to the video for one person or committee: labelled, watermarked with who it’s for, expiring, capped on opens, logged, revocable.</Text>
-              {newLink ? (
-                <View style={styles.created}>
-                  <Text style={crew.label}>Ready to send</Text>
-                  <Text style={styles.link} selectable>{API_BASE_URL}{newLink.path}</Text>
-                  <View style={crew.row}>
-                    <Pressable style={crew.btnSm} onPress={async () => { await Clipboard.setStringAsync(`${API_BASE_URL}${newLink.path}`); setNote('Link copied.'); }}><Text style={crew.btnSmText}>Copy link</Text></Pressable>
-                    <Pressable style={crew.btnSm} onPress={() => setNewLink(null)}><Text style={crew.btnSmText}>Done</Text></Pressable>
+              <Text style={crew.h3}>{scrList.tabBadge ? `${SCREENING_WORDS.tab} · ${scrList.tabBadge}` : SCREENING_WORDS.tab}</Text>
+              <Text style={crew.muted}>{SCREENING_WORDS.distributionLine}</Text>
+              {scrCards.map((card) => (
+                <View key={card.id} style={[styles.scr, card.state.key === 'ended' && { opacity: 0.7 }]}>
+                  <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+                    <StatePill state={card.state} />
+                    <Text style={styles.festName}>{card.label}</Text>
+                    <Text style={crew.mono}>{card.state.key === 'ended' ? card.endedLine || card.access : `${card.windowLine} · ${card.access}`}</Text>
+                    <PartsLine parts={card.parts} />
                   </View>
-                </View>
-              ) : null}
-              {d.screeners.map((s) => (
-                <View key={s.id} style={[styles.scr, s.state !== 'live' && { opacity: 0.65 }]}>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.festName}>{s.label}{s.recipientEmail ? <Text style={crew.mono}> · {s.recipientEmail}</Text> : null}</Text>
-                    <Text style={crew.mono}>{s.state} · {s.views}/{s.maxViews} opens · until {new Date(s.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
-                  </View>
-                  {s.state === 'live' ? <Pressable style={crew.btnSm} onPress={async () => { await Clipboard.setStringAsync(`${API_BASE_URL}${s.path}`); setNote('Link copied.'); }}><Text style={crew.btnSmText}>Copy</Text></Pressable> : null}
-                  {s.state === 'live' ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => Alert.alert('Take down this screener?', 'The link stops working right away.', [{ text: 'Keep' }, { text: 'Take down', style: 'destructive', onPress: () => act((t) => apiDelete(`/api/productions/${id}/screeners`, { screenerId: s.id }, t)) }])}><Text style={crew.btnSmText}>Take down</Text></Pressable> : null}
+                  {scrn.canManage ? <Btn small label={SCREENING_WORDS.open} onPress={() => router.push(screeningHref(card.id))} /> : null}
                 </View>
               ))}
-              {d.episodes.length === 0 ? <Text style={crew.mono}>Upload the title (even before it’s approved) and it shows here to screen.</Text> : (
-                <View style={{ gap: 6, marginTop: 4 }}>
-                  <Text style={crew.label}>New screener · which cut</Text>
-                  <View style={crew.chips}>{d.episodes.map((ep) => <Chip key={ep.id} label={`${ep.title}${ep.status === 'pending' ? ' (in review)' : ''}`} on={scr.episodeId === ep.id} onPress={() => setScr({ ...scr, episodeId: ep.id })} />)}</View>
-                  <TextInput style={crew.input} value={scr.label} onChangeText={(v) => setScr({ ...scr, label: v })} placeholder="For (Sundance programmers)" placeholderTextColor={colors.inkFaint} maxLength={80} />
-                  <TextInput style={crew.input} value={scr.recipientEmail} onChangeText={(v) => setScr({ ...scr, recipientEmail: v })} placeholder="Their email (optional, goes on the watermark)" placeholderTextColor={colors.inkFaint} autoCapitalize="none" keyboardType="email-address" />
-                  <Text style={crew.label}>Good for</Text>
-                  <View style={crew.chips}>{DAYS.map((n) => <Chip key={n} label={`${n} days`} on={scr.days === n} onPress={() => setScr({ ...scr, days: n })} />)}</View>
-                  <View style={crew.row}>
-                    <Text style={crew.label}>Opens allowed</Text>
-                    <TextInput style={[crew.input, { width: 80 }]} value={scr.maxViews} onChangeText={(v) => setScr({ ...scr, maxViews: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="10" placeholderTextColor={colors.inkFaint} />
-                  </View>
-                  <Pressable style={[crew.btn, crew.btnPrimary, { alignSelf: 'flex-start' }, (busy || !scr.episodeId || scr.label.trim().length < 2) && { opacity: 0.6 }]} disabled={busy || !scr.episodeId || scr.label.trim().length < 2} onPress={() => act(async (t) => { const r = await apiPost(`/api/productions/${id}/screeners`, scr, t); setNewLink(r.screener); setScr({ ...scr, label: '', recipientEmail: '' }); return null; })}><Text style={[crew.btnText, crew.btnPrimaryText]}>Make the link</Text></Pressable>
-                </View>
-              )}
+              {scrTab ? (
+                <Pressable style={({ pressed }) => [styles.go, pressed && { opacity: 0.75 }]} onPress={() => router.push(scrTab)} accessibilityRole="link">
+                  <Text style={styles.goText}>{screeningText('distributionGo', { title: releaseTitle })}</Text>
+                </Pressable>
+              ) : null}
             </View>
           </>
         ) : null}
@@ -184,7 +176,7 @@ const styles = StyleSheet.create({
   checkV: { fontFamily: fonts.body, fontSize: 13, color: colors.inkDim, flex: 1, lineHeight: 18 },
   fest: { backgroundColor: colors.surface2, borderRadius: 10, padding: 10, gap: 2, borderLeftWidth: 3, borderLeftColor: colors.sky },
   festName: { fontFamily: fonts.displaySemi, fontSize: 14.5, color: colors.ink },
-  created: { gap: 6, padding: 10, borderRadius: 10, backgroundColor: 'rgba(132,205,152,0.1)', borderWidth: 1, borderColor: 'rgba(132,205,152,0.4)' },
-  link: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.olive },
-  scr: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface2, borderRadius: 10, padding: 10 }
+  scr: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface2, borderRadius: 10, padding: 10 },
+  go: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  goText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.olive }
 });

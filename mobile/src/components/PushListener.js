@@ -89,7 +89,13 @@ const SHOW_EDIT = new RegExp(`^/creator/show/${SHOW_ID}/edit$`);
 // vertical title's own page, opened from Your work and the Dashboard's
 // rows) keeps the tab it was asked to open on.
 const CREATOR_TITLE = /^\/creator\/title\/[A-Za-z0-9_-]{1,160}$/;
-const TITLE_KEEP = { tab: /^(overview|details|artwork|video|selling|channels)$/ };
+const TITLE_KEEP = { tab: /^(overview|details|artwork|video|selling|channels|screenings)$/ };
+// A private screening link's own screen (2026-11-21, migration 128;
+// lib/screeningRules.js screeningHref: the screening_opened, _guessing and
+// _summary notifications). An ended link's notice opens the title's or the
+// show's Private screenings tab (targetTabHref: ?tab=screenings, kept above
+// and in showScreen).
+const CREATOR_SCREENING = /^\/creator\/screenings\/[0-9a-f-]{36}$/i;
 // A production's dashboard (2026-11-19: the ☰ menu's Running now, Your
 // productions, the pitch page's Open its dashboard) keeps the tab it was
 // asked to open on (lib/productionDashRules.js dashHref).
@@ -129,8 +135,9 @@ function showScreen(path, href) {
     } else if (q.ep) row = { key: 'ep', id: q.ep };
     else if (q.draft) row = { key: 'draft', id: q.draft };
     if (row) return `/creator/show/${page[1]}?${row.key}=${enc(row.id)}`;
-    // The show page's Overview tab (2026-11-15); Episodes is the room.
-    return `/creator/show/${page[1]}${q.tab === 'overview' ? '?tab=overview' : ''}`;
+    // The show page's Overview tab (2026-11-15) and its Private screenings
+    // (2026-11-21); Episodes is the room.
+    return `/creator/show/${page[1]}${q.tab === 'overview' || q.tab === 'screenings' ? `?tab=${q.tab}` : ''}`;
   }
   // With no show named it meant the hub, which is the Dashboard now.
   if (path === '/creator/series') return q.series ? `/creator/show/${enc(q.series)}` : '/creator/dashboard';
@@ -195,6 +202,7 @@ export function hrefToRoute(href) {
   if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
   if (PODCAST_SHOW.test(target)) return { route: `${target}${keptQuery(href, PODCAST_KEEP)}` };
   if (CREATOR_TITLE.test(target)) return { route: `${target}${keptQuery(href, TITLE_KEEP)}` };
+  if (CREATOR_SCREENING.test(target)) return { route: target };
   if (PRODUCTION_DASH.test(target)) return { route: `${target}${keptQuery(href, DASH_KEEP)}` };
   if (Object.prototype.hasOwnProperty.call(SCREEN_KEEP, target)) return { route: `${target}${keptQuery(href, SCREEN_KEEP[target])}` };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };

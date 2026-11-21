@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { count } from '../../lib/creatorDashboardRules';
@@ -26,17 +26,41 @@ export function WorkPill({ pill, style }) {
 // --- a row of tabs ----------------------------------------------------------
 
 // A title's tabs (Overview · Details · …) and a show's (Overview ·
-// Episodes): a sideways row, 44pt tall, the current one underlined in the
-// accent. `onPick(key)`.
+// Episodes · Private screenings): a sideways row, 44pt tall, the current
+// one underlined in the accent. `onPick(key)`. The current tab is brought
+// into view when it isn't (2026-11-21: Private screenings, the last tab,
+// opened from a notification sat off the right of a phone).
 export function TabRow({ tabs, current, onPick, label, style }) {
+  const scroller = useRef(null);
+  const spots = useRef({});
+  const view = useRef({ x: 0, width: 0 });
+  const bring = (key) => {
+    const at = spots.current[key];
+    const v = view.current;
+    if (!scroller.current || !at || !v.width) return;
+    if (at.x < v.x) scroller.current.scrollTo({ x: Math.max(0, at.x - 12), animated: true });
+    else if (at.x + at.width > v.x + v.width) scroller.current.scrollTo({ x: at.x + at.width - v.width + 12, animated: true });
+  };
+  useEffect(() => { bring(current); }, [current]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <View style={[w.tabsWrap, style]}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={w.tabs} accessibilityRole="tablist" accessibilityLabel={label}>
+      <ScrollView
+        ref={scroller}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={w.tabs}
+        accessibilityRole="tablist"
+        accessibilityLabel={label}
+        scrollEventThrottle={64}
+        onScroll={(e) => { view.current = { ...view.current, x: e.nativeEvent.contentOffset.x }; }}
+        onLayout={(e) => { view.current = { ...view.current, width: e.nativeEvent.layout.width }; bring(current); }}
+      >
         {tabs.map((t) => {
           const on = t.key === current;
           return (
             <Pressable
               key={t.key}
+              onLayout={(e) => { spots.current[t.key] = e.nativeEvent.layout; if (on) bring(t.key); }}
               style={({ pressed }) => [w.tab, on && w.tabOn, pressed && !on && ss.pressed]}
               onPress={() => onPick(t.key)}
               accessibilityRole="tab"
