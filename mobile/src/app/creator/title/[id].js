@@ -14,6 +14,7 @@ import { hrefToRoute } from '../../../components/PushListener';
 import { isWebsiteAction, rowForTitle, titleImageOpen, useWorkActions } from '../../../components/work/WorkActions';
 import { ActButton, Bars, CardState, MoneyCard, NeedLine, TabRow, WaitLine, WorkPill, w } from '../../../components/work/WorkBits';
 import { dataOf, useRouteBoxes } from '../../../components/work/useRouteBoxes';
+import ScreeningsList from '../../../components/screenings/ScreeningsList';
 
 // A title's dashboard in the app (2026-11-15; the canvas
 // https://claude.ai/artifact/6LuuNpyuaKTS5PkCij8Nfc, board "Dashboard · a
@@ -30,6 +31,9 @@ import { dataOf, useRouteBoxes } from '../../../components/work/useRouteBoxes';
 //             the last 30 days as bars (Views / Watch time), what it has
 //             earned this year, the checklist (each undone item's button
 //             does it) and the history
+//   Private screenings
+//             the links that play it for the people the creator picks
+//             (components/screenings/ScreeningsList.js; migration 128)
 //   Details · Artwork · Video and captions · Selling · Channels
 //             one card each, whose buttons open what Your work opens for
 //             the same action (components/work/WorkActions.js); artwork,
@@ -43,7 +47,7 @@ import { dataOf, useRouteBoxes } from '../../../components/work/useRouteBoxes';
 // /api/creator/money?period=<this year>. A route that refuses leaves its
 // part out; one that fails says so in its part with Try again.
 //
-// Params: id; tab=overview|details|artwork|video|selling|channels.
+// Params: id; tab=overview|details|artwork|video|selling|channels|screenings.
 
 const first = (v) => (Array.isArray(v) ? v[0] : v);
 // A title id is a slug (lib/titleIds.js on the website).
@@ -74,6 +78,8 @@ function TitleScreen() {
   const { boxes, read, readAll } = useRouteBoxes(paths, { getToken, enabled });
   const [chartMode, setChartMode] = useState('views');
   const [refreshing, setRefreshing] = useState(false);
+  // Pulling to refresh reads the Private screenings tab again too.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Read on every visit (back from the Sell sheet's Checkout, the website).
   useFocusEffect(useCallback(() => {
@@ -111,6 +117,7 @@ function TitleScreen() {
 
   async function refresh() {
     setRefreshing(true);
+    setRefreshKey((k) => k + 1);
     await readAll();
     setRefreshing(false);
   }
@@ -345,6 +352,8 @@ function TitleScreen() {
           </View>
         </View>
       ) : null}
+
+      {tab === 'screenings' ? <ScreeningsList target={{ type: 'episode', id }} getToken={getToken} refreshKey={refreshKey} /> : null}
 
       {tab === 'channels' ? (
         <View style={w.card}>

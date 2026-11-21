@@ -26,6 +26,7 @@ import PayeeCard from '../../../../components/show/PayeeCard';
 import { extraKindLabel } from '../../../../lib/extraKinds';
 import { SHOW_TABS } from '../../../../lib/titleDashRules';
 import ShowOverview from '../../../../components/show/ShowOverview';
+import ScreeningsList from '../../../../components/screenings/ScreeningsList';
 import { TabRow } from '../../../../components/work/WorkBits';
 import { hrefToRoute } from '../../../../components/PushListener';
 import { RestoreSheet } from '../../../../components/removal/RemovalBits';
@@ -55,6 +56,11 @@ import { REMOVAL_WORDS, askBackFor, removedState } from '../../../../lib/removal
 // the Overview (2026-11-15: the show page's row of two tabs, Overview ·
 // Episodes; components/show/ShowOverview.js). It still opens on Episodes,
 // the room as it was, so every older link lands where it did.
+// tab=screenings opens Private screenings (2026-11-21, migration 128;
+// components/screenings/ScreeningsList.js): the links that play the show,
+// a season or picked episodes for the people its owner picks. The tab is
+// there for whoever runs the show and a full admin, never on a vertical
+// series.
 
 const POLL_MS = 20000;
 const TOAST_MS = 8000;
@@ -838,7 +844,9 @@ function ShowScreen() {
   }
 
   // --- the screen -----------------------------------------------------------------------------
-  const tab = params.tab === 'overview' ? 'overview' : 'episodes';
+  const screeningsOn = kind !== 'vertical' && (isOwner || Boolean(viewer.isAdmin));
+  const showTabs = SHOW_TABS.filter((t) => t.key !== 'screenings' || screeningsOn);
+  const tab = params.tab === 'overview' ? 'overview' : params.tab === 'screenings' && screeningsOn ? 'screenings' : 'episodes';
   const dashboard = !isLoaded ? null : { isSignedIn: Boolean(isSignedIn) };
   const back = { href: '/creator/dashboard', label: 'Dashboard' };
 
@@ -970,7 +978,7 @@ function ShowScreen() {
       overlay={<RoomToast toast={toast} onClose={() => say(null)} />}
     >
       <View ref={bodyRef} collapsable={false} style={sx.body} onLayout={(e) => { bodyY.current = e.nativeEvent.layout.y; }}>
-        <TabRow tabs={SHOW_TABS} current={tab} onPick={(key) => router.setParams({ tab: key })} label="This show" />
+        <TabRow tabs={showTabs} current={tab} onPick={(key) => router.setParams({ tab: key })} label="This show" />
         {tab === 'overview' ? (
           <ShowOverview
             view={view}
@@ -980,6 +988,8 @@ function ShowScreen() {
               if (where && where.route) router.push(where.route);
             }}
           />
+        ) : tab === 'screenings' ? (
+          <ScreeningsList target={{ type: 'series', id: showId }} getToken={getToken} />
         ) : (
         <>
         {createdNote ? (
