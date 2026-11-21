@@ -78,12 +78,12 @@ t('history, newest first, from the dates the row knows', () => {
 
 t('the tabs and their cards; an extra has no Selling or Channels', () => {
   const d = R.titleDashboard({ title: film, now: NOW });
-  assert.deepEqual(d.tabs.map((x) => x.key), ['overview', 'details', 'artwork', 'video', 'selling', 'channels']);
+  assert.deepEqual(d.tabs.map((x) => x.key), ['overview', 'details', 'artwork', 'video', 'selling', 'channels', 'screenings']);
   assert.equal(d.details.action.key, 'edit_words');
   assert.equal(d.video.captions.action.label, 'Add captions');
   assert.equal(d.selling.action.label, 'Sell it');
   const extra = R.titleDashboard({ title: { ...film, contentType: 'bonus' }, now: NOW });
-  assert.deepEqual(extra.tabs.map((x) => x.key), ['overview', 'details', 'artwork', 'video']);
+  assert.deepEqual(extra.tabs.map((x) => x.key), ['overview', 'details', 'artwork', 'video', 'screenings']);
   const pending = R.titleDashboard({ title: { ...film, status: 'pending' }, now: NOW });
   assert.equal(pending.details.action.key, 'edit_submission');
   assert.equal(pending.selling.note, 'Selling opens once it is live.');
