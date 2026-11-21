@@ -228,7 +228,7 @@ await runCheck('work-revamp', async () => {
     await shot(tp, 'title-1280');
     ok('the head names the film, Film and Live', (await tp.locator('.td-head h1').innerText()).trim() === 'The Long Quiet' && /FILM/i.test(await tp.locator('.td-head').innerText()) && /LIVE/i.test(await tp.locator('.td-head').innerText()));
     const ttabs = await tp.$$eval('.td-tabs .td-tab', (els) => els.map((e) => e.innerText.trim()));
-    ok('the title tabs', ttabs.join(',') === 'Overview,Details,Artwork,Video and captions,Selling,Channels', JSON.stringify(ttabs));
+    ok('the title tabs', ttabs.join(',') === 'Overview,Details,Artwork,Video and captions,Selling,Channels,Private screenings', JSON.stringify(ttabs));
     ok('the four numbers', (await tp.locator('.dash-tile, .td-o .dash-tile').count()) >= 4);
     const checks = await tp.locator('.td-check').evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
     ok('the checklist names what is missing', checks.some((c) => /Captions/.test(c) && /Add captions/.test(c)) && checks.some((c) => /Channels can air it/.test(c)), JSON.stringify(checks));
@@ -274,7 +274,7 @@ await runCheck('work-revamp', async () => {
     await goto(sp, `/creator/show/${IDS.nightBus}`);
     await sp.waitForTimeout(2500);
     const stabs = await sp.$$eval('.td-show-tabs a, .td-show-tabs button', (els) => els.map((e) => ({ t: e.innerText.trim(), cur: e.getAttribute('aria-current') })));
-    ok('the show page has Overview · Episodes', stabs.map((x) => x.t).join(',') === 'Overview,Episodes', JSON.stringify(stabs));
+    ok('the show page has Overview · Episodes · Private screenings', stabs.map((x) => x.t).join(',') === 'Overview,Episodes,Private screenings', JSON.stringify(stabs));
     ok('…and still opens on Episodes, the room as before', (stabs[1] && stabs[1].cur === 'page') && (await sp.locator('.show-room').count()) === 1);
     await goto(sp, `/creator/show/${IDS.nightBus}?tab=overview`);
     await sp.waitForTimeout(3000);
