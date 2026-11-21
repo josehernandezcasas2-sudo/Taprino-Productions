@@ -1,10 +1,15 @@
 import { getRoleContext } from '../../../../lib/roles';
-import { createScreener, revokeScreener } from '../../../../lib/distribution';
+import { endLinkFromDistribution, sendScreeningError } from '../../../../lib/screenings';
 import { applyCors } from '../../../../lib/cors';
+import { requestOrigin } from '../../../../lib/stripe';
+import { SCREENING_WORDS } from '../../../../lib/screeningRules';
 
-// Screeners on a production (migration 109), owner or admin.
-//   POST   { episodeId, label, recipientEmail?, days (3|7|14|30|60), maxViews } → { screener }
-//   DELETE { screenerId } → { ok }   (revokes; the link stops working at once)
+// A production's screeners (migration 109) became private screening links
+// (migration 128, lib/screenings.js), made on the title's own page under
+// Private screenings. What this route still answers, for older builds:
+//   POST   → 410 { error } (links are made on the title's page now)
+//   DELETE { screenerId } → { ok: true, link } (ends the link at once, for
+//          whoever runs its title or owns the old screener)
 export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -16,14 +21,14 @@ export default async function handler(req, res) {
   try {
     const account = await getRoleContext(req).catch(() => ({ userId: null, isAdmin: false }));
     if (!account.userId) return res.status(401).json({ error: 'Sign in first.' });
-    const body = req.body || {};
-    if (req.method === 'POST') return res.status(201).json({ screener: await createScreener(account.userId, id, body, { isAdmin: account.isAdmin }) });
-    if (req.method === 'DELETE') return res.status(200).json(await revokeScreener(account.userId, id, String(body.screenerId || ''), { isAdmin: account.isAdmin }));
+    if (req.method === 'POST') return res.status(410).json({ error: SCREENING_WORDS.distributionLine });
+    if (req.method === 'DELETE') {
+      const body = req.body || {};
+      return res.status(200).json(await endLinkFromDistribution(account, String(body.screenerId || ''), { origin: requestOrigin(req) }));
+    }
     res.setHeader('Allow', 'POST, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message });
-    console.error('productions/[id]/screeners:', err.message);
-    return res.status(500).json({ error: 'Could not do that right now.' });
+    return sendScreeningError(res, err, 'productions/[id]/screeners');
   }
 }

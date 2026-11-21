@@ -1173,3 +1173,41 @@ export const SCREENING_WORDS_APP = {
   tryAgain: 'Try again',
   offline: 'Couldn’t reach Studio Tapa. Check the connection and try again.'
 };
+
+/* ---------- the server's own lines (lib/screenings.js and its routes) ---------- */
+
+// Errors the creator side's routes answer with, beside validateLink's.
+export const SCREENING_WORDS_SERVER = {
+  signIn: 'Sign in first.',
+  badTarget: 'Say which title the links are for.',
+  targetGone: 'That title isn’t here.',
+  linkGone: 'That screening link isn’t here.',
+  unavailable: 'That title can’t be screened right now: it, or the show it belongs to, is pulled, withdrawn, declined or on its way out.',
+  ended: 'That link has ended. Discard it, or run it again with a new address and a new password.',
+  notEnded: 'That link still works. End it first.',
+  tooMany: 'That’s a lot of new links for one day. Try again tomorrow.',
+  slowDown: 'Slow down a little.',
+  badAction: 'Say what to change.',
+  noEpisode: 'That episode isn’t on this link.',
+  ownerFallback: 'the filmmaker',
+  // The viewer's page (/screener/<token>) beside VIEWER_WORDS.
+  viewer: {
+    forLabel: 'For {label}',
+    from: 'From {owner}.',
+    worksUntil: 'Works until {endsAt}.',
+    yourTime: 'your time',
+    until: 'Until {time}',
+    signIn: 'Sign in',
+    signedInAs: 'Signed in as {name}.',
+    opening: 'Opening…',
+    tryAgain: 'Try again',
+    failed: 'Something went wrong. Try again in a moment.',
+    episodes: 'Episodes',
+    thisLink: 'This link · {count}',
+    playing: 'Playing',
+    thisScreen: 'This screen',
+    playingHere: 'Playing here only',
+    ends: 'Ends',
+    home: 'Go to the home page'
+  }
+};

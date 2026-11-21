@@ -52,7 +52,7 @@ export default function Privacy({ account }) {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="November 15, 2026"
+      updated="November 21, 2026"
       account={account}
       summary={
         <>
@@ -131,6 +131,20 @@ export default function Privacy({ account }) {
         lasts a few hours. Where you are in a downloaded title is kept on your phone, and reaches us as
         watch progress only while the app is online. When you remove a phone it leaves your list; we
         keep the record that it was removed and of the downloads it held.
+      </p>
+
+      <h3 id="private-screenings">If you open a private screening</h3>
+      <p>
+        A filmmaker can send a private link to a film or a show, with its own password. When you open
+        one, the filmmaker who made the link sees that it was opened and when, roughly where (the city,
+        region and country your connection comes from, as our host reads it: never an address, and a
+        VPN shows the VPN&rsquo;s place), the kind of device and browser (for example &ldquo;iPhone
+        &middot; Safari&rdquo;), and how much of it was watched. If you&rsquo;re signed in they also see
+        your name; if you aren&rsquo;t, you show as &ldquo;Guest&rdquo;, and we keep a random cookie in
+        your browser so a second open from it counts as the same guest. To stop someone guessing a
+        password we keep a salted hash of the address the tries came from, never the address. A
+        screening never goes in your watch history. What a link records is deleted when the filmmaker
+        discards the link, and a year after it ends at the latest.
       </p>
 
       <h3>If you submit work as a creator</h3>
@@ -234,7 +248,8 @@ export default function Privacy({ account }) {
         creators can request removal. Once a removal is confirmed the title comes off the site at once;
         if nobody bought it we keep its files for {HOLD_DAYS} days in case its creator wants it back,
         then delete them — or longer, if the creator asked us to keep them for later. A title people
-        bought is kept for them.
+        bought is kept for them. What a private screening link records about the people who opened
+        it is deleted when its maker discards the link, and a year after the link ends at the latest.
       </p>
 
       <h2>Your rights</h2>

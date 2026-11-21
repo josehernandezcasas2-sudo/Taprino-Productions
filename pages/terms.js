@@ -70,7 +70,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-19';
+const TEXT_UPDATED = '2026-11-21';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -322,6 +322,12 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
           keeping a title in our app with the app&rsquo;s own Download button (section 4)
         </li>
         <li>Get around signed links, paywalls, or any other access control</li>
+        <li id="private-screenings">
+          Record, copy or re-show a private screening someone sent you, or pass its link or its
+          password on to anyone else: a private screening is for the people it was made for, its
+          picture is marked with who it&rsquo;s for, and its maker sees where and on what kind of
+          device it was opened
+        </li>
         <li>Share your account so people can watch premium content without subscribing</li>
         <li>Upload anything unlawful, hateful, harassing, or sexually explicit involving minors</li>
         <li>Upload work you don&rsquo;t have the rights to</li>
