@@ -370,6 +370,9 @@ await runCheck('private-screenings', async () => {
     r = await make(O, { type: 'episode', id: ID.film }, { label: `Named ${RUN}`, access: 'named', named: { userIds: [N.id], emails: ['someone@else.example.com'] } });
     const NM = r.json && r.json.link;
     ok('a link for named people', r.status === 201 && NM && NM.access === 'named' && NM.named.userIds[0] === N.id, r.text.slice(0, 200));
+    ok('…named.people: each named account’s public name and @handle (never an email)', NM && JSON.stringify(NM.named.people) === JSON.stringify([{ userId: N.id, name: `Nia Named ${RUN}`, handle: `psn${RUN}` }]) && JSON.stringify(NM.named.emails) === '["someone@else.example.com"]', NM && NM.named);
+    r = await call(`/api/screenings?target=episode:${ID.film}`, { who: O });
+    ok('…in the list too; a link naming nobody has people []', r.json && r.json.links.find((l) => l.id === NM.id).named.people.length === 1 && r.json.links.find((l) => l.id === A.id).named.people.length === 0, r.status);
     pg = await pageOf(NM.token);
     ok('…signed out: state named', pg.page && pg.page.state === 'named', pg.page && pg.page.state);
     pg = await pageOf(NM.token, X);
@@ -505,7 +508,7 @@ await runCheck('private-screenings', async () => {
     const ids = people.map((p) => q(p.id)).join(', ');
     const eps = Object.values(ID).map(q).join(', ');
     try {
-      sql(`delete from public.screeners where owner_id in (${ids}) or production_id = ${q(PRODUCTION)} or target_id in (${eps})`);
+      sql(`delete from public.screeners where created_by in (${ids}) or production_id = ${q(PRODUCTION)} or episode_id in (${eps})`);
       sql(`delete from public.productions where id = ${q(PRODUCTION)}`);
       sql(`delete from public.notifications where user_id in (${ids})`);
       sql(`delete from public.episodes where id in (${eps})`);

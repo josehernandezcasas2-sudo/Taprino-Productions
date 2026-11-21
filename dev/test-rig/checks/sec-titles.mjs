@@ -341,11 +341,15 @@ async function ownership() {
 // Distribution page's old POST answers 410; the rule is the same.
 async function screeners() {
   section('A screener plays only a title that could be shown');
-  const NEW = hasColumn('screeners', 'target_id');
-  const gone = (text) => (NEW ? text.includes('available any more') : text.includes('available right now'));
-  const making = (episodeId, label) => (NEW
-    ? call('/api/screenings', { who: DEE, method: 'POST', body: { target: { type: 'episode', id: episodeId }, label, endsAt: new Date(Date.now() + 7 * 86400000).toISOString(), password: 'tide-lantern-42', maxViews: 5 } })
-    : call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId, label, days: 7, maxViews: 5 } }));
+  // Before 128 a 109 screener waits for the migration (its page says it
+  // isn't available; private-screenings.mjs checks that half).
+  if (!hasColumn('screeners', 'target_id')) {
+    const before = await page(`/screener/${TOKEN}`, SIGNED_OUT);
+    ok('before 128: the screener’s page says it isn’t available, no 500', before.status === 200 && before.text.includes('available any more'), before.status);
+    return;
+  }
+  const gone = (text) => text.includes('available any more');
+  const making = (episodeId, label) => call('/api/screenings', { who: DEE, method: 'POST', body: { target: { type: 'episode', id: episodeId }, label, endsAt: new Date(Date.now() + 7 * 86400000).toISOString(), password: 'tide-lantern-42', maxViews: 5 } });
   let r = await page(`/screener/${TOKEN}`, SIGNED_OUT);
   ok('the screener opens while its show is fine', r.status === 200 && !gone(r.text), r.status);
   sql(`update public.series set moderation_hold = true where id = ${q(ID.scrShow)}`);
@@ -359,10 +363,8 @@ async function screeners() {
   }
   r = await making(ID.wFilm, 'For the withdrawn one');
   ok('a withdrawn title can’t be screened', r.status === 400 || r.status === 409 || r.status === 404, `${r.status} ${r.text.slice(0, 200)}`);
-  if (NEW) {
-    r = await call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId: ID.scrE1, label: 'Old way', days: 7, maxViews: 5 } });
-    ok('the Distribution page’s old POST: 410, links are made on the title’s page', r.status === 410, `${r.status} ${r.text.slice(0, 200)}`);
-  }
+  r = await call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId: ID.scrE1, label: 'Old way', days: 7, maxViews: 5 } });
+  ok('the Distribution page’s old POST: 410, links are made on the title’s page', r.status === 410, `${r.status} ${r.text.slice(0, 200)}`);
 }
 
 async function moveOut() {
