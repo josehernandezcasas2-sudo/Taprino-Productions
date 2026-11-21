@@ -108,9 +108,9 @@ t('sections: Team only for a content scheduler who isn\'t on the admin team', ()
 });
 
 t('Admin: a fourth side for admins and sub-admins only', () => {
-  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { isAdmin: true } }).sides.map((x) => x.label), ['Connect', 'Stream', 'Production', 'Admin']);
-  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { canAccessAdmin: true } }).sides.map((x) => x.id), ['connect', 'stream', 'production', 'admin']);
-  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { isCreator: true, isContentScheduler: true } }).sides.map((x) => x.id), ['connect', 'stream', 'production']);
+  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { isAdmin: true } }).sides.map((x) => x.label), ['Connect', 'Production', 'Stream', 'Admin']);
+  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { canAccessAdmin: true } }).sides.map((x) => x.id), ['connect', 'production', 'stream', 'admin']);
+  assert.deepEqual(R.siteMenu({ signedIn: true, roles: { isCreator: true, isContentScheduler: true } }).sides.map((x) => x.id), ['connect', 'production', 'stream']);
   assert.deepEqual(R.siteMenu({ signedIn: false, roles: { isAdmin: true } }).sides.map((x) => x.id), ['connect', 'stream']);
   assert.equal(R.siteMenu({ side: 'admin', signedIn: true, roles: { isCreator: true } }).side, 'connect');
   const m = R.siteMenu({ side: 'admin', signedIn: true, roles: { isAdmin: true } });
@@ -158,7 +158,7 @@ t('Admin: each tile\'s capabilities are the admin nav\'s for that page', () => {
 });
 
 t('Production: a third side signed in only; signed out it opens on Connect', () => {
-  assert.deepEqual(R.siteMenu({ signedIn: true }).sides.map((x) => x.label), ['Connect', 'Stream', 'Production']);
+  assert.deepEqual(R.siteMenu({ signedIn: true }).sides.map((x) => x.label), ['Connect', 'Production', 'Stream']);
   assert.deepEqual(R.siteMenu({ signedIn: false }).sides.map((x) => x.id), ['connect', 'stream']);
   const out = R.siteMenu({ side: 'production', signedIn: false });
   assert.equal(out.side, 'connect');

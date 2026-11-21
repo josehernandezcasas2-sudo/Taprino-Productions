@@ -102,7 +102,7 @@ await runCheck('site-menu', async () => {
       ok('…and no Make films? card', !(await pg.$('.sm-apply')));
       // The Production side (2026-11-20): a third choice, signed in.
       const sides = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => e.textContent.trim()));
-      ok('three sides: Connect, Stream, Production', sides.join('|') === 'Connect|Stream|Production', sides);
+      ok('three sides, Production in the middle: Connect, Production, Stream', sides.join('|') === 'Connect|Production|Stream', sides);
       const sideBoxes = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => ({ sw: e.scrollWidth, cw: e.clientWidth })));
       ok('…each label fits its button', sideBoxes.every((x) => x.sw <= x.cw + 1), sideBoxes);
       await pg.locator('.sm-side.production').tap();
@@ -201,7 +201,7 @@ await runCheck('site-menu', async () => {
       ok('an admin has no Team or Creator section (the Admin and Production sides hold them)', !secs.includes('team') && !secs.includes('creator'), secs);
       // The Admin side (2026-11-20).
       const adminSides = await pg.$$eval('.sm-sides .sm-side', (els) => els.map((e) => e.textContent.trim()));
-      ok('four sides for an admin: Connect, Stream, Production, Admin', adminSides.join('|') === 'Connect|Stream|Production|Admin', adminSides);
+      ok('four sides for an admin: Connect, Production, Stream, Admin', adminSides.join('|') === 'Connect|Production|Stream|Admin', adminSides);
       await pg.locator('.sm-side.admin').click();
       const adminTiles = await tilesOf(pg);
       ok('the Admin side: Admin home, Review queue, Shows, Library, Reports & flags, Applications', adminTiles.join('|') === 'admin-home|admin-review|admin-shows|admin-library|admin-flags|admin-applications', adminTiles);
