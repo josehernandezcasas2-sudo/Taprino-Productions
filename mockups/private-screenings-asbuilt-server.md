@@ -130,8 +130,12 @@ Every route answers what the contract says. Additions (nothing removed or rename
 - The viewer page's props are `{ page, token, renderedAt }` (`renderedAt` keeps
   the countdown's first render the same on both sides).
 - The Distribution page's DELETE answers `{ ok: true, link }`; `getDistribution`
-  takes an optional `origin` and still answers `episodes`; a link the viewer
-  doesn't run carries `password: null` there.
+  takes an optional `origin`; a link the viewer doesn't run carries
+  `password: null` there. `GET /api/productions/<id>/distribution` keeps
+  answering **`screeners: []` and `episodes: []`** beside `screenings` (the
+  coordinator, for the app builder: installed builds call `d.screeners.filter(…)`
+  and `d.episodes.length` and would crash without them; the owner's-episodes
+  read behind the old screener form is gone, nothing is made there any more).
 - `/api/messages/people` answers `displayName` / `avatarUrl` (not `name` /
   `avatar`), per the coordinator; not touched here.
 
@@ -169,7 +173,7 @@ password) and counts them; the daily step reads `{ ready: false }`.
 - `node scripts/test-screening-rules.mjs` 14, `test-notification-types.mjs` 7
   (111 types), `test-sign-in-here.mjs`, `test-private-beta.mjs`,
   `test-sec-titles.mjs` and every other `scripts/test-*.mjs` (71 files): pass.
-- `dev/test-rig/checks/private-screenings.mjs` after 128: **162 ok, 0 FAIL**
+- `dev/test-rig/checks/private-screenings.mjs` after 128: **163 ok, 0 FAIL**
   (run several times; it seeds and removes its own rows), including the browser
   half at 390, 1280 and 320. Before 128 (`RIG_MIGRATE_TO=127 RIG_REBUILD=1`):
   **7 ok, 0 FAIL**.

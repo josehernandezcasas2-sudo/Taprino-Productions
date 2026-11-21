@@ -4,7 +4,8 @@ import { applyCors } from '../../../../lib/cors';
 import { requestOrigin } from '../../../../lib/stripe';
 
 // A production's distribution page (migration 109), owner or admin.
-//   GET   → { production, release, festivals, notes, pressKitUrl, trailerUrl, premiereOn, premiereNote, screenings: { links, href, canManage }, episodes, partners, checklist }
+//   GET   → { production, release, festivals, notes, pressKitUrl, trailerUrl, premiereOn, premiereNote, screenings: { links, href, canManage }, screeners: [], episodes: [], partners, checklist }
+//         (screeners and episodes stay empty for installed app builds that still read them)
 //   PATCH { festivals?, notes?, pressKitUrl?, trailerUrl?, premiereOn?, premiereNote? } → the same
 export default async function handler(req, res) {
   applyCors(req, res);

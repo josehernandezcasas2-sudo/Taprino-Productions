@@ -101,7 +101,7 @@ async function before128(O) {
   r = await open(LEGACY_TOKEN, { password: '' });
   ok('…its open: 503 migration-128', r.status === 503 && r.json.code === 'migration-128', r.status);
   r = await call(`/api/productions/${PRODUCTION}/distribution`, { who: O });
-  ok('the Distribution page lists it, legacy', r.status === 200 && r.json.screenings && r.json.screenings.links.some((l) => l.token === LEGACY_TOKEN && l.legacy === true) && r.json.checklist.screenersLive === 1, r.text.slice(0, 300));
+  ok('the Distribution page lists it, legacy (and screeners: [] for older app builds)', r.status === 200 && r.json.screenings && r.json.screenings.links.some((l) => l.token === LEGACY_TOKEN && l.legacy === true) && r.json.checklist.screenersLive === 1 && Array.isArray(r.json.screeners) && Array.isArray(r.json.episodes), r.text.slice(0, 300));
   const cron = await call('/api/cron/expire-content', { method: 'POST', headers: { Authorization: 'Bearer rig-cron-secret' } });
   ok('the daily step: { ready: false }', cron.status === 200 && cron.json.screenings && cron.json.screenings.ready === false, cron.text.slice(0, 300));
 }
@@ -449,7 +449,8 @@ await runCheck('private-screenings', async () => {
     section('The Distribution page');
     r = await call(`/api/productions/${PRODUCTION}/distribution`, { who: O });
     const sc = r.json && r.json.screenings;
-    ok('screenings in place of screeners: the release’s links and the old screener, the tab, can manage', r.status === 200 && sc && Array.isArray(sc.links) && sc.links.some((l) => l.token === LEGACY_TOKEN) && sc.links.some((l) => l.id === A.id) && sc.href === `/creator/title/${ID.film}?tab=screenings` && sc.canManage === true && !('screeners' in r.json), r.text.slice(0, 300));
+    ok('screenings in place of screeners: the release’s links and the old screener, the tab, can manage', r.status === 200 && sc && Array.isArray(sc.links) && sc.links.some((l) => l.token === LEGACY_TOKEN) && sc.links.some((l) => l.id === A.id) && sc.href === `/creator/title/${ID.film}?tab=screenings` && sc.canManage === true, r.text.slice(0, 300));
+    ok('…and screeners: [] / episodes: [] for installed app builds', Array.isArray(r.json.screeners) && r.json.screeners.length === 0 && Array.isArray(r.json.episodes) && r.json.episodes.length === 0, [r.json.screeners, r.json.episodes]);
     ok('…the checklist counts the live links', r.json && r.json.checklist && r.json.checklist.screenersLive === sc.links.filter((l) => !l.endedAt && Date.parse(l.endsAt) > Date.now() && Date.parse(l.startsAt) <= Date.now() && l.views < l.maxViews).length, r.json && r.json.checklist);
     r = await call(`/api/productions/${PRODUCTION}/screeners`, { who: O, method: 'POST', headers: ORIGIN, body: { episodeId: ID.film, label: 'Old way', days: 7, maxViews: 5 } });
     ok('its old POST: 410 with the line', r.status === 410 && /title’s own page/.test(r.json.error), r.text.slice(0, 200));
