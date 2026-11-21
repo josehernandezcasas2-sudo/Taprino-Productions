@@ -5,6 +5,7 @@ import { recordAudit } from '../../../lib/auditLog';
 import { runSaverStep } from '../../../lib/seriesDrop';
 import { purgeHeldTitles } from '../../../lib/titleRemoval';
 import { expireStaleRequests } from '../../../lib/locationRequests';
+import { runScreeningDailyStep } from '../../../lib/screenings';
 
 // Runs daily via vercel.json's cron config, which Vercel authenticates
 // automatically: set CRON_SECRET as an env var and Vercel sends
@@ -31,6 +32,11 @@ import { expireStaleRequests } from '../../../lib/locationRequests';
 // And location requests nobody answered in time (2026-11-16): the readers
 // run that sweep at most once a minute now, so the day's run catches the
 // rest (lib/locationRequests.js expireStaleRequests).
+//
+// And private screening links (migration 128, lib/screenings.js
+// runScreeningDailyStep): their owners told about links that ended, the
+// daily summaries, and the viewer details of links that ended more than a
+// year ago deleted. Before 128 that step reads { ready: false }.
 function sameSecret(a, b) {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -128,11 +134,23 @@ export default async function handler(req, res) {
     requests = { expired: 0, failed: true };
   }
 
+  // Private screening links, whatever the steps before did.
+  let screenings = null;
+  try {
+    screenings = await runScreeningDailyStep({ now: Date.now() });
+  } catch (err) {
+    console.error('expire-content screenings:', err && err.message ? err.message : err);
+    screenings = { ready: true, ended: 0, summaries: 0, cleared: 0, failed: 1 };
+  }
+
   const purgeWords = purged && purged.ready && (purged.shows || purged.episodes || purged.keptForBuyers || purged.failed)
     ? ` · deleted after their hold: ${purged.shows} show(s), ${purged.episodes} title(s)${purged.names.length ? ` (${purged.names.slice(0, 20).join(', ')})` : ''}${purged.keptForBuyers ? `, ${purged.keptForBuyers} kept for buyers` : ''}${purged.failed ? `, ${purged.failed} failed (tried again tomorrow)` : ''}`
     : '';
   const requestWords = requests && (requests.expired || requests.failed) ? ` · location requests: ${requests.failed ? 'failed' : `${requests.expired} expired`}` : '';
-  if (flagged.length > 0 || purgeWords || requestWords || (savers && (savers.shows > 0 || savers.failed))) {
+  const screeningWords = screenings && screenings.ready && (screenings.ended || screenings.summaries || screenings.cleared || screenings.failed)
+    ? ` · screenings: ${screenings.ended} ended notice(s), ${screenings.summaries} summary(ies), ${screenings.cleared} old viewer row(s) deleted${screenings.failed ? `, ${screenings.failed} step(s) failed` : ''}`
+    : '';
+  if (flagged.length > 0 || purgeWords || requestWords || screeningWords || (savers && (savers.shows > 0 || savers.failed))) {
     await recordAudit({
       // audit_log.admin_id is not null: the scheduled run signs as 'cron'
       // (as creator-payouts does), or Postgres refused the line every night.
@@ -141,9 +159,9 @@ export default async function handler(req, res) {
       action: 'auto_flag_expired_content',
       targetType: 'lifecycle',
       targetId: 'batch',
-      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${purgeWords}${requestWords}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
+      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${purgeWords}${requestWords}${screeningWords}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
     });
   }
 
-  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, purged, savers, requests });
+  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, purged, savers, requests, screenings });
 }

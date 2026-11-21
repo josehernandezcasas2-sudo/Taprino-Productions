@@ -181,6 +181,14 @@ export const NOTIFICATION_TYPES = Object.freeze({
   production_released: kind('Credit is live', 'clapperboard', 'production'),
   screener_opened: kind('Screener opened', 'clapperboard', 'production'),
 
+  // Private screening links (migration 128, lib/screenings.js): opened,
+  // ended, someone guessing the password, the daily summary. The row's
+  // href is the link's own page (ended: the title's Private screenings tab).
+  screening_opened: kind('Screening opened', 'clapperboard', 'creator'),
+  screening_ended: kind('Screening ended', 'clapperboard', 'creator'),
+  screening_guessing: kind('Password guessing', 'lock', 'creator'),
+  screening_summary: kind('Screening summary', 'clapperboard', 'creator'),
+
   // Messages (lib/messages.js).
   message: kind('New message', 'chat', 'message'),
 

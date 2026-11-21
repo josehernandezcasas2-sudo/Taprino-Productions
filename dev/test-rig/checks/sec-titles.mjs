@@ -23,7 +23,7 @@
 // Rig up, any migration from 120 on.
 //   node dev/test-rig/checks/sec-titles.mjs
 import crypto from 'node:crypto';
-import { IDS, USERS, RUN, FAKES, ok, section, runCheck, call, page, sql, rows, q, insert, session, SIGNED_OUT, newUser, removeUser, cloudflare, clerk, ago, uidFor } from './lib.mjs';
+import { IDS, USERS, RUN, FAKES, ok, section, runCheck, call, page, sql, rows, q, insert, session, SIGNED_OUT, newUser, removeUser, cloudflare, clerk, ago, uidFor, hasColumn } from './lib.mjs';
 
 const MARA = session(USERS.mara);
 const DEE = session(USERS.dee);
@@ -143,7 +143,8 @@ async function seed() {
   insert('series', show(ID.scrShow));
   insert('episodes', base(ID.scrE1, { content_type: 'series', series_id: ID.scrShow, season: 1, series_order: 1 }));
   insert('productions', { id: PRODUCTION, owner_id: USERS.dee, title: `Check st production ${RUN}`, status: 'post' });
-  insert('screeners', { production_id: PRODUCTION, episode_id: ID.scrE1, token: TOKEN, label: SCREENER_LABEL, expires_at: new Date(Date.now() + 7 * 86400000).toISOString(), max_views: 20, created_by: USERS.dee });
+  // A 109 screener: since migration 128 it names its owner and title too.
+  insert('screeners', { production_id: PRODUCTION, episode_id: ID.scrE1, token: TOKEN, label: SCREENER_LABEL, expires_at: new Date(Date.now() + 7 * 86400000).toISOString(), max_views: 20, created_by: USERS.dee, ...(hasColumn('screeners', 'target_id') ? { owner_id: USERS.dee, target_id: ID.scrE1 } : {}) });
 
   // Dee's episode in review filed in Mara's show.
   insert('series', show(ID.maraShow, { creator_id: USERS.mara, submitted_by_user_id: USERS.mara }));
@@ -335,21 +336,33 @@ async function ownership() {
   ok('an untagged video nobody uses → 200', r.status === 200, `${r.status} ${r.text.slice(0, 160)}`);
 }
 
+// Since migration 128 (private screening links, lib/screenings.js) a
+// screener is made on the title's page (POST /api/screenings) and the
+// Distribution page's old POST answers 410; the rule is the same.
 async function screeners() {
   section('A screener plays only a title that could be shown');
+  const NEW = hasColumn('screeners', 'target_id');
+  const gone = (text) => (NEW ? text.includes('available any more') : text.includes('available right now'));
+  const making = (episodeId, label) => (NEW
+    ? call('/api/screenings', { who: DEE, method: 'POST', body: { target: { type: 'episode', id: episodeId }, label, endsAt: new Date(Date.now() + 7 * 86400000).toISOString(), password: 'tide-lantern-42', maxViews: 5 } })
+    : call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId, label, days: 7, maxViews: 5 } }));
   let r = await page(`/screener/${TOKEN}`, SIGNED_OUT);
-  ok('the screener opens while its show is fine', r.status === 200 && !r.text.includes('available right now'), r.status);
+  ok('the screener opens while its show is fine', r.status === 200 && !gone(r.text), r.status);
   sql(`update public.series set moderation_hold = true where id = ${q(ID.scrShow)}`);
   try {
     r = await page(`/screener/${TOKEN}`, SIGNED_OUT);
-    ok('its show pulled: the screener says the video isn’t available', r.status === 200 && r.text.includes('available right now'), r.status);
-    r = await call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId: ID.scrE1, label: 'Another festival', days: 7, maxViews: 5 } });
+    ok('its show pulled: the screener says the video isn’t available', r.status === 200 && gone(r.text), r.status);
+    r = await making(ID.scrE1, 'Another festival');
     ok('…and no new screener can be made for it (409)', r.status === 409, `${r.status} ${r.text.slice(0, 200)}`);
   } finally {
     sql(`update public.series set moderation_hold = false where id = ${q(ID.scrShow)}`);
   }
-  r = await call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId: ID.wFilm, label: 'For the withdrawn one', days: 7, maxViews: 5 } });
-  ok('a withdrawn title can’t be screened', r.status === 400 || r.status === 409, `${r.status} ${r.text.slice(0, 200)}`);
+  r = await making(ID.wFilm, 'For the withdrawn one');
+  ok('a withdrawn title can’t be screened', r.status === 400 || r.status === 409 || r.status === 404, `${r.status} ${r.text.slice(0, 200)}`);
+  if (NEW) {
+    r = await call(`/api/productions/${PRODUCTION}/screeners`, { who: DEE, method: 'POST', body: { episodeId: ID.scrE1, label: 'Old way', days: 7, maxViews: 5 } });
+    ok('the Distribution page’s old POST: 410, links are made on the title’s page', r.status === 410, `${r.status} ${r.text.slice(0, 200)}`);
+  }
 }
 
 async function moveOut() {

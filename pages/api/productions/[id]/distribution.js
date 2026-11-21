@@ -1,9 +1,10 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { getDistribution, updateDistribution } from '../../../../lib/distribution';
 import { applyCors } from '../../../../lib/cors';
+import { requestOrigin } from '../../../../lib/stripe';
 
 // A production's distribution page (migration 109), owner or admin.
-//   GET   → { production, release, festivals, notes, pressKitUrl, trailerUrl, premiereOn, premiereNote, screeners, episodes, partners, checklist }
+//   GET   → { production, release, festivals, notes, pressKitUrl, trailerUrl, premiereOn, premiereNote, screenings: { links, href, canManage }, episodes, partners, checklist }
 //   PATCH { festivals?, notes?, pressKitUrl?, trailerUrl?, premiereOn?, premiereNote? } → the same
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -16,8 +17,8 @@ export default async function handler(req, res) {
   try {
     const account = await getRoleContext(req).catch(() => ({ userId: null, isAdmin: false }));
     if (!account.userId) return res.status(401).json({ error: 'Sign in first.' });
-    if (req.method === 'GET') return res.status(200).json(await getDistribution(id, { viewerId: account.userId, isAdmin: account.isAdmin }));
-    if (req.method === 'PATCH') return res.status(200).json(await updateDistribution(account.userId, id, req.body || {}, { isAdmin: account.isAdmin }));
+    if (req.method === 'GET') return res.status(200).json(await getDistribution(id, { viewerId: account.userId, isAdmin: account.isAdmin, origin: requestOrigin(req) }));
+    if (req.method === 'PATCH') return res.status(200).json(await updateDistribution(account.userId, id, req.body || {}, { isAdmin: account.isAdmin, origin: requestOrigin(req) }));
     res.setHeader('Allow', 'GET, PATCH');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
