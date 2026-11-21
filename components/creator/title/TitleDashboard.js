@@ -20,6 +20,7 @@ import { SITE } from '../../../lib/siteConfig';
 import { bg, editValuesFor, useRoute } from './TitleBits';
 import TitleOverview from './TitleOverview';
 import { ArtworkTab, ChannelsTab, DetailsTab, SellingTab, VideoTab } from './TitleCards';
+import ScreeningsTab, { screeningsBadge, useScreeningsList } from '../screenings/ScreeningsTab';
 
 // A title's dashboard (/creator/title/<id>; Jose, 2026-11-14: "for series,
 // and single items like a film/short, add a dashboard that will encompass
@@ -35,6 +36,11 @@ import { ArtworkTab, ChannelsTab, DetailsTab, SellingTab, VideoTab } from './Tit
 //
 // A show's episode isn't edited here: the page sends it to the episode
 // editor (/creator/show/<sid>/episode/<eid>), as Your work does.
+//
+// Private screenings (migration 128, 2026-11-21): the tab is
+// components/creator/screenings/ScreeningsTab.js. The page reads the
+// title's links once it knows the tab is there (not on a vertical title),
+// so the tab can say "3 live", and hands the same answer to the tab.
 
 const EXTRACT_POLL_MS = 3000;
 
@@ -85,6 +91,9 @@ export default function TitleDashboard({ id, isAdmin = false, isCreator = false,
 
   const asked = typeof router.query.tab === 'string' ? router.query.tab : 'overview';
   const tab = dash && dash.tabs.some((t) => t.key === asked) ? asked : 'overview';
+  const screeningTarget = useMemo(() => ({ type: 'episode', id }), [id]);
+  const screenings = useScreeningsList(screeningTarget, { enabled: Boolean(dash && dash.tabs.some((t) => t.key === 'screenings')) });
+  const screeningsLive = screeningsBadge(screenings);
 
   // On a phone the tab row scrolls: keep the open tab in view.
   const tabsRef = useRef(null);
@@ -317,6 +326,7 @@ export default function TitleDashboard({ id, isAdmin = false, isCreator = false,
             aria-current={t.key === tab ? 'page' : undefined}
           >
             {t.label}
+            {t.key === 'screenings' && screeningsLive ? <span className="scn-tab-badge">{screeningsLive}</span> : null}
           </Link>
         ))}
       </nav>
@@ -336,7 +346,8 @@ export default function TitleDashboard({ id, isAdmin = false, isCreator = false,
           extract={extract}
         />
       )}
-      {tab !== 'overview' && (
+      {tab === 'screenings' && <ScreeningsTab target={screeningTarget} route={screenings} />}
+      {tab !== 'overview' && tab !== 'screenings' && (
         <div className="td-panel">
           {tab === 'details' && <DetailsTab {...cardProps} />}
           {tab === 'artwork' && <ArtworkTab {...cardProps} />}

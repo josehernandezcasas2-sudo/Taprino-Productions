@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
@@ -8,6 +9,7 @@ import Footer from '../../../components/Footer';
 import ShowControlRoom from '../../../components/show/ShowControlRoom';
 import ShowOverview from '../../../components/show/ShowOverview';
 import { BackArrowIcon } from '../../../components/PlayerIcons';
+import ScreeningsTab, { screeningsBadge, useScreeningsList } from '../../../components/creator/screenings/ScreeningsTab';
 import { SHOW_TABS } from '../../../lib/titleDashRules';
 
 // The show page — one control room per series or podcast (the series
@@ -26,6 +28,13 @@ import { SHOW_TABS } from '../../../lib/titleDashRules';
 // show's numbers, money and what needs the creator
 // (components/show/ShowOverview.js) in its place. The two page files under
 // /creator/show/<id>/ (episode/[episodeId], edit) have no tabs.
+//
+// Private screenings (migration 128, 2026-11-21): the third tab,
+// ?tab=screenings, is components/creator/screenings/ScreeningsTab.js with
+// the show as its target (a link plays the whole show, a season or the
+// episodes picked). The page reads the show's links so the tab can say
+// "3 live"; for someone who doesn't run the show the route answers that
+// only whoever runs it makes its links.
 export async function getServerSideProps({ req, res, params }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
@@ -53,8 +62,11 @@ export default function ShowPage({ showId, mainGenres, isSignedIn, isSubscriber,
   const q = router.query || {};
   const ep = typeof q.ep === 'string' && isTitleId(q.ep) ? q.ep : null;
   const edit = q.edit === 'art' ? 'art' : q.edit === 'details' ? 'details' : null;
-  const tab = q.tab === 'overview' ? 'overview' : 'episodes';
+  const tab = q.tab === 'overview' ? 'overview' : q.tab === 'screenings' ? 'screenings' : 'episodes';
   const base = `/creator/show/${encodeURIComponent(showId)}`;
+  const screeningTarget = useMemo(() => ({ type: 'series', id: showId }), [showId]);
+  const screenings = useScreeningsList(screeningTarget);
+  const screeningsLive = screeningsBadge(screenings);
   return (
     <>
       <HeaderNav mainGenres={mainGenres} isSignedIn={isSignedIn} isSubscriber={isSubscriber} email={email} isAdmin={isAdmin} isCreator={isCreator} />
@@ -64,19 +76,24 @@ export default function ShowPage({ showId, mainGenres, isSignedIn, isSubscriber,
           {SHOW_TABS.map((t) => (
             <Link
               key={t.key}
-              href={t.key === 'overview' ? `${base}?tab=overview` : base}
+              href={t.key === 'episodes' ? base : `${base}?tab=${encodeURIComponent(t.key)}`}
               shallow
               scroll={false}
               className={`td-tab${t.key === tab ? ' on' : ''}`}
               aria-current={t.key === tab ? 'page' : undefined}
             >
               {t.label}
+              {t.key === 'screenings' && screeningsLive ? <span className="scn-tab-badge">{screeningsLive}</span> : null}
             </Link>
           ))}
         </nav>
       </div>
       {tab === 'overview' ? (
         <ShowOverview key={showId} showId={showId} />
+      ) : tab === 'screenings' ? (
+        <main id="main-content" className="td-page td-show">
+          <ScreeningsTab key={showId} target={screeningTarget} route={screenings} withHead />
+        </main>
       ) : (
         <div className="td-show-room">
           <ShowControlRoom

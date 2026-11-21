@@ -4,11 +4,20 @@ import ProductionShell, { shellProps } from '../../../components/productions/Pro
 import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getDistribution } from '../../../lib/distribution';
-import { FESTIVAL_STATUS, SCREENER_DAYS } from '../../../lib/distributionRules';
+import { FESTIVAL_STATUS } from '../../../lib/distributionRules';
+import { SCREENING_WORDS, screeningText, screeningsList } from '../../../lib/screeningRules';
+import { EndedCard, OpenCard } from '../../../components/creator/screenings/ScreeningsTab';
+import { webText } from '../../../components/creator/screenings/ScreeningBits';
 
 // A production's distribution page (migration 109), for its owner: the
 // checklist that reads the rest of the site, the festival tracker, the
-// premiere / press kit / trailer, partners who distribute, and screeners.
+// premiere / press kit / trailer, partners who distribute, and the private
+// screenings. Since migration 128 (2026-11-21) screening links are made on
+// the title's own page (its Private screenings tab): the card here lists
+// the released title's links and the production's older screeners,
+// read-only with where each stands, Open › for the ones the viewer runs,
+// and a way to the tab (getDistribution's `screenings: { links, href,
+// canManage }`).
 export async function getServerSideProps({ req, res, params }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
@@ -35,6 +44,11 @@ export default function DistributionPage(props) {
   const [error, setError] = useState(null);
   const [note, setNote] = useState(null);
   useEffect(() => { setData(initial); }, [initial]);
+  // "2 live": a link's state follows the clock, so it is worked out once
+  // the page is in the browser.
+  const links = data && data.screenings && Array.isArray(data.screenings.links) ? data.screenings.links : null;
+  const [liveBadge, setLiveBadge] = useState('');
+  useEffect(() => { setLiveBadge(links ? screeningsList(links, Date.now()).tabBadge : ''); }, [links]);
 
   async function api(url, body, method = 'PATCH') {
     setBusy(true);
@@ -62,7 +76,8 @@ export default function DistributionPage(props) {
     );
   }
 
-  const { production: p, release, festivals, checklist: c, screeners, episodes, partners } = data;
+  const { production: p, release, festivals, checklist: c, partners } = data;
+  const screenings = data.screenings || { links: [], href: null, canManage: false };
 
   return (
     <ProductionShell title={`${p.title} · Distribution`} {...props}>
@@ -71,7 +86,7 @@ export default function DistributionPage(props) {
         <div>
           <span className="crew-eyebrow">Distribution</span>
           <h1>{p.title}</h1>
-          <p>Where it goes after the cut: Studio Tapa, Buy to own, early screenings, festivals, press — and private screeners for the people who decide.</p>
+          <p>Where it goes after the cut: Studio Tapa, Buy to own, early screenings, festivals, press — and private screenings for the people who decide.</p>
         </div>
         <Link href={`/productions/${p.id}`} className="crew-btn">Back to the production</Link>
       </div>
@@ -91,7 +106,7 @@ export default function DistributionPage(props) {
               <li className={c.trailer ? 'on' : ''}><b>Trailer</b><span>{c.trailer ? <a href={data.trailerUrl} target="_blank" rel="noopener noreferrer">Linked ↗</a> : 'Add a trailer link below.'}</span></li>
               <li className={c.pressKit ? 'on' : ''}><b>Press kit</b><span>{c.pressKit ? <a href={data.pressKitUrl} target="_blank" rel="noopener noreferrer">Linked ↗</a> : 'Stills, logline, bios, poster — one folder link.'}</span></li>
               <li className={c.shotHere ? 'on' : ''}><b>Shot here</b><span>{c.shotHere ? `${c.shotHere} ${c.shotHere === 1 ? 'place credits' : 'places credit'} the title.` : 'Credit the places you shot at from their listings; the hosts confirm.'}</span></li>
-              <li className={c.screenersLive ? 'on' : ''}><b>Screeners</b><span>{c.screenersLive ? `${c.screenersLive} live.` : 'Make a private link for programmers and press below.'}</span></li>
+              <li className={liveBadge ? 'on' : ''}><b>{SCREENING_WORDS.tab}</b><span>{liveBadge ? `${liveBadge}.` : screenings.href && screenings.canManage ? <Link href={screenings.href}>{SCREENING_WORDS.distributionLine}</Link> : SCREENING_WORDS.distributionLine}</span></li>
             </ul>
           </section>
 
@@ -115,8 +130,8 @@ export default function DistributionPage(props) {
           {/* ---- festival tracker ---- */}
           <Festivals festivals={festivals} busy={busy} onSave={(list) => api(`/api/productions/${p.id}/distribution`, { festivals: list })} />
 
-          {/* ---- screeners ---- */}
-          <Screeners productionId={p.id} screeners={screeners} episodes={episodes} busy={busy} api={api} onChanged={() => api(`/api/productions/${p.id}/distribution`, {}, 'GET').then((r) => r && setData(r))} />
+          {/* ---- private screenings (read-only; made on the title's own page) ---- */}
+          <PrivateScreenings screenings={screenings} release={release} canReach={Boolean(props.isCreator || props.isAdmin)} />
         </div>
       </div>
     </ProductionShell>
@@ -205,70 +220,37 @@ function Festivals({ festivals, busy, onSave }) {
   );
 }
 
-function Screeners({ productionId, screeners, episodes, busy, api, onChanged }) {
-  const [form, setForm] = useState({ episodeId: episodes[0] ? episodes[0].id : '', label: '', recipientEmail: '', days: 14, maxViews: 10 });
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(null);
-  const [created, setCreated] = useState(null);
-  const set = (patch) => setForm((f) => ({ ...f, ...patch }));
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-
-  async function create(e) {
-    e.preventDefault();
-    const r = await api(`/api/productions/${productionId}/screeners`, form, 'POST');
-    if (r && r.screener) { setCreated(r.screener); setOpen(false); set({ label: '', recipientEmail: '' }); onChanged(); }
-  }
-  async function revoke(s) {
-    if (!window.confirm(`Take down the screener for ${s.label}? The link stops working right away.`)) return;
-    const r = await api(`/api/productions/${productionId}/screeners`, { screenerId: s.id }, 'DELETE');
-    if (r) onChanged();
-  }
-  function copy(s) {
-    navigator.clipboard.writeText(`${origin}${s.path}`).then(() => { setCopied(s.id); setTimeout(() => setCopied(null), 1500); }).catch(() => {});
-  }
-
+// The released title's screening links and the production's older
+// screeners, read-only: where each stands, Open › for the links the viewer
+// runs (an older screener made here is its production owner's) when they
+// can reach a link's page (creators and admins), and the way to the
+// title's Private screenings tab.
+function PrivateScreenings({ screenings, release, canReach }) {
+  const [now, setNow] = useState(null);
+  useEffect(() => { setNow(Date.now()); }, [screenings]);
+  const links = Array.isArray(screenings.links) ? screenings.links : [];
+  const byId = new Map(links.map((l) => [l.id, l]));
+  const list = now ? screeningsList(links, now) : null;
+  const canOpen = (id) => {
+    const l = byId.get(id);
+    return Boolean(canReach && l && (screenings.canManage || (l.legacy && l.productionId)));
+  };
   return (
     <section className="crew-panel prod-section">
-      <div className="crew-rhead"><h2 className="cc-h2">Screeners · {screeners.filter((s) => s.state === 'live').length} live</h2>{episodes.length > 0 && !open && <button type="button" className="crew-btn sm primary" onClick={() => setOpen(true)}>+ New screener</button>}</div>
-      <p className="crew-muted" style={{ margin: 0 }}>A private link to the video for one person or committee: labelled with who it’s for, watermarked with that on the picture, expiring, capped on opens, logged, revocable. No account needed on their side.</p>
-      {episodes.length === 0 && <div className="crew-mono">Upload the title (even before it’s approved) and it shows here to screen.</div>}
-      {created && (
-        <div className="dist-created">
-          <span className="crew-eyebrow">Ready to send</span>
-          <code className="res-code-val">{origin}{created.path}</code>
-          <div className="crew-actions"><button type="button" className="crew-btn sm" onClick={() => copy(created)}>{copied === created.id ? 'Copied' : 'Copy link'}</button><a href={`mailto:${created.recipientEmail || ''}?subject=${encodeURIComponent('Private screener')}&body=${encodeURIComponent(`Here’s a private screener link, good until ${new Date(created.expiresAt).toLocaleDateString()}. Please don’t forward it.\n\n${origin}${created.path}`)}`} className="crew-btn sm">Email it</a><button type="button" className="crew-btn sm ghost" onClick={() => setCreated(null)}>Done</button></div>
+      <div className="crew-rhead"><h2 className="cc-h2">{SCREENING_WORDS.tab}{list && list.tabBadge ? ` · ${list.tabBadge}` : ''}</h2></div>
+      <p className="crew-muted" style={{ margin: 0 }}>{SCREENING_WORDS.distributionLine}</p>
+      {list && links.length === 0 && (
+        <p className="crew-muted" style={{ margin: 0 }}>{release ? webText('distributionNone', { title: release.title }) : webText('distributionNoRelease')}</p>
+      )}
+      {list && links.length > 0 && (
+        <div className="scn-dist">
+          {list.open.map((card) => <OpenCard key={card.id} card={card} link={byId.get(card.id)} readOnly canOpen={canOpen(card.id)} />)}
+          {list.ended.map((card) => <EndedCard key={card.id} card={card} readOnly canOpen={canOpen(card.id)} />)}
         </div>
       )}
-      {open && (
-        <form className="prod-add" onSubmit={create}>
-          <label className="crew-field"><span>Which cut</span>
-            <select className="crew-select" value={form.episodeId} onChange={(e) => set({ episodeId: e.target.value })}>{episodes.map((ep) => <option key={ep.id} value={ep.id}>{ep.title}{ep.status === 'pending' ? ' (in review)' : ''}</option>)}</select>
-          </label>
-          <div className="crew-row2">
-            <label className="crew-field"><span>For</span><input type="text" className="crew-input" value={form.label} onChange={(e) => set({ label: e.target.value })} placeholder="Sundance programmers" maxLength={80} required /></label>
-            <label className="crew-field"><span>Their email (optional)</span><input type="email" className="crew-input" value={form.recipientEmail} onChange={(e) => set({ recipientEmail: e.target.value })} placeholder="goes on the watermark" /></label>
-          </div>
-          <div className="crew-row2">
-            <label className="crew-field"><span>Good for</span><select className="crew-select" value={form.days} onChange={(e) => set({ days: Number(e.target.value) })}>{SCREENER_DAYS.map((d) => <option key={d} value={d}>{d} days</option>)}</select></label>
-            <label className="crew-field"><span>Opens allowed</span><input type="number" className="crew-input" min="1" max="500" value={form.maxViews} onChange={(e) => set({ maxViews: e.target.value })} /></label>
-          </div>
-          <div className="crew-actions"><button type="submit" className="crew-btn sm primary" disabled={busy || !form.episodeId || form.label.trim().length < 2}>Make the link</button><button type="button" className="crew-btn sm ghost" onClick={() => setOpen(false)}>Cancel</button></div>
-        </form>
+      {release && screenings.href && screenings.canManage && canReach && (
+        <div className="crew-actions"><Link href={screenings.href} className="crew-btn sm primary">{screeningText('distributionGo', { title: release.title })}</Link></div>
       )}
-      <div className="dist-screeners">
-        {screeners.map((s) => (
-          <div key={s.id} className={`dist-screener st-${s.state.replace(' ', '-')}`}>
-            <div style={{ minWidth: 0 }}>
-              <div className="dist-screener-label">{s.label}{s.recipientEmail && <small> · {s.recipientEmail}</small>}</div>
-              <div className="crew-mono">{s.state} · {s.views}/{s.maxViews} opens · until {new Date(s.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{s.lastViewedAt ? ` · last opened ${new Date(s.lastViewedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}</div>
-            </div>
-            <div className="crew-actions">
-              {s.state === 'live' && <button type="button" className="crew-btn sm" onClick={() => copy(s)}>{copied === s.id ? 'Copied' : 'Copy link'}</button>}
-              {s.state === 'live' && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => revoke(s)}>Take down</button>}
-            </div>
-          </div>
-        ))}
-      </div>
     </section>
   );
 }
