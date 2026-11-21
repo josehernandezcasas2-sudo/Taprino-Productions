@@ -215,12 +215,15 @@ export default function ScreenerPage({ page, token, renderedAt }) {
 
   // The beat: every 20 seconds while a visit is open.
   useEffect(() => {
-    if (!watch) return undefined;
+    // A stopped visit (ended, another screen, not where it works…) sends no
+    // more beats, and its place stays where it stopped.
+    if (!watch || stop) return undefined;
     let stopped = false;
     const beat = async () => {
       const w = watchRef.current;
       if (!w || stopped) return;
       const v = playerRef.current ? playerRef.current.querySelector('video.tp-video') : null;
+      if (!v) return;
       const position = v ? Math.floor(v.currentTime || 0) : 0;
       const duration = v && Number.isFinite(v.duration) ? Math.floor(v.duration) : 0;
       const playing = Boolean(v && !v.paused && !v.ended);
@@ -240,7 +243,7 @@ export default function ScreenerPage({ page, token, renderedAt }) {
       clearInterval(t);
       document.removeEventListener('visibilitychange', onHide);
     };
-  }, [watch && watch.session, watch && watch.current && watch.current.id, token, halt]);
+  }, [watch && watch.session, watch && watch.current && watch.current.id, token, halt, Boolean(stop)]);
 
   const start = (data) => {
     const kept = { session: data.session, viewer: data.viewer, watermark: data.watermark, link: data.link, episodes: data.episodes, episodeId: data.current.id, position: 0 };

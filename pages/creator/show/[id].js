@@ -67,13 +67,16 @@ export default function ShowPage({ showId, mainGenres, isSignedIn, isSubscriber,
   const screeningTarget = useMemo(() => ({ type: 'series', id: showId }), [showId]);
   const screenings = useScreeningsList(screeningTarget);
   const screeningsLive = screeningsBadge(screenings);
+  // Vertical shows get no private screening links (the app hides the tab too).
+  const vertical = screenings.state === 'ok' && screenings.data && screenings.data.target && screenings.data.target.contentType === 'vertical';
+  const tabs = vertical ? SHOW_TABS.filter((t) => t.key !== 'screenings') : SHOW_TABS;
   return (
     <>
       <HeaderNav mainGenres={mainGenres} isSignedIn={isSignedIn} isSubscriber={isSubscriber} email={email} isAdmin={isAdmin} isCreator={isCreator} />
       <div className="td-show-top">
         <Link href="/creator/dashboard" className="acct-back td-back"><BackArrowIcon size={14} /> Dashboard</Link>
         <nav className="td-tabs td-show-tabs" aria-label="This show">
-          {SHOW_TABS.map((t) => (
+          {tabs.map((t) => (
             <Link
               key={t.key}
               href={t.key === 'episodes' ? base : `${base}?tab=${encodeURIComponent(t.key)}`}
@@ -90,7 +93,7 @@ export default function ShowPage({ showId, mainGenres, isSignedIn, isSubscriber,
       </div>
       {tab === 'overview' ? (
         <ShowOverview key={showId} showId={showId} />
-      ) : tab === 'screenings' ? (
+      ) : tab === 'screenings' && !vertical ? (
         <main id="main-content" className="td-page td-show">
           <ScreeningsTab key={showId} target={screeningTarget} route={screenings} withHead />
         </main>

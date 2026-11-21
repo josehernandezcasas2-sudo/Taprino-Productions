@@ -978,6 +978,7 @@ export const VIEWER_WORDS = {
   session: { title: 'Open it again', line: 'This visit has run out. Type the password again to keep watching.' },
   password_changed: { title: 'The password changed', line: '{owner} set a new password. Type it to keep watching.' },
   suspended: { title: 'Not available', line: 'This account can’t play anything right now.' },
+  busy: { title: 'Busy right now', line: 'Lots of people are opening this at once. Try again in a moment.' },
   watch: 'Watch',
   password_label: 'Password',
   noPasswordLine: 'This older screener has no password.',
@@ -1190,6 +1191,14 @@ export const SCREENING_WORDS_SERVER = {
   badAction: 'Say what to change.',
   noEpisode: 'That episode isn’t on this link.',
   ownerFallback: 'the filmmaker',
+  checkFailed: 'Couldn’t check who runs this title just now. Try again in a minute.',
+  vertical: 'Vertical titles don’t get private screening links.',
+  legacyPassword: 'Only whoever runs this title can give this older screener a password.',
+  opensFloor: 'It’s been opened {n} times already, so the total can’t go under that.',
+  passwordShort: 'The password needs 8 characters or more.',
+  passwordSpaces: 'Leave spaces out of the password.',
+  member: 'a Studio Tapa member',
+  yesterday: 'Yesterday',
   // The viewer's page (/screener/<token>) beside VIEWER_WORDS.
   viewer: {
     forLabel: 'For {label}',

@@ -326,17 +326,18 @@ await runCheck('private-screenings', async () => {
     section('A show’s visit: moving between episodes uses no other open');
     r = await open(S.token);
     const vs = r.json || {};
+    const gs = guest(cookieOf(r));
     ok('a season link: the season’s episodes, in order, the first playing', r.status === 200 && vs.episodes && vs.episodes.map((e) => e.id).join(',') === [ID.s1e1, ID.s1e2].join(',') && vs.current.id === ID.s1e1 && vs.episodes[0].code === 'S1 E1', r.text.slice(0, 300));
-    r = await play(S.token, vs.session, ID.s1e2);
+    r = await play(S.token, vs.session, ID.s1e2, gs);
     ok('…the next episode: an address, still one open', r.status === 200 && r.json.current.id === ID.s1e2 && linkRow(S.id).views === 1, r.text.slice(0, 200));
-    r = await play(S.token, vs.session, ID.s2e1);
+    r = await play(S.token, vs.session, ID.s2e1, gs);
     ok('…an episode not on the link: 404', r.status === 404, r.status);
-    r = await beat(S.token, vs.session, { episodeId: ID.s1e2, position: 300, duration: 1440, playing: true });
+    r = await beat(S.token, vs.session, { episodeId: ID.s1e2, position: 300, duration: 1440, playing: true, who: gs });
     ok('…its beat counts the episode now playing', r.json.ok === true && JSON.stringify(rows(`select watched from public.screener_views where screener_id = ${q(S.id)}`)[0].watched) === JSON.stringify({ [ID.s1e2]: [300, 1440] }));
     pg = await pageOf(S.token);
     ok('…the page: kind show, two episodes', pg.page && pg.page.kind === 'show' && pg.page.episodesCount === 2, pg.page);
     sql(`update public.screener_views set viewed_at = now() - interval '13 hours' where screener_id = ${q(S.id)}`);
-    r = await play(S.token, vs.session, ID.s1e1);
+    r = await play(S.token, vs.session, ID.s1e1, gs);
     ok('a visit past its twelve hours: 401 session', r.status === 401 && r.json.reason === 'session', r.status);
 
     section('Country, signed in, named');
